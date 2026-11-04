@@ -3,7 +3,6 @@ package cn.xfangfang.biliduo.ui.settings
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
-import android.os.Build
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -17,7 +16,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -32,15 +30,12 @@ import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Language
-import androidx.compose.material.icons.outlined.MailOutline
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material.icons.outlined.Subtitles
 import androidx.compose.material.icons.outlined.Wifi
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -66,10 +61,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -81,12 +73,10 @@ import cn.xfangfang.biliduo.duo.DuoSessionViewModel
 import cn.xfangfang.biliduo.ui.common.DuoConfirmOverlay
 import cn.xfangfang.biliduo.ui.common.DuoPageHeader
 import cn.xfangfang.biliduo.ui.common.DuoPalette
-import cn.xfangfang.biliduo.ui.common.DuoPillButton
 import cn.xfangfang.biliduo.ui.duo.duoClickable
 import cn.xfangfang.biliduo.ui.top.TopGlyph
 import cn.xfangfang.biliduo.ui.top.TopPanelUi
 import cn.xfangfang.biliduo.ui.duo.duoFocusRing
-import cn.xfangfang.biliduo.ui.duo.duoTextFieldNavigation
 import cn.xfangfang.biliduo.ui.player.PlayerUiState
 import cn.xfangfang.biliduo.ui.player.PlayerViewModel
 import kotlinx.coroutines.delay
@@ -123,21 +113,14 @@ fun SettingsScreen(
     playerViewModel: PlayerViewModel? = null,
 ) {
     val context = LocalContext.current
-    val keyboard = LocalSoftwareKeyboardController.current
     val scope = rememberCoroutineScope()
     var category by remember { mutableIntStateOf(0) }
     var wifiOnlyPlayback by remember { mutableStateOf(AppSettings.wifiOnlyPlayback) }
     var wifiOnlyDownload by remember { mutableStateOf(AppSettings.wifiOnlyDownload) }
     var confirmClearDownloads by remember { mutableStateOf(false) }
-    var feedbackVisible by remember { mutableStateOf(false) }
-    var feedbackType by remember { mutableStateOf(FeedbackType.BUG) }
-    var feedbackContent by remember { mutableStateOf("") }
-    var feedbackContact by remember { mutableStateOf("") }
     var storageTick by remember { mutableIntStateOf(0) }
     val clearRowFocus = remember { FocusRequester() }
     val firstRowFocus = remember { FocusRequester() }
-    val feedbackContentFocus = remember { FocusRequester() }
-    val feedbackRowFocus = remember { FocusRequester() }
 
     val playerUiFlow = playerViewModel?.uiState
     val playerUi: PlayerUiState? = if (playerUiFlow != null) {
@@ -169,7 +152,7 @@ fun SettingsScreen(
             2 -> Triple(TopGlyph.THEME, 0xFFB18CFF, "深色界面为双屏掌机准备。")
             3 -> Triple(TopGlyph.DANMAKU, 0xFFFFB35C, "弹幕的密度、速度与屏蔽词。")
             4 -> Triple(TopGlyph.STORAGE, 0xFF6FD3A2, "本地缓存与已完成下载。")
-            5 -> Triple(TopGlyph.ABOUT, 0xFFA9A9B4, "版本、许可证与用户反馈。")
+            5 -> Triple(TopGlyph.ABOUT, 0xFFA9A9B4, "版本、许可证与开源仓库。")
             else -> Triple(TopGlyph.PLAY, 0xFFFB7299, "清晰度、倍速与后台行为。")
         }
         val wifi = AppSettings.isWifiConnected(context)
@@ -202,14 +185,6 @@ fun SettingsScreen(
         delay(120)
         runCatching { firstRowFocus.requestFocus() }
     }
-    LaunchedEffect(feedbackVisible) {
-        if (feedbackVisible) {
-            delay(100)
-            runCatching { feedbackContentFocus.requestFocus() }
-        } else {
-            keyboard?.hide()
-        }
-    }
     fun closeClearDownloads() {
         confirmClearDownloads = false
         scope.launch {
@@ -218,56 +193,18 @@ fun SettingsScreen(
         }
     }
 
-    fun closeFeedback() {
-        feedbackVisible = false
-        keyboard?.hide()
-        scope.launch {
-            delay(120)
-            runCatching { feedbackRowFocus.requestFocus() }
-        }
-    }
-
-    LaunchedEffect(feedbackVisible, confirmClearDownloads, session) {
-        when {
-            feedbackVisible -> session?.setBackInterceptor {
-                closeFeedback()
-                true
-            }
-            confirmClearDownloads -> session?.setBackInterceptor {
+    LaunchedEffect(confirmClearDownloads, session) {
+        if (confirmClearDownloads) {
+            session?.setBackInterceptor {
                 closeClearDownloads()
                 true
             }
-            else -> session?.setBackInterceptor(null)
+        } else {
+            session?.setBackInterceptor(null)
         }
     }
     DisposableEffect(session) {
         onDispose { session?.setBackInterceptor(null) }
-    }
-
-    fun sendFeedback() {
-        val intent = Intent(Intent.ACTION_SENDTO, Uri.parse(FeedbackEmail.mailtoUri())).apply {
-            // The settings UI lives in a Presentation, not an Activity; without
-            // NEW_TASK Android throws AndroidRuntimeException on startActivity.
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            putExtra(Intent.EXTRA_EMAIL, arrayOf(FeedbackEmail.RECIPIENT))
-            putExtra(Intent.EXTRA_SUBJECT, FeedbackEmail.subject(feedbackType, BuildConfig.VERSION_NAME))
-            putExtra(
-                Intent.EXTRA_TEXT,
-                FeedbackEmail.body(
-                    content = feedbackContent,
-                    contact = feedbackContact,
-                    version = BuildConfig.VERSION_NAME,
-                    androidVersion = Build.VERSION.RELEASE,
-                    deviceModel = Build.MODEL,
-                ),
-            )
-        }
-        try {
-            context.startActivity(intent)
-            feedbackVisible = false
-        } catch (_: ActivityNotFoundException) {
-            Toast.makeText(context, "未找到邮件应用，无法发送反馈", Toast.LENGTH_SHORT).show()
-        }
     }
 
     fun openRepository(url: String = REPOSITORY_URL) {
@@ -357,13 +294,6 @@ fun SettingsScreen(
                     )
                     else -> AboutSettings(
                         firstFocus = firstRowFocus,
-                        feedbackFocus = feedbackRowFocus,
-                        onFeedback = {
-                            feedbackType = FeedbackType.BUG
-                            feedbackContent = ""
-                            feedbackContact = ""
-                            feedbackVisible = true
-                        },
                         onOpenRepository = { openRepository() },
                         onOpenIssues = { openRepository(ISSUES_URL) },
                     )
@@ -394,21 +324,6 @@ fun SettingsScreen(
         )
     }
 
-    if (feedbackVisible) {
-        FeedbackOverlay(
-            type = feedbackType,
-            content = feedbackContent,
-            contact = feedbackContact,
-            contentFocus = feedbackContentFocus,
-            onType = { feedbackType = it },
-            onContent = { feedbackContent = it },
-            onContact = { feedbackContact = it },
-            onSend = { sendFeedback() },
-            onCancel = {
-                closeFeedback()
-            },
-        )
-    }
 }
 
 @Composable
@@ -596,8 +511,6 @@ private fun StorageSettings(
 @Composable
 private fun AboutSettings(
     firstFocus: FocusRequester,
-    feedbackFocus: FocusRequester,
-    onFeedback: () -> Unit,
     onOpenRepository: () -> Unit,
     onOpenIssues: () -> Unit,
 ) {
@@ -619,13 +532,6 @@ private fun AboutSettings(
         subtitle = "问题反馈与功能建议",
         icon = Icons.Outlined.Language,
         onClick = onOpenIssues,
-    )
-    SettingsActionRow(
-        title = "用户反馈",
-        subtitle = "Bug 反馈与功能建议",
-        icon = Icons.Outlined.MailOutline,
-        focusRequester = feedbackFocus,
-        onClick = onFeedback,
     )
     Spacer(Modifier.height(10.dp))
     Text(
@@ -818,129 +724,6 @@ private fun SwitchVisual(checked: Boolean) {
         )
     }
 }
-
-@Composable
-private fun FeedbackOverlay(
-    type: FeedbackType,
-    content: String,
-    contact: String,
-    contentFocus: FocusRequester,
-    onType: (FeedbackType) -> Unit,
-    onContent: (String) -> Unit,
-    onContact: (String) -> Unit,
-    onSend: () -> Unit,
-    onCancel: () -> Unit,
-) {
-    val keyboard = LocalSoftwareKeyboardController.current
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(DuoPalette.Scrim),
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .clickable(
-                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                    indication = null,
-                    onClick = onCancel,
-                ),
-        )
-        Column(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = 12.dp)
-                .width(430.dp)
-                .clip(RoundedCornerShape(14.dp))
-                .background(DuoPalette.SurfaceHigh)
-                .border(1.dp, DuoPalette.Outline, RoundedCornerShape(14.dp))
-                .clickable(
-                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                    indication = null,
-                    onClick = {},
-                )
-                .padding(14.dp),
-        ) {
-            Text("用户反馈", color = DuoPalette.Text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FeedbackType.entries.forEach { entry ->
-                    DuoPillButton(
-                        text = entry.label,
-                        primary = entry == type,
-                        onClick = { onType(entry) },
-                    )
-                }
-            }
-            Spacer(Modifier.height(8.dp))
-            OutlinedTextField(
-                value = content,
-                onValueChange = onContent,
-                label = { Text("反馈内容", fontSize = 11.sp) },
-                textStyle = TextStyle(color = DuoPalette.Text, fontSize = 12.sp),
-                minLines = 3,
-                maxLines = 4,
-                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                    imeAction = ImeAction.Default,
-                ),
-                colors = feedbackFieldColors(),
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 100.dp)
-                    .focusRequester(contentFocus),
-            )
-            Spacer(Modifier.height(8.dp))
-            OutlinedTextField(
-                value = contact,
-                onValueChange = onContact,
-                label = { Text("联系方式（选填）", fontSize = 11.sp) },
-                textStyle = TextStyle(color = DuoPalette.Text, fontSize = 12.sp),
-                singleLine = true,
-                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                    imeAction = ImeAction.Done,
-                ),
-                colors = feedbackFieldColors(),
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.fillMaxWidth().duoTextFieldNavigation(),
-            )
-            Spacer(Modifier.height(10.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                DuoPillButton(
-                    text = "取消",
-                    modifier = Modifier.weight(1f),
-                    onClick = {
-                        keyboard?.hide()
-                        onCancel()
-                    },
-                )
-                DuoPillButton(
-                    text = "打开邮件发送",
-                    primary = true,
-                    enabled = FeedbackEmail.isValid(content),
-                    modifier = Modifier.weight(1f),
-                    onClick = {
-                        keyboard?.hide()
-                        onSend()
-                    },
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun feedbackFieldColors() = OutlinedTextFieldDefaults.colors(
-    focusedTextColor = DuoPalette.Text,
-    unfocusedTextColor = DuoPalette.Text,
-    focusedContainerColor = DuoPalette.Surface,
-    unfocusedContainerColor = DuoPalette.Surface,
-    focusedBorderColor = DuoPalette.Pink,
-    unfocusedBorderColor = DuoPalette.Outline,
-    focusedLabelColor = DuoPalette.Pink,
-    unfocusedLabelColor = DuoPalette.Secondary,
-    cursorColor = DuoPalette.Pink,
-)
 
 private fun nextValue(current: Float, options: List<Float>): Float {
     val index = options.indexOfFirst { kotlin.math.abs(it - current) < 0.01f }
