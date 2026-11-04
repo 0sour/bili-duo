@@ -262,9 +262,11 @@ docs/
 - [docs/bili-duo-research.md](docs/bili-duo-research.md) — 选型、竞品与双屏限制
 - [docs/research/2026-11-03-ui-research.md](docs/research/2026-11-03-ui-research.md) — UI 调研
 - [docs/ui/mockups/](docs/ui/mockups/) — 1280×960 视觉原型
-- [docs/ui/prototype/](docs/ui/prototype/) — 可点击交互原型（键盘模拟手柄）
+- [docs/ui/prototype/](docs/ui/prototype/) — 早期可点击交互原型（键盘模拟手柄）
 
-设计稿与实现可能有细微差异，以本文「当前状态」和实际代码为准。
+> `mockups/` 和 `prototype/` 保留了早期的 Y 模式切换设计；该设计已废弃，
+> 当前键位以 [`docs/ui/INPUT_AND_FOCUS.md`](docs/ui/INPUT_AND_FOCUS.md) 为准。
+> 设计稿与实现可能有细微差异，以本文「当前状态」和实际代码为准。
 
 ---
 
