@@ -1,0 +1,464 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>动态图文 · 下屏浏览三方案</title>
+<style>
+html,body{margin:0;background:#17181b;color:#f2f2f4;font-family:"Noto Sans SC","Microsoft YaHei",system-ui,sans-serif;}
+body{padding:16px 18px 24px;} #standalone-root{width:min(1280px,100%);}
+.local-switch{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px;}
+.local-switch button{font:inherit;font-size:12px;color:#a6a6ae;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:6px 12px;cursor:pointer;}
+.local-switch button.on{color:#1a0710;background:#fb7299;border-color:#fb7299;}
+#standalone-root > .viz-carousel > section{display:none !important;}
+#standalone-root > .viz-carousel > section.active{display:block !important;}
+
+  i[data-lucide] { font-style: normal; line-height: 1; display: inline-flex; align-items: center; justify-content: center; }
+  i[data-lucide="home"]::before { content: "⌂"; }
+  i[data-lucide="layers"]::before { content: "▤"; }
+  i[data-lucide="search"]::before { content: "⌕"; }
+  i[data-lucide="user"]::before { content: "◉"; }
+  i[data-lucide="refresh-cw"]::before { content: "↻"; }
+  i[data-lucide="arrow-left"]::before { content: "←"; }
+  i[data-lucide="chevron-left"]::before { content: "‹"; }
+  i[data-lucide="chevron-right"]::before { content: "›"; }
+  i[data-lucide="x"]::before { content: "×"; }
+</style></head><body>
+<div class="local-switch" role="tablist" aria-label="设计方案"><button data-tab="0">沉浸详情</button><button data-tab="1">内联展开</button><button data-tab="2">图片画廊</button></div>
+<div id="standalone-root">
+<div id="dyn-reader-variants" class="viz-carousel" aria-label="动态图文浏览方案">
+  <section data-variant="沉浸详情" aria-label="沉浸式动态详情页">
+    <div class="duo-stage" id="v1-stage">
+      <div class="duo-shell">
+        <aside class="duo-rail">
+          <div class="duo-logo"><span></span><span></span><b></b></div>
+          <div class="rail-item"><i data-lucide="home"></i><em>首页</em></div>
+          <div class="rail-item active"><i data-lucide="layers"></i><em>动态</em></div>
+          <div class="rail-item"><i data-lucide="search"></i><em>搜索</em></div>
+          <div class="rail-item"><i data-lucide="user"></i><em>个人</em></div>
+        </aside>
+        <main class="duo-main">
+          <header class="duo-head">
+            <strong>动态</strong>
+            <div class="chips">
+              <span class="chip on">全部</span><span class="chip">视频</span><span class="chip">图文</span>
+            </div>
+            <span class="refresh"><i data-lucide="refresh-cw"></i>刷新</span>
+          </header>
+          <div class="duo-feed">
+            <article class="dyn-card focused" id="v1-card">
+              <div class="author">
+                <span class="avatar av-a">甜</span>
+                <div class="who"><b>甜夕sweet</b><small>8分钟前 · 图文</small></div>
+                <span class="kind">图文</span>
+              </div>
+              <p class="body-text">今天出去做饼干噜（是七夕的礼物哦）~做到现在还没做完[恶欲之花动态表情包_挠头]。最近每天都有好多小奖状贴啵啵间，感觉被吸夕猫的爱意狠狠包围噜。</p>
+              <div class="thumbs">
+                <span class="pic p1"><em>饼干的下午</em></span>
+                <span class="pic p2"><em>礼物包装</em></span>
+                <span class="pic p3"><em>桌面一角</em></span>
+              </div>
+              <div class="stat"><span>评论 0</span><span>转发 0</span><span>赞 18</span><b>按 A 阅读全文</b></div>
+            </article>
+            <article class="dyn-card small-card">
+              <div class="author"><span class="avatar av-b">明</span><div class="who"><b>明日方舟终末地</b><small>2天前 · 图文</small></div></div>
+              <p class="body-text">互动抽奖 #明日方舟终末地# #丹青渡# 关注并转发此动态，我们将于12月1日抽取10位管理员送出角色亚克力立牌。</p>
+            </article>
+          </div>
+        </main>
+        <footer class="duo-mode"><span class="dot"></span>浏览 · 手柄/触屏<em>B 返回</em><em>A 确认</em></footer>
+      </div>
+
+      <div class="detail-layer" id="v1-detail">
+        <header class="detail-head">
+          <button class="back-btn" id="v1-back" aria-label="返回动态列表"><i data-lucide="arrow-left"></i></button>
+          <div class="detail-title"><b>动态详情</b><small>甜夕sweet · 8分钟前</small></div>
+          <span class="detail-kind">图文</span>
+        </header>
+        <div class="detail-body">
+          <div class="detail-text">
+            <div class="author">
+              <span class="avatar av-a">甜</span>
+              <div class="who"><b>甜夕sweet</b><small>8分钟前 · 图文</small></div>
+            </div>
+            <p>今天出去做饼干噜（是七夕的礼物哦）~做到现在还没做完[恶欲之花动态表情包_挠头]。</p>
+            <p>最近每天都有好多小奖状贴啵啵间，感觉被吸夕猫的爱意狠狠包围噜。感谢@鲜榨甜橙一杯 姐姐的咩咩，真的好可爱；感谢@烙弓 宝贝的咩咩，是好久不见的老朋友啦；感谢@最爱夕宝的六月猪 @花应好sweet 宝贝的心有蔷薇。</p>
+            <div class="detail-actions"><span class="pill">查看原图</span><span class="hint">A 打开图片 · B 返回列表</span></div>
+          </div>
+          <div class="detail-pics">
+            <div class="big-pic p1 focused-pic"><span>1 / 4</span></div>
+            <div class="pic-row"><span class="pic p2"></span><span class="pic p3"></span><span class="pic p4"><em>+1</em></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section data-variant="内联展开" aria-label="动态卡片列表内展开" hidden>
+    <div class="duo-stage" id="v2-stage">
+      <div class="duo-shell">
+        <aside class="duo-rail">
+          <div class="duo-logo"><span></span><span></span><b></b></div>
+          <div class="rail-item"><i data-lucide="home"></i><em>首页</em></div>
+          <div class="rail-item active"><i data-lucide="layers"></i><em>动态</em></div>
+          <div class="rail-item"><i data-lucide="search"></i><em>搜索</em></div>
+          <div class="rail-item"><i data-lucide="user"></i><em>个人</em></div>
+        </aside>
+        <main class="duo-main">
+          <header class="duo-head">
+            <strong>动态</strong>
+            <div class="chips"><span class="chip on">全部</span><span class="chip">视频</span><span class="chip">图文</span></div>
+            <span class="refresh"><i data-lucide="refresh-cw"></i>刷新</span>
+          </header>
+          <div class="duo-feed">
+            <article class="dyn-card focused expandable is-expanded" id="v2-card">
+              <div class="author">
+                <span class="avatar av-a">甜</span>
+                <div class="who"><b>甜夕sweet</b><small>8分钟前 · 图文</small></div>
+                <span class="kind">图文</span>
+              </div>
+              <p class="body-text expand-text">今天出去做饼干噜（是七夕的礼物哦）~做到现在还没做完[恶欲之花动态表情包_挠头]。最近每天都有好多小奖状贴啵啵间，感觉被吸夕猫的爱意狠狠包围噜。感谢@鲜榨甜橙一杯 姐姐的咩咩，真的好可爱；感谢@烙弓 宝贝的咩咩，是好久不见的老朋友啦；感谢@最爱夕宝的六月猪 @花应好sweet 宝贝的心有蔷薇，谢谢宝贝出新礼物就想到我。</p>
+              <div class="thumbs">
+                <span class="pic p1"><em>饼干的下午</em></span><span class="pic p2"><em>礼物包装</em></span><span class="pic p3"><em>桌面一角</em></span>
+              </div>
+              <div class="stat"><span>评论 0</span><span>转发 0</span><span>赞 18</span><b id="v2-toggle">A 收起全文</b></div>
+            </article>
+            <article class="dyn-card small-card">
+              <div class="author"><span class="avatar av-b">明</span><div class="who"><b>明日方舟终末地</b><small>2天前 · 图文</small></div></div>
+              <p class="body-text">互动抽奖 #明日方舟终末地# #丹青渡# 关注并转发此动态，我们将于12月1日抽取10位管理员送出角色亚克力立牌。</p>
+            </article>
+          </div>
+        </main>
+        <footer class="duo-mode"><span class="dot"></span>浏览 · 手柄/触屏<em>B 返回</em><em>A 确认</em></footer>
+      </div>
+    </div>
+  </section>
+
+  <section data-variant="图片画廊" aria-label="动态图片全屏画廊" hidden>
+    <div class="duo-stage" id="v3-stage">
+      <div class="duo-shell">
+        <aside class="duo-rail">
+          <div class="duo-logo"><span></span><span></span><b></b></div>
+          <div class="rail-item"><i data-lucide="home"></i><em>首页</em></div>
+          <div class="rail-item active"><i data-lucide="layers"></i><em>动态</em></div>
+          <div class="rail-item"><i data-lucide="search"></i><em>搜索</em></div>
+          <div class="rail-item"><i data-lucide="user"></i><em>个人</em></div>
+        </aside>
+        <main class="duo-main">
+          <header class="duo-head">
+            <strong>动态</strong>
+            <div class="chips"><span class="chip on">全部</span><span class="chip">视频</span><span class="chip">图文</span></div>
+            <span class="refresh"><i data-lucide="refresh-cw"></i>刷新</span>
+          </header>
+          <div class="duo-feed">
+            <article class="dyn-card" id="v3-card">
+              <div class="author">
+                <span class="avatar av-a">甜</span>
+                <div class="who"><b>甜夕sweet</b><small>8分钟前 · 图文</small></div>
+                <span class="kind">图文</span>
+              </div>
+              <p class="body-text">今天出去做饼干噜（是七夕的礼物哦）~做到现在还没做完。</p>
+              <div class="thumbs"><span class="pic p1"></span><span class="pic p2"></span><span class="pic p3"><em>+1</em></span></div>
+              <div class="stat"><span>评论 0</span><span>转发 0</span><span>赞 18</span><b>按 A 查看图片</b></div>
+            </article>
+          </div>
+        </main>
+        <footer class="duo-mode"><span class="dot"></span>浏览 · 手柄/触屏<em>B 返回</em><em>A 确认</em></footer>
+      </div>
+
+      <div class="gallery-layer" id="v3-gallery">
+        <header class="gallery-head">
+          <span class="counter" id="v3-counter">1 / 4</span>
+          <div class="gallery-title"><b>甜夕sweet</b><small>今天的饼干与礼物</small></div>
+          <button class="text-toggle" id="v3-text-toggle">纯文字</button>
+          <button class="close-btn" id="v3-close" aria-label="关闭图片"><i data-lucide="x"></i></button>
+        </header>
+        <div class="gallery-main">
+          <button class="nav-arrow left" id="v3-prev" aria-label="上一张"><i data-lucide="chevron-left"></i></button>
+          <div class="gallery-image p1" id="v3-image"><span id="v3-caption">插画 1 · 饼干的下午</span></div>
+          <button class="nav-arrow right" id="v3-next" aria-label="下一张"><i data-lucide="chevron-right"></i></button>
+        </div>
+        <div class="gallery-reader" id="v3-reader">
+          <b>今天出去做饼干噜</b>
+          <p>今天出去做饼干噜（是七夕的礼物哦）~做到现在还没做完[恶欲之花动态表情包_挠头]。最近每天都有好多小奖状贴啵啵间，感觉被吸夕猫的爱意狠狠包围噜。</p>
+        </div>
+        <div class="thumb-strip" id="v3-thumbs">
+          <button class="thumb p1 active" data-index="1" aria-label="第 1 张"></button>
+          <button class="thumb p2" data-index="2" aria-label="第 2 张"></button>
+          <button class="thumb p3" data-index="3" aria-label="第 3 张"></button>
+          <button class="thumb p4" data-index="4" aria-label="第 4 张"></button>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<style>
+  #dyn-reader-variants { width: 100%; }
+  .duo-stage {
+    container-type: size;
+    position: relative;
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    overflow: hidden;
+    background: #0f0f0f;
+    color: #f2f2f4;
+    font-family: "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif;
+    border-radius: 0.8cqw;
+  }
+  .duo-shell {
+    position: absolute; inset: 0; display: grid;
+    grid-template-columns: 10cqw 1fr; grid-template-rows: 1fr 5.8cqh;
+  }
+  .duo-stage button { font: inherit; color: inherit; border: 0; padding: 0; cursor: pointer; }
+  .duo-stage i[data-lucide] { display: inline-flex; width: 2.2cqw; height: 2.2cqw; }
+  .duo-stage i[data-lucide] svg { width: 100%; height: 100%; stroke-width: 1.8; }
+
+  .duo-rail {
+    grid-column: 1; grid-row: 1; width: 10cqw; min-height: 0;
+    background: #0c0c0d; display: flex; flex-direction: column; align-items: center;
+    gap: 0.8cqh; padding-top: 1.4cqh; border-right: 1px solid rgba(255,255,255,.03);
+    overflow: hidden;
+  }
+  .duo-logo { width: 6.3cqw; height: 6.3cqw; border-radius: 1.5cqw; background: #000;
+    border: 1px solid rgba(255,255,255,.12); position: relative; margin-bottom: 0.6cqh; flex: none; }
+  .duo-logo span { position: absolute; left: 1.35cqw; width: 3.5cqw; height: 2.1cqw;
+    border: 1px solid #fb7299; border-radius: .45cqw; }
+  .duo-logo span:first-child { top: 1.1cqw; }
+  .duo-logo span:nth-child(2) { top: 3.25cqw; }
+  .duo-logo b { position: absolute; left: 3.0cqw; top: 2.65cqw; width: 0; height: 0;
+    border-top: .55cqw solid transparent; border-bottom: .55cqw solid transparent;
+    border-left: .9cqw solid #fff; }
+  .rail-item { width: 8cqw; border-radius: 1.3cqw; padding: 1.2cqh 0 0.9cqh;
+    display: flex; flex-direction: column; align-items: center; gap: .45cqh; color: #a6a6ae; }
+  .rail-item em { font-style: normal; font-size: max(10px, 1.45cqw); line-height: 1.1; }
+  .rail-item.active { color: #fb7299; background: rgba(255,255,255,.07); }
+  .rail-item.active i { color: #fb7299; }
+
+  .duo-main { grid-column: 2; grid-row: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+  .duo-head { height: 8.4cqh; flex: none; display: flex; align-items: center; gap: 1.5cqw; padding: 1.2cqh 1.6cqw; }
+  .duo-head strong { font-size: 2.3cqw; font-weight: 500; letter-spacing: .02em; }
+  .chips { display: flex; gap: .9cqw; }
+  .chip { height: 4.2cqh; padding: 0 1.6cqw; display: inline-flex; align-items: center;
+    border-radius: 99px; background: rgba(255,255,255,.06); color: #a6a6ae;
+    font-size: max(11px, 1.55cqw); border: 1px solid rgba(255,255,255,.08); white-space: nowrap; }
+  .chip.on { color: #fb7299; background: rgba(251,114,153,.18); border-color: rgba(251,114,153,.8); }
+  .refresh { margin-left: auto; height: 4.2cqh; padding: 0 1.5cqw; display: inline-flex; gap: .6cqw;
+    align-items: center; border-radius: 99px; background: rgba(255,255,255,.06);
+    color: #a6a6ae; font-size: max(11px, 1.55cqw); white-space: nowrap; }
+  .refresh i { width: 1.7cqw; height: 1.7cqw; }
+
+  .duo-feed { flex: 1; overflow: hidden; padding: 0 1.8cqw; display: flex; flex-direction: column; gap: 1.8cqh; }
+  .dyn-card { position: relative; flex: none; background: #17171a; border-radius: 1.5cqw;
+    padding: 1.9cqw 2.1cqw 1.6cqw; }
+  .dyn-card.focused::after { content: ""; position: absolute; inset: -.55cqw; border-radius: 1.9cqw;
+    border: .18cqw solid rgba(255,255,255,.96); box-shadow: 0 0 0 .48cqw rgba(0,0,0,.58); pointer-events: none; }
+  .author { display: flex; align-items: center; gap: 1.1cqw; }
+  .avatar { width: 3.5cqw; height: 3.5cqw; border-radius: 50%; display: grid; place-items: center;
+    font-size: 1.55cqw; font-weight: 500; flex: none; }
+  .av-a { background: linear-gradient(135deg,#f3c7d8,#b48cf2); color: #28162f; }
+  .av-b { background: linear-gradient(135deg,#8ed9c1,#4a8fb0); color: #0c2228; }
+  .who { display: flex; flex-direction: column; gap: .35cqh; min-width: 0; }
+  .who b { font-size: 2.05cqw; font-weight: 500; }
+  .who small { color: #73737f; font-size: max(10px, 1.45cqw); }
+  .kind { margin-left: auto; color: #fb7299; background: rgba(251,114,153,.12);
+    border-radius: .55cqw; padding: .35cqh .8cqw; font-size: max(10px, 1.35cqw); }
+  .body-text { margin-top: 1.35cqh; font-size: 2.08cqw; line-height: 1.55; color: #f2f2f4;
+    display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; }
+  .thumbs { display: grid; grid-template-columns: repeat(3, 1fr); gap: .8cqw; margin-top: 1.4cqh; }
+  .pic { position: relative; display: block; aspect-ratio: 16 / 10; border-radius: .85cqw;
+    overflow: hidden; background: #26262e; }
+  .pic em { position: absolute; left: .8cqw; bottom: .7cqh; font-style: normal;
+    font-size: max(9px, 1.25cqw); color: rgba(255,255,255,.86); }
+  .p1 { background: radial-gradient(circle at 35% 38%, #ffe6b9 0 17%, transparent 18%),
+    radial-gradient(circle at 68% 44%, #c5e7c3 0 22%, transparent 23%),
+    linear-gradient(135deg,#f4b5c7 0 45%, #7fb6a2 46% 100%); }
+  .p2 { background: radial-gradient(circle at 62% 35%, #ffd9e6 0 16%, transparent 17%),
+    linear-gradient(150deg,#5a7a9d 0 40%, #d2a0b6 41% 70%, #f5dfbf 71% 100%); }
+  .p3 { background: linear-gradient(120deg,#d9b4ec 0 30%, #f1d3a4 31% 60%, #9fb9e8 61% 100%); }
+  .p4 { background: linear-gradient(140deg,#8dc7bc 0 35%, #f4c7b4 36% 65%, #d7a4c4 66% 100%); }
+  .p5 { background: linear-gradient(115deg,#f2c6a0 0 32%, #7fa8c4 33% 66%, #c4a3d8 67% 100%); }
+  .p6 { background: linear-gradient(125deg,#a5c6e7 0 30%, #e9b6c6 31% 68%, #f0d8ad 69% 100%); }
+  .stat { display: flex; gap: 2cqw; align-items: center; color: #73737f;
+    font-size: max(10px, 1.45cqw); margin-top: 1.35cqh; }
+  .stat b { margin-left: auto; color: #fb7299; font-weight: 500; }
+  .small-card { padding-bottom: 1.2cqw; }
+  .small-card .body-text { -webkit-line-clamp: 2; }
+
+  .duo-mode { grid-column: 1 / -1; grid-row: 2; height: 5.8cqh;
+    background: #141418; display: flex; align-items: center;
+    gap: .8cqw; padding: 0 1.6cqw; color: #f5f5f7; font-size: max(10px, 1.45cqw); }
+  .duo-mode .dot { width: .7cqw; height: .7cqw; border-radius: 50%; background: #6fb7ff; flex: none; }
+  .duo-mode em { margin-left: auto; color: #73737f; font-style: normal; }
+  .duo-mode em + em { margin-left: 1.6cqw; }
+
+  /* Variant 1: detail */
+  .detail-layer { position: absolute; inset: 0 0 5.8cqh 10cqw; background: #0f0f0f;
+    display: flex; flex-direction: column; transform: translateX(0); transition: transform .22s ease, opacity .22s ease; }
+  #v1-stage:not(.detail-open) .detail-layer { transform: translateX(100%); opacity: 0; pointer-events: none; }
+  .detail-head { height: 8.4cqh; flex: none; display: flex; align-items: center; gap: 1.2cqw;
+    padding: 0 1.8cqw; border-bottom: 1px solid rgba(255,255,255,.06); }
+  .back-btn, .close-btn { width: 4.4cqw; height: 4.4cqw; border-radius: 50%;
+    background: rgba(255,255,255,.06); display: grid; place-items: center; flex: none; }
+  .back-btn i, .close-btn i { width: 2.3cqw; height: 2.3cqw; }
+  .detail-title { display: flex; flex-direction: column; gap: .35cqh; }
+  .detail-title b { font-size: 2.2cqw; font-weight: 500; }
+  .detail-title small { font-size: max(10px, 1.4cqw); color: #73737f; }
+  .detail-kind { margin-left: auto; color: #fb7299; border: 1px solid rgba(251,114,153,.5);
+    border-radius: .55cqw; padding: .4cqh .9cqw; font-size: max(10px, 1.35cqw); }
+  .detail-body { flex: 1; min-height: 0; display: grid; grid-template-columns: 1.15fr 1fr;
+    gap: 1.8cqw; padding: 1.8cqw; }
+  .detail-text { min-width: 0; display: flex; flex-direction: column; gap: 1.2cqh; }
+  .detail-text p { font-size: 1.95cqw; line-height: 1.6; color: #d8d8de; }
+  .detail-actions { margin-top: auto; display: flex; align-items: center; gap: 1.2cqw; }
+  .pill { color: #1a0710; background: #fb7299; border-radius: 99px; padding: .75cqh 1.5cqw;
+    font-size: max(11px, 1.55cqw); font-weight: 500; }
+  .hint { color: #73737f; font-size: max(10px, 1.35cqw); }
+  .detail-pics { min-width: 0; display: flex; flex-direction: column; gap: .8cqw; }
+  .big-pic { flex: 1; border-radius: 1cqw; position: relative; min-height: 0; }
+  .big-pic span { position: absolute; right: .9cqw; bottom: .8cqh; color: #fff;
+    background: rgba(0,0,0,.55); border-radius: .45cqw; padding: .25cqh .6cqw;
+    font-size: max(9px, 1.25cqw); }
+  .big-pic.focused-pic::after { content: ""; position: absolute; inset: -.55cqw;
+    border-radius: 1.35cqw; border: .18cqw solid rgba(255,255,255,.96);
+    box-shadow: 0 0 0 .45cqw rgba(0,0,0,.6); pointer-events: none; }
+  .pic-row { height: 8.5cqh; display: grid; grid-template-columns: repeat(3,1fr); gap: .8cqw; }
+  .pic-row .pic { aspect-ratio: auto; height: 100%; }
+
+  /* Variant 2: inline expand */
+  .expand-text { -webkit-line-clamp: 3; }
+  .is-expanded .expand-text { -webkit-line-clamp: unset; display: block; }
+  .extra-pics { display: none; }
+  .is-expanded .extra-pics { display: grid; }
+  .is-expanded .dyn-card { background: #1b1b1f; }
+
+  /* Variant 3: gallery */
+  .gallery-layer { position: absolute; inset: 0 0 5.8cqh 10cqw; background: #0b0b0e;
+    display: grid; grid-template-rows: 7.4cqh 1fr 8.6cqh;
+    opacity: 0; pointer-events: none; transition: opacity .18s ease; }
+  #v3-stage.gallery-open .gallery-layer { opacity: 1; pointer-events: auto; }
+  .gallery-head { grid-row: 1; display: flex; align-items: center; gap: 1.2cqw;
+    padding: 0 1.8cqw; border-bottom: 1px solid rgba(255,255,255,.06); min-height: 0; }
+  .counter { color: #fb7299; font-size: max(11px, 1.55cqw); font-variant-numeric: tabular-nums; }
+  .gallery-title { display: flex; flex-direction: column; gap: .25cqh; min-width: 0; }
+  .gallery-title b { font-size: 1.95cqw; font-weight: 500; }
+  .gallery-title small { color: #73737f; font-size: max(10px, 1.35cqw); }
+  .text-toggle { margin-left: auto; background: transparent; border: 1px solid rgba(255,255,255,.16); border-radius: 99px;
+    padding: .55cqh 1.1cqw; color: #a6a6ae; font-size: max(10px, 1.35cqw); }
+  .close-btn { width: 4.2cqw; height: 4.2cqw; }
+  .gallery-main { grid-row: 2; min-height: 0; display: flex; align-items: center;
+    justify-content: center; gap: 1.2cqw; padding: 1.5cqw 1.8cqw 0; position: relative; }
+  .gallery-image { width: 74%; height: 100%; border-radius: 1cqw; position: relative;
+    transition: background .2s ease; }
+  .gallery-image span { position: absolute; left: 1.2cqw; bottom: 1cqh; color: #fff;
+    background: rgba(0,0,0,.5); border-radius: .5cqw; padding: .45cqh .9cqw;
+    font-size: max(10px, 1.4cqw); }
+  .nav-arrow { width: 4.6cqw; height: 4.6cqw; border-radius: 50%; background: rgba(255,255,255,.07);
+    display: grid; place-items: center; flex: none; }
+  .nav-arrow i { width: 2.5cqw; height: 2.5cqw; }
+  .gallery-reader { display: none; grid-row: 2 / 4; margin: 1.5cqw 1.8cqw;
+    padding: 1.6cqw; border-radius: 1cqw; background: #17171a; overflow: hidden; }
+  .gallery-reader b { font-size: 2.1cqw; font-weight: 500; }
+  .gallery-reader p { margin-top: 1cqh; font-size: 1.95cqw; line-height: 1.65; color: #d8d8de; }
+  .thumb-strip { grid-row: 3; display: flex; gap: .8cqw; padding: .8cqh 1.8cqw; min-height: 0; }
+  .thumb { flex: 1; border-radius: .7cqw; opacity: .55; border: .2cqw solid transparent; }
+  .thumb.active { opacity: 1; border-color: #fff;
+    box-shadow: 0 0 0 .22cqw #0b0b0e, 0 0 0 .4cqw rgba(255,255,255,.95); }
+  #v3-stage.reader-mode .gallery-main, #v3-stage.reader-mode .thumb-strip { display: none; }
+  #v3-stage.reader-mode .counter { visibility: hidden; }
+  #v3-stage.reader-mode .gallery-reader { display: block; }
+
+  @media (max-width: 640px) {
+    .duo-stage { border-radius: 0; }
+    .rail-item em { display: none; }
+    .rail-item { padding: 1.4cqh 0; }
+    .duo-head { gap: 1cqw; }
+    .chip { padding: 0 1.1cqw; }
+    .refresh { padding: 0 1.1cqw; }
+  }
+
+  i[data-lucide] { font-style: normal; line-height: 1; display: inline-flex; align-items: center; justify-content: center; }
+  i[data-lucide="home"]::before { content: "⌂"; }
+  i[data-lucide="layers"]::before { content: "▤"; }
+  i[data-lucide="search"]::before { content: "⌕"; }
+  i[data-lucide="user"]::before { content: "◉"; }
+  i[data-lucide="refresh-cw"]::before { content: "↻"; }
+  i[data-lucide="arrow-left"]::before { content: "←"; }
+  i[data-lucide="chevron-left"]::before { content: "‹"; }
+  i[data-lucide="chevron-right"]::before { content: "›"; }
+  i[data-lucide="x"]::before { content: "×"; }
+</style>
+
+<script>
+  (() => {
+    const root = document.getElementById("dyn-reader-variants");
+    if (!root) return;
+
+    const v1 = document.getElementById("v1-stage");
+    const v1Card = document.getElementById("v1-card");
+    const v1Back = document.getElementById("v1-back");
+    v1.classList.add("detail-open");
+    v1Card.addEventListener("click", () => v1.classList.add("detail-open"));
+    v1Back.addEventListener("click", (event) => {
+      event.stopPropagation();
+      v1.classList.remove("detail-open");
+    });
+
+    const v2 = document.getElementById("v2-stage");
+    const v2Card = document.getElementById("v2-card");
+    const v2Toggle = document.getElementById("v2-toggle");
+    v2Card.addEventListener("click", () => {
+      const expanded = v2Card.classList.toggle("is-expanded");
+      v2Toggle.textContent = expanded ? "A 收起全文" : "A 展开全文";
+    });
+
+    const galleryStage = document.getElementById("v3-stage");
+    const galleryCard = document.getElementById("v3-card");
+    const galleryClose = document.getElementById("v3-close");
+    const galleryPrev = document.getElementById("v3-prev");
+    const galleryNext = document.getElementById("v3-next");
+    const galleryImage = document.getElementById("v3-image");
+    const galleryCaption = document.getElementById("v3-caption");
+    const galleryCounter = document.getElementById("v3-counter");
+    const textToggle = document.getElementById("v3-text-toggle");
+    const thumbs = Array.from(document.querySelectorAll("#v3-thumbs .thumb"));
+    const captions = ["插画 1 · 饼干的下午", "插画 2 · 礼物包装", "插画 3 · 桌面一角", "插画 4 · 花与卡片"];
+    let index = 0;
+
+    function renderGallery() {
+      const n = index + 1;
+      galleryImage.className = "gallery-image p" + n;
+      galleryCaption.textContent = captions[index];
+      galleryCounter.textContent = n + " / 4";
+      thumbs.forEach((thumb, i) => thumb.classList.toggle("active", i === index));
+    }
+    function openGallery() {
+      galleryStage.classList.add("gallery-open");
+      renderGallery();
+    }
+    galleryCard.addEventListener("click", openGallery);
+    galleryClose.addEventListener("click", () => galleryStage.classList.remove("gallery-open"));
+    galleryPrev.addEventListener("click", () => {
+      index = (index + 3) % 4;
+      renderGallery();
+    });
+    galleryNext.addEventListener("click", () => {
+      index = (index + 1) % 4;
+      renderGallery();
+    });
+    thumbs.forEach((thumb, i) => thumb.addEventListener("click", () => {
+      index = i;
+      renderGallery();
+    }));
+    textToggle.addEventListener("click", () => {
+      const reader = galleryStage.classList.toggle("reader-mode");
+      textToggle.textContent = reader ? "看图片" : "纯文字";
+    });
+    openGallery();
+  })();
+</script>
+
+</div>
+<script>
+const sections=Array.from(document.querySelectorAll('#standalone-root > .viz-carousel > section'));
+const tabs=Array.from(document.querySelectorAll('.local-switch button'));
+function show(i){sections.forEach((s,j)=>{s.hidden=false;s.classList.toggle('active',i===j);});tabs.forEach((b,j)=>b.classList.toggle('on',i===j));}
+tabs.forEach((b,i)=>b.addEventListener('click',()=>show(i)));show(0);
+</script></body></html>

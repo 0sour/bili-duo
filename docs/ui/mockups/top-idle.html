@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>bili-duo 上屏待机 1920×1080</title>
+<style>
+  :root{
+    --bg:#0B0B0E; --surface:#141418; --surface2:#1C1C22; --surface3:#26262E;
+    --line:#2E2E38; --t1:#F5F5F7; --t2:#A9A9B4; --t3:#73737F;
+    --pink:#FB7299; --blue:#00A1D6;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{width:1920px;height:1080px;overflow:hidden;background:var(--bg);
+    font-family:"Noto Sans SC","Microsoft YaHei",system-ui,sans-serif;color:var(--t1)}
+  .stage{position:relative;width:1920px;height:1080px;overflow:hidden;
+    background:
+      radial-gradient(1000px 720px at 16% 18%,rgba(251,114,153,.16),transparent 66%),
+      radial-gradient(1100px 800px at 88% 82%,rgba(0,161,214,.13),transparent 66%),
+      var(--bg);}
+  .grid{position:absolute;inset:0;opacity:.5;
+    background-image:
+      linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);
+    background-size:80px 80px;
+    -webkit-mask-image:radial-gradient(circle at 62% 45%,#000 0%,transparent 74%);
+            mask-image:radial-gradient(circle at 62% 45%,#000 0%,transparent 74%);}
+  .vignette{position:absolute;inset:0;
+    background:radial-gradient(circle at 50% 48%,transparent 40%,rgba(0,0,0,.55) 100%);}
+  .hairline{position:absolute;left:0;right:0;height:1px;background:rgba(255,255,255,.07)}
+  .hairline.top{top:0}.hairline.bottom{bottom:0}
+
+  header{position:absolute;left:96px;right:96px;top:64px;height:56px;
+    display:flex;align-items:center;justify-content:space-between}
+  .mark{font-size:34px;font-weight:800;letter-spacing:-.6px}
+  .mark span{color:var(--pink)}
+  .status{display:flex;align-items:center;gap:12px;height:42px;padding:0 18px;
+    border:1px solid var(--line);border-radius:999px;background:rgba(20,20,24,.7);
+    color:var(--t2);font-size:20px;letter-spacing:.4px}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--pink);
+    box-shadow:0 0 0 6px rgba(251,114,153,.12)}
+
+  main{position:absolute;left:96px;right:96px;top:206px;bottom:150px;display:flex;
+    align-items:center;justify-content:space-between;gap:64px}
+  .copy{width:760px;flex:none}
+  .kicker{font-size:18px;letter-spacing:4px;color:var(--pink);font-weight:600;
+    margin-bottom:28px}
+  h1{font-size:88px;line-height:1.12;font-weight:800;letter-spacing:-2px}
+  h1 .pink{color:var(--pink)}
+  .sub{margin-top:34px;width:690px;font-size:28px;line-height:1.72;color:var(--t2)}
+  .hint{margin-top:46px;display:inline-flex;align-items:center;gap:16px;height:58px;
+    padding:0 22px 0 14px;border:1px solid var(--line);border-radius:12px;
+    background:rgba(20,20,24,.78);font-size:22px;color:var(--t1)}
+  .key{display:flex;align-items:center;justify-content:center;width:34px;height:34px;
+    border-radius:8px;background:var(--pink);color:#1A0710;font-size:18px;font-weight:800}
+  .hint b{font-weight:600}
+  .hint .muted{color:var(--t3);font-weight:400}
+
+  .device{position:relative;width:760px;height:700px;flex:none;margin-right:12px}
+  .device-glow{position:absolute;left:70px;top:70px;width:650px;height:600px;
+    background:radial-gradient(circle,rgba(251,114,153,.17),transparent 66%);
+    filter:blur(16px)}
+  .screen{position:absolute;border-radius:24px;border:2px solid rgba(255,255,255,.15);
+    background:linear-gradient(145deg,rgba(28,28,34,.96),rgba(14,14,18,.96));
+    box-shadow:0 40px 90px rgba(0,0,0,.5)}
+  .screen.top{left:96px;top:46px;width:600px;height:337px}
+  .screen.bottom{left:96px;top:414px;width:470px;height:316px}
+  .screen-label{position:absolute;left:20px;top:15px;font-size:15px;letter-spacing:2.6px;
+    color:var(--t3)}
+  .top-content{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+  .top-content::before{content:"";position:absolute;inset:34px;border-radius:14px;
+    background:
+      radial-gradient(240px 140px at 62% 42%,rgba(251,114,153,.26),transparent 72%),
+      linear-gradient(135deg,rgba(0,161,214,.14),rgba(251,114,153,.08));
+    border:1px solid rgba(255,255,255,.06)}
+  .play{position:relative;width:92px;height:92px;border-radius:50%;
+    background:var(--pink);display:flex;align-items:center;justify-content:center;
+    box-shadow:0 0 0 12px rgba(251,114,153,.13),0 0 50px rgba(251,114,153,.35)}
+  .play::after{content:"";display:block;margin-left:7px;border-left:27px solid #1A0710;
+    border-top:17px solid transparent;border-bottom:17px solid transparent}
+  .rail{position:absolute;left:0;top:0;bottom:0;width:54px;border-right:1px solid var(--line);
+    border-radius:24px 0 0 24px;background:rgba(20,20,24,.55)}
+  .rail .r{position:absolute;left:17px;width:20px;height:20px;border-radius:6px;
+    background:var(--surface3)}
+  .rail .r:nth-child(1){top:54px;background:var(--pink);opacity:.85}
+  .rail .r:nth-child(2){top:94px}.rail .r:nth-child(3){top:134px}
+  .cards{position:absolute;left:72px;top:54px;right:18px;bottom:18px;
+    display:grid;grid-template-columns:repeat(3,1fr);grid-auto-rows:102px;gap:9px}
+  .cards i{border-radius:7px;background:#1A1A20;border:1px solid rgba(255,255,255,.045);
+    position:relative;overflow:hidden}
+  .cards i::after{content:"";position:absolute;left:6px;right:6px;bottom:8px;height:5px;
+    border-radius:3px;background:rgba(255,255,255,.10)}
+  .cards i:nth-child(4){border-color:rgba(251,114,153,.65);
+    box-shadow:0 0 0 2px rgba(251,114,153,.18)}
+
+  footer{position:absolute;left:96px;right:96px;bottom:56px;display:flex;
+    align-items:center;justify-content:space-between;color:var(--t3);font-size:20px;
+    letter-spacing:.4px}
+  footer .left{display:flex;align-items:center;gap:14px}
+  footer .line{width:42px;height:1px;background:var(--line)}
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="grid"></div>
+  <div class="vignette"></div>
+  <div class="hairline top"></div>
+  <div class="hairline bottom"></div>
+
+  <header>
+    <div class="mark">bili<span>-duo</span></div>
+    <div class="status"><span class="dot"></span>待机 · 下屏浏览</div>
+  </header>
+
+  <main>
+    <section class="copy">
+      <div class="kicker">DUAL-SCREEN BILIBILI CLIENT</div>
+      <h1>下屏选视频，<br><span class="pink">上屏先预览。</span></h1>
+      <p class="sub">移动焦点或触摸视频卡片，上屏会展示封面、简介和 UP 主信息；开始播放后自动切换为视频画面。</p>
+      <div class="hint">
+        <span class="key">A</span>
+        <b>开始播放</b>
+        <span class="muted">·</span>
+        <span class="muted">移动焦点即可预览</span>
+      </div>
+    </section>
+
+    <section class="device">
+      <div class="device-glow"></div>
+      <div class="screen top">
+        <div class="screen-label">TOP · VIDEO</div>
+        <div class="top-content"><div class="play"></div></div>
+      </div>
+      <div class="screen bottom">
+        <div class="screen-label">BOTTOM · UI</div>
+        <div class="rail"><div class="r"></div><div class="r"></div><div class="r"></div></div>
+        <div class="cards"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="left"><span>上屏只负责显示</span><span class="line"></span><span>不响应触摸或手柄</span></div>
+    <div>下屏触摸与手柄共用一套焦点</div>
+  </footer>
+</div>
+</body>
+</html>

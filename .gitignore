@@ -1,0 +1,41 @@
+*.iml
+.gradle
+/local.properties
+/.idea
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+app/build/
+/apk/
+/android-sdk/
+/keystore/
+/keystore.properties
+AGENTS.md
+5.26prompt.md
+.github/
+PLAN.md
+setup.ps1
+.opencode/
+TODO.md
+docs/specs/
+
+# Internal working notes (kept out of the public repo)
+HANDOFF.md
+docs/ROADMAP.md
+docs/CLASS_DIAGRAM.md
+
+# Local test artifacts / screenshots
+.tmp/
+.zcode/
+
+# Build and signing artifacts
+*.apk
+*.jks
+*.keystore
+
+# Local test screenshots in dist (may contain account content)
+dist/*
+!dist/README.md

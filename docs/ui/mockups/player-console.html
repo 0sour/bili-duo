@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>bili-duo 播放控制台 1280×960</title>
+<style>
+  :root{
+    --bg:#0B0B0E; --s1:#141418; --s2:#1C1C22; --s3:#26262E; --s4:#32323C;
+    --out:#2E2E38; --out2:#42424E;
+    --t1:#F5F5F7; --t2:#A9A9B4; --t3:#73737F;
+    --pink:#FB7299; --pink-press:#E45F86; --onpink:#1A0710; --blue:#00A1D6;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{width:1280px;height:960px;overflow:hidden;background:var(--bg);
+    font-family:"Noto Sans SC","Microsoft YaHei",system-ui,sans-serif;color:var(--t1)}
+  .screen{width:1280px;height:960px;display:flex;flex-direction:column}
+  .console{flex:1;display:grid;grid-template-columns:544px 664px;gap:24px;padding:24px;min-height:0}
+  /* left */
+  .left{display:flex;flex-direction:column;min-width:0}
+  .title-row{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+  .title{font-size:34px;line-height:44px;font-weight:700;max-height:88px;overflow:hidden;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+  .quality{flex:none;font-size:22px;color:var(--pink);border:2px solid var(--pink);
+    border-radius:8px;padding:3px 10px;margin-top:6px}
+  .sub{margin-top:10px;font-size:23px;color:var(--t2)}
+  .progress{margin-top:30px}
+  .times{display:flex;justify-content:space-between;font-size:22px;color:var(--t3);
+    font-variant-numeric:tabular-nums}
+  .bar{position:relative;height:6px;border-radius:3px;background:var(--s4);margin:18px 0 0}
+  .bar .buf{position:absolute;left:0;top:0;bottom:0;width:58%;background:rgba(255,255,255,.18);border-radius:3px}
+  .bar .fill{position:absolute;left:0;top:0;bottom:0;width:41%;background:var(--pink);border-radius:3px}
+  .bar .knob{position:absolute;left:41%;top:50%;width:26px;height:26px;border-radius:50%;
+    background:#fff;transform:translate(-50%,-50%);box-shadow:0 0 0 4px rgba(251,114,153,.35)}
+  .transport{display:flex;align-items:center;justify-content:space-between;margin-top:34px;padding:0 2px}
+  .btn{width:80px;height:80px;border-radius:50%;background:var(--s3);display:flex;align-items:center;
+    justify-content:center;color:var(--t1);flex:none}
+  .btn svg{width:38px;height:38px}
+  .btn.play{width:112px;height:112px;background:var(--pink);color:var(--onpink);
+    box-shadow:0 0 0 5px var(--pink),0 0 30px rgba(251,114,153,.45)}
+  .btn.play svg{width:52px;height:52px;margin-left:6px}
+  .chips{display:flex;flex-wrap:nowrap;gap:10px;margin-top:26px;overflow:hidden}
+  .chip{height:56px;display:flex;align-items:center;gap:8px;padding:0 16px;border-radius:12px;
+    background:var(--s3);font-size:21px;color:var(--t1);flex:none}
+  .chip.on{background:rgba(251,114,153,.14);color:var(--pink);box-shadow:inset 0 0 0 2px var(--pink)}
+  .chip .k{color:var(--t3);font-size:20px}
+  .queue{margin-top:26px;border-top:2px solid var(--out);padding-top:16px}
+  .qhead{display:flex;justify-content:space-between;font-size:20px;color:var(--t3);margin-bottom:12px}
+  .qrow{display:flex;align-items:center;gap:14px;background:var(--s1);border-radius:14px;padding:10px}
+  .qthumb{position:relative;width:112px;height:63px;border-radius:10px;flex:none;
+    background:linear-gradient(135deg,#2C2C54,#AA4A44)}
+  .qthumb span{position:absolute;right:6px;bottom:6px;font-size:16px;background:rgba(0,0,0,.7);
+    padding:1px 5px;border-radius:4px}
+  .qmeta b{display:block;font-size:22px;font-weight:500}
+  .qmeta span{display:block;margin-top:4px;font-size:19px;color:var(--t3)}
+  .hint{margin-top:auto;font-size:20px;color:var(--t3);line-height:30px}
+  /* right */
+  .right{background:var(--s1);border:2px solid var(--out);border-radius:24px;display:flex;
+    flex-direction:column;min-height:0;overflow:hidden}
+  .rtabs{height:72px;display:flex;align-items:flex-end;gap:36px;padding:0 24px;border-bottom:2px solid var(--out);flex:none}
+  .rtab{font-size:24px;color:var(--t2);padding-bottom:14px;position:relative;font-weight:500}
+  .rtab.active{color:var(--t1);font-weight:700}
+  .rtab.active::after{content:"";position:absolute;left:0;right:0;bottom:0;height:5px;background:var(--pink);border-radius:3px 3px 0 0}
+  .rtab .count{font-size:20px;color:var(--t3);font-weight:400;margin-left:4px}
+  .rhead{display:flex;align-items:center;justify-content:space-between;padding:16px 24px 10px;flex:none}
+  .rhead .total{font-size:22px;color:var(--t3)}
+  .sort{display:flex;gap:10px}
+  .sort span{font-size:20px;padding:6px 14px;border-radius:8px;color:var(--t2);background:var(--s3)}
+  .sort span.on{color:var(--pink);background:rgba(251,114,153,.14);box-shadow:inset 0 0 0 2px var(--pink)}
+  .comments{overflow:hidden;padding:0 24px 24px}
+  .c{display:flex;gap:16px;padding:18px 0;border-bottom:2px solid var(--out)}
+  .c:last-child{border-bottom:none}
+  .avatar{width:64px;height:64px;border-radius:50%;flex:none}
+  .a1{background:linear-gradient(135deg,#7A3B69,#D06C8A)}
+  .a2{background:linear-gradient(135deg,#0E4C6B,#35BFA6)}
+  .a3{background:linear-gradient(135deg,#8C5A24,#E0A34E)}
+  .cbody{flex:1;min-width:0}
+  .cname{font-size:23px;color:var(--t2)}
+  .cname b{color:var(--t1);font-weight:500}
+  .ctext{margin-top:8px;font-size:24px;line-height:36px;color:var(--t1);
+    display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+  .cactions{margin-top:10px;display:flex;gap:28px;font-size:20px;color:var(--t3)}
+  /* modebar */
+  .modebar{height:56px;flex:none;background:var(--s1);border-top:2px solid var(--out);
+    display:flex;align-items:center;justify-content:space-between;padding:0 24px;
+    font-size:22px;color:var(--t2)}
+  .mode-left{display:flex;align-items:center;gap:12px;color:var(--t1)}
+  .dot{width:14px;height:14px;border-radius:50%;background:var(--blue)}
+  .mode-mid{color:var(--t3)}
+</style>
+</head>
+<body>
+<div class="screen">
+  <div class="console">
+    <section class="left">
+      <div class="title-row">
+        <div class="title">双屏掌机上的 B 站客户端，到底该怎么设计？</div>
+        <div class="quality">1080P</div>
+      </div>
+      <div class="sub">数码研究所 · 12.3万播放 · 3.2万弹幕</div>
+
+      <div class="progress">
+        <div class="times"><span>03:21</span><span>12:34</span></div>
+        <div class="bar"><div class="buf"></div><div class="fill"></div><div class="knob"></div></div>
+      </div>
+
+      <div class="transport">
+        <div class="btn">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h2v14H6zM18 5v14l-9-7 9-7z"/></svg>
+        </div>
+        <div class="btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5a7 7 0 1 1-6.5 4.4"/><path d="M5 4v5h5"/><text x="12" y="16" text-anchor="middle" font-size="8" fill="currentColor" stroke="none">10</text></svg>
+        </div>
+        <div class="btn play">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7L8 5z"/></svg>
+        </div>
+        <div class="btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5a7 7 0 1 0 6.5 4.4"/><path d="M19 4v5h-5"/><text x="12" y="16" text-anchor="middle" font-size="8" fill="currentColor" stroke="none">10</text></svg>
+        </div>
+        <div class="btn">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 5h2v14h-2zM6 5v14l9-7-9-7z"/></svg>
+        </div>
+      </div>
+
+      <div class="chips">
+        <div class="chip">1080P</div>
+        <div class="chip">1.0×</div>
+        <div class="chip on">弹幕 开</div>
+        <div class="chip">音量 80%</div>
+        <div class="chip">⋯</div>
+      </div>
+
+      <div class="queue">
+        <div class="qhead"><span>接下来播放</span><span>共 12P</span></div>
+        <div class="qrow">
+          <div class="qthumb"><span>08:42</span></div>
+          <div class="qmeta"><b>P2 安装与初始配置</b><span>数码研究所 · 8.7万播放</span></div>
+        </div>
+      </div>
+
+      <div class="hint">Y 回到手柄控播放 · LB/RB 切换分P<br>START 打开更多菜单 · 触摸下屏可直接操作</div>
+    </section>
+
+    <section class="right">
+      <nav class="rtabs">
+        <div class="rtab active">评论 <span class="count">2.3万</span></div>
+        <div class="rtab">推荐</div>
+        <div class="rtab">简介</div>
+        <div class="rtab">分P</div>
+      </nav>
+      <div class="rhead">
+        <div class="total">按热度排序</div>
+        <div class="sort"><span class="on">热门</span><span>最新</span></div>
+      </div>
+      <div class="comments">
+        <div class="c">
+          <div class="avatar a1"></div>
+          <div class="cbody">
+            <div class="cname"><b>掌机老张</b> · 2小时前</div>
+            <div class="ctext">这个思路是对的。之前用双屏掌机看视频，最烦的就是上屏弹出控制条，手柄一按两套 UI 同时响应。把控制全部放到下屏，上屏只留画面，才是双屏该有的样子。</div>
+            <div class="cactions"><span>♡ 1.2万</span><span>回复 328</span></div>
+          </div>
+        </div>
+        <div class="c">
+          <div class="avatar a2"></div>
+          <div class="cbody">
+            <div class="cname"><b>不吃香菜的猫</b> · 1小时前</div>
+            <div class="ctext">4:3 的下屏用来放评论和推荐刚好，比在视频上盖一层弹幕列表舒服多了。希望能早点用上。</div>
+            <div class="cactions"><span>♡ 8632</span><span>回复 91</span></div>
+          </div>
+        </div>
+        <div class="c">
+          <div class="avatar a3"></div>
+          <div class="cbody">
+            <div class="cname"><b>交互设计观察</b> · 45分钟前</div>
+            <div class="ctext">模式提示条是关键。没有它，用户永远不知道手柄现在控制的是哪块屏；有了它，切换就是可预测的。</div>
+            <div class="cactions"><span>♡ 5210</span><span>回复 47</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <footer class="modebar">
+    <div class="mode-left"><span class="dot"></span><span>手柄：下屏</span></div>
+    <div class="mode-mid">B 返回 · Y 回播放</div>
+    <div class="mode-right">A 确认 · START 菜单</div>
+  </footer>
+</div>
+</body>
+</html>

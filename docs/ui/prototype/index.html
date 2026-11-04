@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>bili-duo 交互原型 v0.1</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="page">
+
+  <!-- ================= 说明面板（不属于产品 UI） ================= -->
+  <aside class="guide">
+    <div class="brand">
+      <div class="mark">
+        <svg viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="8" rx="2" stroke="#1A0710" stroke-width="2"/><rect x="3" y="14" width="18" height="6" rx="2" stroke="#1A0710" stroke-width="2"/><path d="M10 7.2l4 2.3-4 2.3V7.2z" fill="#1A0710"/></svg>
+      </div>
+      <div><h1>bili-duo</h1><p>双屏交互原型 v0.1</p></div>
+    </div>
+
+    <div class="mode-card">
+      <span class="dot gray" id="guideModeDot"></span>
+      <b id="guideMode">浏览</b>
+      <span class="hint" id="guideHint">方向键移动焦点<br>Enter 打开</span>
+    </div>
+
+    <h2>键盘 = 手柄</h2>
+    <div class="keys">
+      <div><kbd>↑↓←→</kbd><span>方向键 / 焦点</span></div>
+      <div><kbd>Enter</kbd><kbd>Space</kbd><span>A 确认</span></div>
+      <div><kbd>Esc</kbd><kbd>Bksp</kbd><span>B 返回</span></div>
+      <div><kbd>X</kbd><span>弹幕 / 上下文</span></div>
+      <div><kbd>Y</kbd><span>切 TOP / BOTTOM</span></div>
+      <div><kbd>Q</kbd><kbd>E</kbd><span>LB / RB 上一/下一P</span></div>
+      <div><kbd>1</kbd><kbd>2</kbd><span>LT / RT 切 tab、调倍速</span></div>
+      <div><kbd>Tab</kbd><span>START 菜单</span></div>
+      <div><kbd>Shift</kbd><kbd>Tab</kbd><span>BACK 信息</span></div>
+      <div><kbd>鼠标</kbd><span>触摸下屏</span></div>
+    </div>
+
+    <h2>四条流程</h2>
+    <div class="steps">
+      <ol>
+        <li>首页 → 直接播放</li>
+        <li>Y / 触摸切输入模式</li>
+        <li>START 清晰度、BACK 更多</li>
+        <li>B 逐级返回 / 退出确认</li>
+      </ol>
+    </div>
+
+    <div class="buttons">
+      <button id="resetBtn">重置原型</button>
+      <button id="zoomBtn">缩放 50%</button>
+    </div>
+    <p class="foot">这是设计验证原型，不是最终 Compose 实现。上屏只放视频占位，所有控制都在下屏。</p>
+  </aside>
+
+  <!-- ================= 双屏设备 ================= -->
+  <main class="stage">
+    <div class="scaler">
+      <div class="device">
+        <div class="bezel top-bezel">
+          <div class="screen top-screen" id="topScreen">
+            <div id="topIdle">bili-duo</div>
+            <div class="video" id="topVideo">
+              <div class="scene"></div>
+              <div class="danmaku" id="danmakuLayer"></div>
+            </div>
+          </div>
+        </div>
+        <div class="hinge"></div>
+        <div class="bezel bottom-bezel">
+          <div class="screen bottom-screen" id="bottomScreen">
+            <div id="app" data-mode="browse">
+
+              <!-- ---------- 浏览壳层（首页） ---------- -->
+              <div class="browse-shell" id="browseShell">
+                <aside class="rail">
+                  <div class="logo"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="8" rx="2" stroke="#1A0710" stroke-width="2"/><rect x="3" y="14" width="18" height="6" rx="2" stroke="#1A0710" stroke-width="2"/><path d="M10 7.2l4 2.3-4 2.3V7.2z" fill="#1A0710"/></svg></div>
+                  <div class="rail-item active" data-focusable data-focus-id="rail-home" data-action="rail-home">
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M3 10.8L12 3l9 7.8V21H3V10.8z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9.5 21v-6h5v6" stroke="currentColor" stroke-width="2"/></svg><span>首页</span>
+                  </div>
+                  <div class="rail-item" data-focusable data-focus-id="rail-search" data-action="rail" data-label="搜索">
+                    <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M16.5 16.5L21 21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>搜索</span>
+                  </div>
+                  <div class="rail-item" data-focusable data-focus-id="rail-history" data-action="rail" data-label="历史">
+                    <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="2"/><path d="M12 7.5V12l3.2 2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>历史</span>
+                  </div>
+                  <div class="rail-item" data-focusable data-focus-id="rail-fav" data-action="rail" data-label="收藏">
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M12 3.6l2.6 5.3 5.8.8-4.2 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8L3.6 9.7l5.8-.8L12 3.6z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg><span>收藏</span>
+                  </div>
+                  <div class="rail-item" data-focusable data-focus-id="rail-me" data-action="rail" data-label="我的">
+                    <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8.2" r="3.6" stroke="currentColor" stroke-width="2"/><path d="M4.8 20c.8-3.6 3.7-5.6 7.2-5.6s6.4 2 7.2 5.6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>我的</span>
+                  </div>
+                  <div class="rail-spacer"></div>
+                  <div class="rail-item" data-focusable data-focus-id="rail-settings" data-action="rail" data-label="设置">
+                    <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3.2" stroke="currentColor" stroke-width="2"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.4 1a7 7 0 0 0-2-1.2L14.2 3h-4.4l-.3 2.7a7 7 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.5A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.5 2 3.4 2.4-1a7 7 0 0 0 2 1.2l.3 2.7h4.4l.3-2.7a7 7 0 0 0 2-1.2l2.4 1 2-3.4-2-1.5c.1-.4.1-.8.1-1.2z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg><span>设置</span>
+                  </div>
+                </aside>
+
+                <div class="main">
+                  <!-- ---------- 首页 ---------- -->
+                  <section id="screenHome" data-screen="home">
+                    <header class="appbar">
+                      <h1>首页</h1>
+                      <div class="actions">
+                        <span data-focusable data-focus-id="home-search" data-action="toast" data-msg="搜索页不在本原型范围"><svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M16.5 16.5L21 21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+                        <span data-focusable data-focus-id="home-refresh" data-action="refresh"><svg viewBox="0 0 24 24" fill="none"><path d="M20 11a8 8 0 1 0-2.3 6.3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M20 5v6h-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                      </div>
+                    </header>
+                    <nav class="tabs">
+                      <div class="tab active" data-focusable data-focus-id="home-tab-recommend" data-tab-group="home" data-tab="recommend" data-action="tab-home" data-nav-down="home-card-1">推荐</div>
+                      <div class="tab" data-focusable data-focus-id="home-tab-hot" data-tab-group="home" data-tab="hot" data-action="tab-home" data-nav-down="home-card-1">热门</div>
+                      <div class="tab" data-focusable data-focus-id="home-tab-bangumi" data-tab-group="home" data-tab="bangumi" data-action="tab-home" data-nav-down="home-card-1">番剧</div>
+                      <div class="tab" data-focusable data-focus-id="home-tab-film" data-tab-group="home" data-tab="film" data-action="tab-home" data-nav-down="home-card-1">影视</div>
+                    </nav>
+                    <div class="grid">
+                      <article class="card c1" data-focusable data-focus-id="home-card-1" data-action="play-card" data-title="双屏掌机上的 B 站客户端，到底该怎么设计？" data-duration="12:34">
+                        <div class="thumb"><div class="art">双屏</div><div class="dur">12:34</div></div>
+                        <h2>双屏掌机上的 B 站客户端，到底该怎么设计？</h2>
+                        <div class="meta">数码研究所 · 12.3万播放</div>
+                      </article>
+                      <article class="card c2" data-focusable data-focus-id="home-card-2" data-action="play-card" data-title="4K 修复：十年前的国产动画还能再战">
+                        <div class="thumb"><div class="art">4K</div><div class="dur">08:21</div></div>
+                        <h2>4K 修复：十年前的国产动画还能再战</h2>
+                        <div class="meta">动画档案馆 · 8.1万播放</div>
+                      </article>
+                      <article class="card c3" data-focusable data-focus-id="home-card-3" data-action="play-card" data-title="当我把下屏变成控制台，上屏只放视频">
+                        <div class="thumb"><div class="art">MAD</div><div class="dur">03:07</div></div>
+                        <h2>当我把下屏变成控制台，上屏只放视频</h2>
+                        <div class="meta">交互实验室 · 21.7万播放</div>
+                      </article>
+                      <article class="card c4" data-focusable data-focus-id="home-card-4" data-action="play-card" data-title="2026 年度动画盘点：这十部值得补">
+                        <div class="thumb"><div class="art">2026</div><div class="dur">15:42</div></div>
+                        <h2>2026 年度动画盘点：这十部值得补</h2>
+                        <div class="meta">番剧观察 · 33.9万播放</div>
+                      </article>
+                      <article class="card c5" data-focusable data-focus-id="home-card-5" data-action="play-card" data-title="这个 MAD 我做了三个月，只为这一分钟">
+                        <div class="thumb"><div class="art">MAD</div><div class="dur">02:18</div></div>
+                        <h2>这个 MAD 我做了三个月，只为这一分钟</h2>
+                        <div class="meta">剪辑师阿树 · 6.6万播放</div>
+                      </article>
+                      <article class="card c6" data-focusable data-focus-id="home-card-6" data-action="play-card" data-title="掌机模拟器折腾指南：从入门到退烧">
+                        <div class="thumb"><div class="art">掌机</div><div class="dur">26:05</div></div>
+                        <h2>掌机模拟器折腾指南：从入门到退烧</h2>
+                        <div class="meta">掌机日常 · 19.2万播放</div>
+                      </article>
+                    </div>
+                  </section>
+
+                </div>
+              </div>
+
+              <!-- ---------- 播放控制台 ---------- -->
+              <section id="screenPlayer" data-screen="player" hidden>
+                <div class="console">
+                  <section class="left">
+                    <div class="title-row">
+                      <div class="title" id="playerTitle">双屏掌机上的 B 站客户端，到底该怎么设计？</div>
+                      <div class="quality" id="playerQualityBadge">1080P</div>
+                    </div>
+                    <div class="sub" id="playerSub">数码研究所 · 12.3万播放 · P1 / 12P</div>
+                    <div class="progress">
+                      <div class="times"><span id="playerTime">03:21</span><span id="playerDuration">12:34</span></div>
+                      <div class="bar"><div class="buf"></div><div class="fill" id="playerFill"></div><div class="knob" id="playerKnob"></div></div>
+                    </div>
+                    <div class="transport">
+                      <div class="tbtn" data-focusable data-focus-id="player-prev" data-action="part-prev" title="上一个分P">
+                        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h2v14H6zM18 5v14l-9-7 9-7z"/></svg>
+                      </div>
+                      <div class="tbtn" data-focusable data-focus-id="player-rew" data-action="seek-back" title="后退 10 秒">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5a7 7 0 1 1-6.5 4.4"/><path d="M5 4v5h5"/><text x="12" y="16" text-anchor="middle" font-size="8" fill="currentColor" stroke="none">10</text></svg>
+                      </div>
+                      <div class="tbtn play playing" id="playerPlay" data-focusable data-focus-id="player-play" data-action="toggle-play" data-nav-down="player-quality" title="播放/暂停">
+                        <svg class="icon-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7L8 5z"/></svg>
+                        <svg class="icon-pause" viewBox="0 0 24 24" fill="currentColor"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>
+                      </div>
+                      <div class="tbtn" data-focusable data-focus-id="player-fwd" data-action="seek-fwd" title="前进 10 秒">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5a7 7 0 1 0 6.5 4.4"/><path d="M19 4v5h-5"/><text x="12" y="16" text-anchor="middle" font-size="8" fill="currentColor" stroke="none">10</text></svg>
+                      </div>
+                      <div class="tbtn" data-focusable data-focus-id="player-next" data-action="part-next" title="下一个分P">
+                        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 5h2v14h-2zM6 5v14l9-7-9-7z"/></svg>
+                      </div>
+                    </div>
+                    <div class="chips">
+                      <div class="chip" data-focusable data-focus-id="player-quality" data-action="quality" data-nav-up="player-play">清晰度 <span id="qualityChip">1080P</span></div>
+                      <div class="chip" data-focusable data-focus-id="player-speed" data-action="speed">倍速 <span id="speedChip">1.0×</span></div>
+                      <div class="chip on" id="player-danmaku" data-focusable data-focus-id="player-danmaku" data-action="danmaku">弹幕 <span id="danmakuChip">开</span></div>
+                      <div class="chip" data-focusable data-focus-id="player-volume" data-action="volume"><span id="volumeChip">音量 80%</span></div>
+                      <div class="chip" data-focusable data-focus-id="player-more" data-action="more">⋯</div>
+                    </div>
+                    <div class="queue">
+                      <div class="qhead"><span>接下来播放</span><span>共 12P</span></div>
+                      <div class="qrow" data-focusable data-focus-id="player-queue" data-action="part" data-part="2" data-title="P2 安装与初始配置" data-duration="08:42">
+                        <div class="qthumb"><span>08:42</span></div>
+                        <div class="qmeta"><b id="queueTitle">P2 安装与初始配置</b><span>数码研究所 · 8.7万播放</span></div>
+                      </div>
+                    </div>
+                    <div class="hint">Y 回到手柄控播放 · LB/RB 切换分P<br>START 打开更多菜单 · 触摸下屏可直接操作</div>
+                  </section>
+
+                  <section class="right">
+                    <nav class="tabs">
+                      <div class="tab active" data-focusable data-focus-id="player-tab-comments" data-tab-group="player" data-tab="comments" data-action="tab-player" data-nav-down="player-comment-1">评论 <span class="count">2.3万</span></div>
+                      <div class="tab" data-focusable data-focus-id="player-tab-related" data-tab-group="player" data-tab="related" data-action="tab-player" data-nav-down="player-related-1">推荐</div>
+                      <div class="tab" data-focusable data-focus-id="player-tab-intro" data-tab-group="player" data-tab="intro" data-action="tab-player" data-nav-down="player-follow">简介</div>
+                      <div class="tab" data-focusable data-focus-id="player-tab-parts" data-tab-group="player" data-tab="parts" data-action="tab-player" data-nav-down="player-part-1">分P</div>
+                    </nav>
+                    <div class="rhead" id="playerSortRow">
+                      <div class="total">按热度排序</div>
+                      <div class="sort">
+                        <span class="on" data-focusable data-focus-id="player-sort-hot" data-action="sort" data-sort="hot">热门</span>
+                        <span data-focusable data-focus-id="player-sort-new" data-action="sort" data-sort="new">最新</span>
+                      </div>
+                    </div>
+                    <div class="panes">
+                      <div class="pane" data-pane-group="player" data-pane="comments">
+                        <div class="comment" data-focusable data-focus-id="player-comment-1" data-action="comment">
+                          <div class="avatar a1"></div>
+                          <div class="cbody"><div class="cname"><b>掌机老张</b> · 2小时前</div><div class="ctext">这个思路是对的。之前用双屏掌机看视频，最烦的就是上屏弹出控制条，手柄一按两套 UI 同时响应。把控制全部放到下屏，上屏只留画面，才是双屏该有的样子。</div><div class="cactions"><span>♡ 1.2万</span><span>回复 328</span></div></div>
+                        </div>
+                        <div class="comment" data-focusable data-focus-id="player-comment-2" data-action="comment">
+                          <div class="avatar a2"></div>
+                          <div class="cbody"><div class="cname"><b>不吃香菜的猫</b> · 1小时前</div><div class="ctext">4:3 的下屏用来放评论和推荐刚好，比在视频上盖一层弹幕列表舒服多了。希望能早点用上。</div><div class="cactions"><span>♡ 8632</span><span>回复 91</span></div></div>
+                        </div>
+                        <div class="comment" data-focusable data-focus-id="player-comment-3" data-action="comment">
+                          <div class="avatar a3"></div>
+                          <div class="cbody"><div class="cname"><b>交互设计观察</b> · 45分钟前</div><div class="ctext">模式提示条是关键。没有它，用户永远不知道手柄现在控制的是哪块屏；有了它，切换就是可预测的。</div><div class="cactions"><span>♡ 5210</span><span>回复 47</span></div></div>
+                        </div>
+                      </div>
+                      <div class="pane" data-pane-group="player" data-pane="related" hidden>
+                        <div class="related-row" data-focusable data-focus-id="player-related-1" data-action="related" data-title="4K 修复：十年前的国产动画还能再战">
+                          <div class="related-thumb"><span>08:21</span></div><div class="related-meta"><b>4K 修复：十年前的国产动画还能再战</b><span>动画档案馆 · 8.1万播放</span></div>
+                        </div>
+                        <div class="related-row" data-focusable data-focus-id="player-related-2" data-action="related" data-title="当我把下屏变成控制台，上屏只放视频">
+                          <div class="related-thumb"><span>03:07</span></div><div class="related-meta"><b>当我把下屏变成控制台，上屏只放视频</b><span>交互实验室 · 21.7万播放</span></div>
+                        </div>
+                        <div class="related-row" data-focusable data-focus-id="player-related-3" data-action="related" data-title="2026 年度动画盘点：这十部值得补">
+                          <div class="related-thumb"><span>15:42</span></div><div class="related-meta"><b>2026 年度动画盘点：这十部值得补</b><span>番剧观察 · 33.9万播放</span></div>
+                        </div>
+                      </div>
+                      <div class="pane" data-pane-group="player" data-pane="intro" hidden>
+                        <div class="intro-stats"><span>12.3万播放</span><span>3.2万弹幕</span><span>1.8万点赞</span></div>
+                        <div class="intro-text">这是 bili-duo 的交互原型：上屏只显示视频，下屏承载完整 UI。所有控制、评论、推荐和设置都在下屏，触摸和手柄共用一套焦点。</div>
+                        <div class="up-card">
+                          <div class="up-avatar"></div>
+                          <div class="up-meta">
+                            <b>数码研究所</b>
+                            <span>12.3万粉丝 · 128个视频</span>
+                            <div class="up-sign">折腾掌机、双屏和交互，偶尔写点代码。</div>
+                          </div>
+                          <div class="up-follow" id="player-follow" data-focusable data-focus-id="player-follow" data-action="follow">关注</div>
+                        </div>
+                        <div class="intro-actions">
+                          <div class="intro-action" id="player-fav" data-focusable data-focus-id="player-fav" data-action="fav">收藏</div>
+                          <div class="intro-action" id="player-download" data-focusable data-focus-id="player-download" data-action="download">下载</div>
+                        </div>
+                        <div class="bv-row" data-focusable data-focus-id="player-bv" data-action="toast" data-msg="BV 号已复制（原型）"><span>BV1xx411c7mD</span><span>复制</span></div>
+                      </div>
+                      <div class="pane" data-pane-group="player" data-pane="parts" hidden>
+                        <div class="part-row current" data-focusable data-focus-id="player-part-1" data-action="part" data-part="1" data-title="P1 双屏掌机上的 B 站客户端" data-duration="12:34"><span class="p-index">P1</span><span>双屏掌机上的 B 站客户端</span></div>
+                        <div class="part-row" data-focusable data-focus-id="player-part-2" data-action="part" data-part="2" data-title="P2 安装与初始配置" data-duration="08:42"><span class="p-index">P2</span><span>安装与初始配置</span></div>
+                        <div class="part-row" data-focusable data-focus-id="player-part-3" data-action="part" data-part="3" data-title="P3 焦点与输入路由" data-duration="15:20"><span class="p-index">P3</span><span>焦点与输入路由</span></div>
+                        <div class="part-row" data-focusable data-focus-id="player-part-4" data-action="part" data-part="4" data-title="P4 真机验收清单" data-duration="11:05"><span class="p-index">P4</span><span>真机验收清单</span></div>
+                      </div>
+                    </div>
+                  </section>
+                </div>
+              </section>
+
+              <!-- ---------- 模式条 ---------- -->
+              <footer class="modebar">
+                <div class="mode-left"><span class="dot gray" id="modeDot"></span><span id="modeLabel">浏览</span></div>
+                <div class="mode-mid" id="modeMid">B 返回 · A 打开</div>
+                <div class="mode-right" id="modeRight">←→ 移动</div>
+              </footer>
+
+              <!-- ---------- Overlay ---------- -->
+              <div class="overlay-host" id="overlayHost" hidden>
+                <div class="scrim"></div>
+
+                <div class="sheet right" data-overlay="quality" hidden>
+                  <h3>清晰度</h3>
+                  <div class="sub">当前：<span id="qualitySheetCurrent">1080P</span></div>
+                  <div class="sheet-list">
+                    <div class="sheet-item" data-focusable data-focus-id="overlay-quality-auto" data-action="set-quality" data-value="自动"><span>自动</span><span class="desc">根据网络切换</span><span class="check">✓</span></div>
+                    <div class="sheet-item" data-focusable data-focus-id="overlay-quality-1080p-high" data-action="set-quality" data-value="1080P 高码率"><span>1080P 高码率</span><span class="desc">需登录</span><span class="check">✓</span></div>
+                    <div class="sheet-item selected" data-focusable data-focus-id="overlay-quality-1080p" data-action="set-quality" data-value="1080P"><span>1080P</span><span class="check">✓</span></div>
+                    <div class="sheet-item" data-focusable data-focus-id="overlay-quality-720p" data-action="set-quality" data-value="720P"><span>720P</span><span class="check">✓</span></div>
+                    <div class="sheet-item" data-focusable data-focus-id="overlay-quality-480p" data-action="set-quality" data-value="480P"><span>480P</span><span class="check">✓</span></div>
+                  </div>
+                </div>
+
+                <div class="sheet bottom" data-overlay="speed" hidden>
+                  <h3>播放速度</h3>
+                  <div class="sub">当前：<span id="speedSheetCurrent">1.0×</span> · B 关闭</div>
+                  <div class="speed-grid">
+                    <div class="chip" data-focusable data-focus-id="overlay-speed-05" data-action="set-speed" data-value="0.5">0.5×</div>
+                    <div class="chip" data-focusable data-focus-id="overlay-speed-075" data-action="set-speed" data-value="0.75">0.75×</div>
+                    <div class="chip on" data-focusable data-focus-id="overlay-speed-10" data-action="set-speed" data-value="1">1.0×</div>
+                    <div class="chip" data-focusable data-focus-id="overlay-speed-125" data-action="set-speed" data-value="1.25">1.25×</div>
+                    <div class="chip" data-focusable data-focus-id="overlay-speed-15" data-action="set-speed" data-value="1.5">1.5×</div>
+                    <div class="chip" data-focusable data-focus-id="overlay-speed-175" data-action="set-speed" data-value="1.75">1.75×</div>
+                    <div class="chip" data-focusable data-focus-id="overlay-speed-20" data-action="set-speed" data-value="2">2.0×</div>
+                  </div>
+                </div>
+
+                <div class="sheet right" data-overlay="more" hidden>
+                  <h3>更多</h3>
+                  <div class="sub">播放控制台菜单</div>
+                  <div class="sheet-list">
+                    <div class="sheet-item" data-focusable data-focus-id="overlay-more-aspect" data-action="toast" data-msg="画面比例（原型）"><span>画面比例</span><span class="desc">适应</span></div>
+                    <div class="sheet-item" data-focusable data-focus-id="overlay-more-decoder" data-action="toast" data-msg="解码方式（原型）"><span>解码方式</span><span class="desc">硬件</span></div>
+                    <div class="sheet-item" data-focusable data-focus-id="overlay-more-shot" data-action="toast" data-msg="已截图（原型）"><span>截图</span></div>
+                    <div class="sheet-item" data-focusable data-focus-id="overlay-more-queue" data-action="toast" data-msg="播放队列（原型）"><span>播放队列</span></div>
+                    <div class="sheet-item" data-focusable data-focus-id="overlay-more-exit" data-action="exit"><span style="color:var(--red)">退出播放</span></div>
+                  </div>
+                </div>
+
+                <div class="dialog" data-overlay="exit" hidden>
+                  <h3>退出播放？</h3>
+                  <p>视频将停止，播放进度会保存。按 A 确认退出，按 B 继续观看。</p>
+                  <div class="dialog-actions">
+                    <div class="dialog-btn" data-focusable data-focus-id="overlay-exit-cancel" data-action="cancel">继续观看</div>
+                    <div class="dialog-btn danger" data-focusable data-focus-id="overlay-exit-confirm" data-action="confirm-exit">退出播放</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="hud" id="hud" hidden></div>
+              <div class="toast" id="toast" hidden></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>动态图文 · 上屏四状态</title>
+<style>
+html,body{margin:0;background:#17181b;color:#f2f2f4;font-family:"Noto Sans SC","Microsoft YaHei",system-ui,sans-serif;}
+body{padding:16px 18px 24px;} #standalone-root{width:min(1280px,100%);}
+.local-switch{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px;}
+.local-switch button{font:inherit;font-size:12px;color:#a6a6ae;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:6px 12px;cursor:pointer;}
+.local-switch button.on{color:#1a0710;background:#fb7299;border-color:#fb7299;}
+#standalone-root > .viz-carousel > section{display:none !important;}
+#standalone-root > .viz-carousel > section.active{display:block !important;}
+
+  i[data-lucide] { font-style: normal; line-height: 1; display: inline-flex; align-items: center; justify-content: center; }
+  i[data-lucide="home"]::before { content: "⌂"; }
+  i[data-lucide="layers"]::before { content: "▤"; }
+  i[data-lucide="search"]::before { content: "⌕"; }
+  i[data-lucide="user"]::before { content: "◉"; }
+  i[data-lucide="refresh-cw"]::before { content: "↻"; }
+  i[data-lucide="arrow-left"]::before { content: "←"; }
+  i[data-lucide="chevron-left"]::before { content: "‹"; }
+  i[data-lucide="chevron-right"]::before { content: "›"; }
+  i[data-lucide="x"]::before { content: "×"; }
+</style></head><body>
+<div class="local-switch" role="tablist" aria-label="设计方案"><button data-tab="0">列表预览</button><button data-tab="1">详情阅读</button><button data-tab="2">图片画册</button><button data-tab="3">纯文字</button></div>
+<div id="standalone-root">
+<div id="dynamic-top-variants" class="viz-carousel" aria-label="动态图文上屏方案">
+  <section data-variant="列表预览" aria-label="动态列表聚焦时的上屏预览">
+    <div class="top-stage">
+      <div class="top-bg"></div>
+      <div class="top-grid"></div>
+      <header class="top-head">
+        <div class="brand"><span class="brand-logo"><i></i><i></i><b></b></span><strong>Bili-Duo</strong></div>
+        <span class="top-pill"><i class="dot"></i>PREVIEW · 上屏预览</span>
+      </header>
+      <div class="preview-split">
+        <div class="mosaic">
+          <div class="mosaic-hero p1"><span>饼干的下午</span></div>
+          <div class="mosaic-side"><div class="p2"></div><div class="p3"><em>+2</em></div></div>
+        </div>
+        <div class="preview-copy">
+          <div class="eyebrow"><i></i>DYNAMIC / 图文动态</div>
+          <h1>今天出去做饼干噜<br>是七夕的礼物哦</h1>
+          <div class="byline"><span class="avatar">甜</span><div><b>甜夕sweet</b><small>8分钟前 · 4 张图片</small></div></div>
+          <p>做到现在还没做完。最近每天都有好多小奖状贴啵啵间，感觉被吸夕猫的爱意狠狠包围噜。</p>
+          <div class="meta"><span>评论 0</span><span>转发 0</span><span>赞 18</span><b>聚焦卡片 · 按 A 阅读</b></div>
+        </div>
+      </div>
+      <footer class="top-note">上屏只读 · 聚焦卡片后显示动态预览 <span>PREVIEW</span></footer>
+    </div>
+  </section>
+
+  <section data-variant="详情阅读" aria-label="动态详情阅读的上屏设计" hidden>
+    <div class="top-stage">
+      <div class="top-bg"></div>
+      <div class="top-grid"></div>
+      <header class="top-head">
+        <div class="brand"><span class="brand-logo"><i></i><i></i><b></b></span><strong>Bili-Duo</strong></div>
+        <span class="top-pill"><i class="dot"></i>DETAIL · 动态详情</span>
+      </header>
+      <div class="detail-split">
+        <div class="detail-copy">
+          <div class="eyebrow"><i></i>DYNAMIC / 图文阅读</div>
+          <h1>今天的饼干<br>与七夕礼物</h1>
+          <p>今天出去做饼干噜（是七夕的礼物哦）~做到现在还没做完。最近每天都有好多小奖状贴啵啵间，感觉被吸夕猫的爱意狠狠包围噜。</p>
+          <p class="dim">感谢@鲜榨甜橙一杯 姐姐的咩咩，真的好可爱；感谢@烙弓 宝贝的咩咩，是好久不见的老朋友啦。</p>
+          <div class="byline"><span class="avatar">甜</span><div><b>甜夕sweet</b><small>8分钟前 · 图文</small></div></div>
+          <div class="meta"><span>评论 0</span><span>转发 0</span><span>赞 18</span><b>下屏滚动阅读 · B 返回</b></div>
+        </div>
+        <div class="detail-visual">
+          <div class="hero p1"><span>1 / 4</span></div>
+          <div class="hero-strip"><div class="p2"></div><div class="p3"></div><div class="p4"><em>+1</em></div></div>
+        </div>
+      </div>
+      <footer class="top-note">上屏只读 · 下屏滚动详情时同步更新 <span>DETAIL</span></footer>
+    </div>
+  </section>
+
+  <section data-variant="图片画册" aria-label="动态图片全屏画册的上屏设计" hidden>
+    <div class="top-stage gallery-stage">
+      <div class="gallery-backdrop p1"></div>
+      <div class="gallery-shade"></div>
+      <div class="top-grid"></div>
+      <header class="top-head">
+        <div class="brand"><span class="brand-logo"><i></i><i></i><b></b></span><strong>Bili-Duo</strong></div>
+        <span class="top-pill"><i class="dot"></i>GALLERY · 图片 1 / 4</span>
+      </header>
+      <div class="gallery-frame p1"><span class="frame-caption">插画 1 · 饼干的下午</span></div>
+      <div class="gallery-copy">
+        <div class="eyebrow"><i></i>甜夕sweet · 8分钟前</div>
+        <h2>今天的饼干与礼物</h2>
+        <p>下屏方向键切换图片 · B 关闭画册</p>
+      </div>
+      <div class="gallery-dots"><i class="on"></i><i></i><i></i><i></i></div>
+      <footer class="top-note">上屏只读 · 图片浏览 <span>GALLERY</span></footer>
+    </div>
+  </section>
+
+  <section data-variant="纯文字" aria-label="纯文字动态的上屏阅读设计" hidden>
+    <div class="top-stage text-stage">
+      <div class="top-bg"></div>
+      <div class="top-grid"></div>
+      <div class="quote-mark">“</div>
+      <header class="top-head">
+        <div class="brand"><span class="brand-logo"><i></i><i></i><b></b></span><strong>Bili-Duo</strong></div>
+        <span class="top-pill"><i class="dot"></i>TEXT · 纯文字动态</span>
+      </header>
+      <div class="text-copy">
+        <div class="eyebrow"><i></i>DYNAMIC / 纯文字</div>
+        <h1>今天出去做饼干噜<br>做到现在还没做完。</h1>
+        <p>最近每天都有好多小奖状贴啵啵间，感觉被吸夕猫的爱意狠狠包围噜。感谢@鲜榨甜橙一杯 姐姐的咩咩，真的好可爱。</p>
+        <div class="byline"><span class="avatar">甜</span><div><b>甜夕sweet</b><small>8分钟前 · 动态</small></div></div>
+      </div>
+      <div class="text-side">
+        <div class="quote-rule"></div>
+        <span class="side-label">NO IMAGES</span>
+        <span class="side-note">没有配图时，上屏用排版呈现正文，而不是留一块空封面。</span>
+        <div class="side-stats"><b>0</b><small>评论</small><b>0</b><small>转发</small><b>18</b><small>赞</small></div>
+      </div>
+      <footer class="top-note">上屏只读 · 纯文字阅读 <span>TEXT</span></footer>
+    </div>
+  </section>
+</div>
+
+<style>
+  #dynamic-top-variants { width: 100%; }
+  .top-stage {
+    container-type: size;
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    background: #0b0b0e;
+    color: #f5f5f7;
+    font-family: "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif;
+  }
+  .top-bg { position: absolute; inset: 0;
+    background:
+      radial-gradient(48cqw 38cqh at 24% 34%, rgba(0,161,214,.13), transparent 68%),
+      radial-gradient(48cqw 38cqh at 72% 56%, rgba(251,114,153,.12), transparent 68%),
+      #0b0b0e; }
+  .top-grid { position: absolute; inset: 0; opacity: .34;
+    background-image: linear-gradient(rgba(255,255,255,.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.03) 1px, transparent 1px);
+    background-size: 4.2cqw 4.2cqw;
+    -webkit-mask-image: radial-gradient(circle at 55% 50%, #000 0%, transparent 76%);
+            mask-image: radial-gradient(circle at 55% 50%, #000 0%, transparent 76%); }
+  .top-head { position: absolute; left: 3.3cqw; top: 3.1cqh; right: 3.3cqw;
+    display: flex; align-items: center; justify-content: space-between; z-index: 3; }
+  .brand { display: flex; align-items: center; gap: .9cqw; }
+  .brand strong { font-size: 1.4cqw; letter-spacing: .02em; font-weight: 500; }
+  .brand-logo { position: relative; width: 2.5cqw; height: 2.5cqw; border-radius: .6cqw;
+    background: #000; border: 1px solid rgba(255,255,255,.14); flex: none; }
+  .brand-logo i { position: absolute; left: .53cqw; width: 1.4cqw; height: .82cqw;
+    border: 1px solid #fb7299; border-radius: .18cqw; }
+  .brand-logo i:first-child { top: .42cqw; }
+  .brand-logo i:nth-child(2) { top: 1.28cqw; }
+  .brand-logo b { position: absolute; left: 1.2cqw; top: 1.06cqw; width: 0; height: 0;
+    border-top: .22cqw solid transparent; border-bottom: .22cqw solid transparent;
+    border-left: .34cqw solid #fff; }
+  .top-pill { display: flex; align-items: center; gap: .45cqw; height: 2.2cqw;
+    padding: 0 1.05cqw; border-radius: 99px; border: 1px solid rgba(255,255,255,.14);
+    background: rgba(20,20,24,.72); color: #a9a9b4; font-size: .72cqw;
+    letter-spacing: .12em; white-space: nowrap; }
+  .top-pill .dot { width: .45cqw; height: .45cqw; border-radius: 50%;
+    background: #fb7299; box-shadow: 0 0 0 .3cqw rgba(251,114,153,.12); }
+  .top-note { position: absolute; left: 3.3cqw; right: 3.3cqw; bottom: 2.7cqh;
+    display: flex; justify-content: space-between; color: rgba(255,255,255,.3);
+    font-size: .65cqw; letter-spacing: .14em; }
+  .top-note span { color: rgba(255,255,255,.22); }
+
+  /* shared content */
+  .eyebrow { display: flex; align-items: center; gap: .65cqw; color: #fb7299;
+    font-size: .9cqw; letter-spacing: .12em; font-weight: 500; }
+  .eyebrow i { width: 1.2cqw; height: .11cqw; background: #fb7299; border-radius: 1px; }
+  h1 { font-size: 2.2cqw; line-height: 1.25; font-weight: 500; letter-spacing: -.02em; }
+  h2 { font-size: 1.5cqw; line-height: 1.3; font-weight: 500; }
+  p { font-size: 1.12cqw; line-height: 1.72; color: #a9a9b4; }
+  .avatar { width: 2.6cqw; height: 2.6cqw; border-radius: 50%; flex: none;
+    display: grid; place-items: center; font-size: .95cqw; font-weight: 500;
+    color: #28162f; background: linear-gradient(135deg,#f3c7d8,#b48cf2);
+    border: 1px solid rgba(255,255,255,.16); }
+  .byline { display: flex; align-items: center; gap: .8cqw; }
+  .byline b { display: block; font-size: 1.12cqw; font-weight: 500; }
+  .byline small { display: block; margin-top: .25cqh; color: #73737f; font-size: .8cqw; }
+  .meta { display: flex; align-items: center; gap: 1.5cqw; color: #73737f;
+    font-size: .8cqw; }
+  .meta b { margin-left: auto; color: #fb7299; font-weight: 500; }
+  .p1 { background: radial-gradient(circle at 35% 38%, #ffe6b9 0 17%, transparent 18%),
+    radial-gradient(circle at 68% 44%, #c5e7c3 0 22%, transparent 23%),
+    linear-gradient(135deg,#f4b5c7 0 45%, #7fb6a2 46% 100%); }
+  .p2 { background: radial-gradient(circle at 62% 35%, #ffd9e6 0 16%, transparent 17%),
+    linear-gradient(150deg,#5a7a9d 0 40%, #d2a0b6 41% 70%, #f5dfbf 71% 100%); }
+  .p3 { background: linear-gradient(120deg,#d9b4ec 0 30%, #f1d3a4 31% 60%, #9fb9e8 61% 100%); }
+  .p4 { background: linear-gradient(140deg,#8dc7bc 0 35%, #f4c7b4 36% 65%, #d7a4c4 66% 100%); }
+
+  /* Variant 1: list preview */
+  .preview-split { position: absolute; left: 3.3cqw; right: 3.3cqw; top: 8.2cqh;
+    bottom: 7.2cqh; display: grid; grid-template-columns: 1.18fr .82fr; gap: 3.2cqw; }
+  .mosaic { display: grid; grid-template-columns: 1fr .42fr; gap: .9cqw; min-height: 0; }
+  .mosaic-hero { border-radius: 1.2cqw; position: relative; overflow: hidden;
+    border: 1px solid rgba(255,255,255,.12); }
+  .mosaic-hero span { position: absolute; left: 1cqw; bottom: 1.2cqh; color: #fff;
+    background: rgba(0,0,0,.5); border-radius: .4cqw; padding: .35cqh .7cqw;
+    font-size: .68cqw; }
+  .mosaic-side { display: grid; grid-template-rows: 1fr 1fr; gap: .9cqw; min-height: 0; }
+  .mosaic-side > div { border-radius: 1.2cqw; border: 1px solid rgba(255,255,255,.1);
+    position: relative; overflow: hidden; }
+  .mosaic-side em { position: absolute; right: .7cqw; bottom: .9cqh; color: #fff;
+    background: rgba(0,0,0,.55); border-radius: .35cqw; padding: .3cqh .55cqw;
+    font-style: normal; font-size: .65cqw; }
+  .preview-copy { display: flex; flex-direction: column; justify-content: center; gap: 1.3cqh; }
+  .preview-copy h1 { max-height: none; }
+  .preview-copy p { max-height: 8.2cqh; overflow: hidden; }
+  .preview-copy .meta { margin-top: .5cqh; }
+
+  /* Variant 2: detail */
+  .detail-split { position: absolute; left: 3.3cqw; right: 3.3cqw; top: 8.2cqh;
+    bottom: 7.2cqh; display: grid; grid-template-columns: .92fr 1.08fr; gap: 3.2cqw; }
+  .detail-copy { display: flex; flex-direction: column; justify-content: center; gap: 1.2cqh; }
+  .detail-copy h1 { font-size: 1.9cqw; }
+  .detail-copy p { max-height: 9.2cqh; overflow: hidden; }
+  .detail-copy .dim { color: #73737f; }
+  .detail-copy .meta { margin-top: .4cqh; }
+  .detail-visual { display: grid; grid-template-rows: 1fr 8.2cqh; gap: .9cqw; min-height: 0; }
+  .hero { border-radius: 1.2cqw; border: 1px solid rgba(255,255,255,.13);
+    position: relative; overflow: hidden; }
+  .hero span { position: absolute; right: 1cqw; bottom: 1cqh; color: #fff;
+    background: rgba(0,0,0,.55); border-radius: .4cqw; padding: .35cqh .7cqw;
+    font-size: .7cqw; }
+  .hero-strip { display: grid; grid-template-columns: repeat(3,1fr); gap: .9cqw; min-height: 0; }
+  .hero-strip > div { border-radius: .8cqw; position: relative; overflow: hidden;
+    border: 1px solid rgba(255,255,255,.1); }
+  .hero-strip em { position: absolute; inset: 0; display: grid; place-items: center;
+    color: #fff; background: rgba(0,0,0,.3); font-style: normal; font-size: .8cqw; }
+
+  /* Variant 3: gallery */
+  .gallery-backdrop { position: absolute; inset: -6%; filter: blur(3.2cqw) saturate(.9);
+    opacity: .42; transform: scale(1.08); }
+  .gallery-shade { position: absolute; inset: 0;
+    background: linear-gradient(180deg, rgba(11,11,14,.52) 0%, rgba(11,11,14,.12) 42%,
+      rgba(11,11,14,.82) 100%); }
+  .gallery-frame { position: absolute; left: 50%; top: 8.2cqh; transform: translateX(-50%);
+    width: 67cqw; height: 72cqh; border-radius: 1.2cqw; overflow: hidden;
+    border: 1px solid rgba(255,255,255,.18);
+    box-shadow: 0 2.2cqw 6cqw rgba(0,0,0,.6); }
+  .gallery-frame::after { content: ""; position: absolute; inset: 0;
+    background: linear-gradient(180deg, transparent 58%, rgba(0,0,0,.52) 100%); }
+  .frame-caption { position: absolute; left: 1.2cqw; bottom: 1.3cqh; z-index: 2;
+    color: #fff; font-size: .72cqw; background: rgba(0,0,0,.45); border-radius: .4cqw;
+    padding: .35cqh .7cqw; }
+  .gallery-copy { position: absolute; left: 3.3cqw; bottom: 7.4cqh; z-index: 3;
+    max-width: 38cqw; }
+  .gallery-copy h2 { margin-top: .5cqh; font-size: 1.6cqw; }
+  .gallery-copy p { margin-top: .35cqh; font-size: .82cqw; color: rgba(255,255,255,.55); }
+  .gallery-dots { position: absolute; left: 50%; bottom: 3.2cqh; transform: translateX(-50%);
+    display: flex; gap: .55cqw; z-index: 3; }
+  .gallery-dots i { width: .48cqw; height: .48cqw; border-radius: 50%;
+    background: rgba(255,255,255,.28); }
+  .gallery-dots i.on { width: 1.2cqw; border-radius: 99px; background: #fb7299; }
+
+  /* Variant 4: text-only */
+  .text-stage .top-bg { background:
+      radial-gradient(52cqw 46cqh at 30% 40%, rgba(251,114,153,.13), transparent 66%),
+      radial-gradient(44cqw 40cqh at 82% 68%, rgba(0,161,214,.1), transparent 68%),
+      #0b0b0e; }
+  .quote-mark { position: absolute; right: 3cqw; top: 15cqh; color: rgba(251,114,153,.07);
+    font-family: Georgia, serif; font-size: 30cqw; line-height: 1; pointer-events: none; }
+  .text-copy { position: absolute; left: 7.2cqw; top: 26cqh; width: 56cqw; }
+  .text-copy h1 { margin-top: 1.5cqh; font-size: 2.35cqw; line-height: 1.36; }
+  .text-copy p { margin-top: 1.8cqh; max-width: 46cqw; }
+  .text-copy .byline { margin-top: 2.4cqh; }
+  .text-side { position: absolute; right: 4.2cqw; top: 26cqh; width: 22cqw;
+    display: flex; flex-direction: column; gap: 1.1cqh; }
+  .quote-rule { width: 100%; height: 1px; background: rgba(255,255,255,.1); }
+  .side-label { color: #fb7299; font-size: .7cqw; letter-spacing: .18em; }
+  .side-note { color: #73737f; font-size: .82cqw; line-height: 1.7; }
+  .side-stats { margin-top: 1.2cqh; display: grid; grid-template-columns: auto 1fr auto 1fr auto 1fr;
+    gap: .5cqw; align-items: baseline; }
+  .side-stats b { color: #f5f5f7; font-size: 1.35cqw; font-weight: 500; }
+  .side-stats small { color: #73737f; font-size: .68cqw; }
+
+  @media (max-width: 700px) {
+    .top-pill { letter-spacing: .04em; }
+    .top-note { letter-spacing: .04em; }
+  }
+
+  i[data-lucide] { font-style: normal; line-height: 1; display: inline-flex; align-items: center; justify-content: center; }
+  i[data-lucide="home"]::before { content: "⌂"; }
+  i[data-lucide="layers"]::before { content: "▤"; }
+  i[data-lucide="search"]::before { content: "⌕"; }
+  i[data-lucide="user"]::before { content: "◉"; }
+  i[data-lucide="refresh-cw"]::before { content: "↻"; }
+  i[data-lucide="arrow-left"]::before { content: "←"; }
+  i[data-lucide="chevron-left"]::before { content: "‹"; }
+  i[data-lucide="chevron-right"]::before { content: "›"; }
+  i[data-lucide="x"]::before { content: "×"; }
+</style>
+
+</div>
+<script>
+const sections=Array.from(document.querySelectorAll('#standalone-root > .viz-carousel > section'));
+const tabs=Array.from(document.querySelectorAll('.local-switch button'));
+function show(i){sections.forEach((s,j)=>{s.hidden=false;s.classList.toggle('active',i===j);});tabs.forEach((b,j)=>b.classList.toggle('on',i===j));}
+tabs.forEach((b,i)=>b.addEventListener('click',()=>show(i)));show(0);
+</script></body></html>

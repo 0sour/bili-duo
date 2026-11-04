@@ -1,0 +1,7 @@
+bili-duo is based in part on bilibili-pure-apk:
+  https://github.com/yearzen1/bilibili-pure-apk
+  Copyright (c) 2026 yearzen1
+  Licensed under the MIT License (see LICENSE).
+
+The dual-screen UI architecture is informed by xVideoPlayer, EmuLnk and Wayfinder;
+their code is not included here. See docs/bili-duo-research.md for references.

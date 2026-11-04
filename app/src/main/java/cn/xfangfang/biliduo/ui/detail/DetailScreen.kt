@@ -1,0 +1,1958 @@
+package cn.xfangfang.biliduo.ui.detail
+
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.animation.core.SnapSpec
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.ThumbUp
+import androidx.compose.material.icons.outlined.ArrowDownward
+import androidx.compose.material.icons.outlined.ArrowUpward
+import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.FileDownload
+import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.outlined.ThumbUp
+import androidx.compose.material.icons.automirrored.outlined.PlaylistPlay
+import cn.xfangfang.biliduo.data.model.FavFolder
+import cn.xfangfang.biliduo.data.model.UgcSeason
+import cn.xfangfang.biliduo.data.model.SeasonArchiveItem
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import coil.size.Size
+import cn.xfangfang.biliduo.data.model.VideoInfo
+import cn.xfangfang.biliduo.data.model.VideoPage
+import cn.xfangfang.biliduo.ui.common.CreateFolderDialog
+import cn.xfangfang.biliduo.ui.common.DismissSelectionCard
+import cn.xfangfang.biliduo.ui.common.DismissSelectionClickable
+import cn.xfangfang.biliduo.util.fixPic
+import cn.xfangfang.biliduo.util.formatCount
+import cn.xfangfang.biliduo.util.formatDuration
+import cn.xfangfang.biliduo.util.formatPubdate
+import cn.xfangfang.biliduo.util.formatPubdateCompact
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.snapshotFlow
+import me.saket.telephoto.zoomable.ZoomSpec
+import me.saket.telephoto.zoomable.rememberZoomableState
+import me.saket.telephoto.zoomable.zoomable
+
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
+import android.util.Log
+import android.widget.Toast
+import cn.xfangfang.biliduo.BilibiliApp
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
+import cn.xfangfang.biliduo.data.api.BilibiliApi
+import cn.xfangfang.biliduo.data.download.DownloadManager
+import cn.xfangfang.biliduo.data.local.AppSettings
+import cn.xfangfang.biliduo.data.model.DownloadInfo
+import cn.xfangfang.biliduo.data.model.QualityOption
+import cn.xfangfang.biliduo.data.model.PlayUrlInfo
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
+private fun fullResPic(url: String): String = fixPic(url).substringBefore("@")
+
+private fun formatTimestamp(unixSeconds: Long): String {
+    val now = System.currentTimeMillis() / 1000
+    val diff = now - unixSeconds
+    return when {
+        diff < 60 -> "刚刚"
+        diff < 3600 -> "${diff / 60}分钟前"
+        diff < 86400 -> "${diff / 3600}小时前"
+        diff < 604800 -> "${diff / 86400}天前"
+        else -> SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(unixSeconds * 1000))
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DetailScreen(
+    bvid: String,
+    onBack: () -> Unit,
+    onPlay: (bvid: String) -> Unit,
+    onUploaderClick: (mid: Long) -> Unit = {},
+    onUserClick: (mid: Long) -> Unit = {},
+    onCollectionVideoClick: (bvid: String) -> Unit = {},
+    onOpenNote: (cvid: String) -> Unit = {},
+    viewModel: DetailViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+) {
+    val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var showQualityDialog by remember { mutableStateOf(false) }
+    var availableQualities by remember { mutableStateOf<List<QualityOption>>(emptyList()) }
+    var isLoadingQualities by remember { mutableStateOf(false) }
+    var confirmMobilePlay by remember { mutableStateOf(false) }
+    var confirmMobileDownload by remember { mutableStateOf(false) }
+    var showUnfollowConfirm by remember { mutableStateOf(false) }
+    var showMultiPDialog by remember { mutableStateOf(false) }
+    var multiPQualities by remember { mutableStateOf<List<QualityOption>>(emptyList()) }
+    var multiPSelectedQuality by remember { mutableStateOf<QualityOption?>(null) }
+    var multiPSelectedPages by remember { mutableStateOf<Set<Int>>(emptySet()) }
+
+    fun startDownloadFlow() {
+        val dm = DownloadManager.getInstance(context)
+        val videoInfo = uiState.videoInfo ?: return
+        val pages = videoInfo.pages
+
+        if (pages != null && pages.size > 1) {
+            showMultiPDialog = true
+            multiPSelectedPages = emptySet()
+            multiPSelectedQuality = null
+            scope.launch {
+                try {
+                    val api = BilibiliApi.create()
+                    val response = withContext(Dispatchers.IO) {
+                        api.getPlayUrlDash(bvid = bvid, cid = pages.first().cid)
+                    }
+                    if (response.code == 0) {
+                        val info = response.data
+                        val qualities = info?.accept_quality?.zip(info.accept_description ?: emptyList()) { q, desc ->
+                            QualityOption(quality = q, description = desc)
+                        } ?: emptyList()
+                        multiPQualities = qualities
+                        multiPSelectedQuality = qualities.firstOrNull()
+                    } else {
+                        Toast.makeText(context, "获取画质信息失败", Toast.LENGTH_SHORT).show()
+                        showMultiPDialog = false
+                    }
+                } catch (e: Exception) {
+                    Toast.makeText(context, "获取画质信息失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                    showMultiPDialog = false
+                }
+            }
+            return
+        }
+
+        val existing = dm.getDownload("${bvid}_${videoInfo.cid}")
+        if (existing != null) {
+            val msg = when (existing.status) {
+                DownloadInfo.STATUS_COMPLETED -> "该视频已下载，可在“我的下载”中查看"
+                DownloadInfo.STATUS_DOWNLOADING,
+                DownloadInfo.STATUS_PENDING -> "正在下载中，请稍候"
+                DownloadInfo.STATUS_PAUSED -> "下载已暂停，请到“我的下载”继续"
+                DownloadInfo.STATUS_FAILED -> "上次下载失败，请到“我的下载”重试"
+                else -> "该视频已在下载列表中"
+            }
+            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+            return
+        }
+        scope.launch {
+            isLoadingQualities = true
+            try {
+                val api = BilibiliApi.create()
+                val response = withContext(Dispatchers.IO) {
+                    api.getPlayUrlDash(bvid = bvid, cid = videoInfo.cid)
+                }
+                if (response.code == 0) {
+                    val info = response.data
+                    val qualities = info?.accept_quality?.zip(info.accept_description ?: emptyList()) { q, desc ->
+                        QualityOption(quality = q, description = desc)
+                    } ?: emptyList()
+                    availableQualities = qualities
+                    showQualityDialog = qualities.isNotEmpty()
+                } else {
+                    Toast.makeText(context, "获取画质信息失败", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                Toast.makeText(context, "获取画质信息失败: ${e.message}", Toast.LENGTH_SHORT).show()
+            } finally {
+                isLoadingQualities = false
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        if (uiState.videoInfo == null) {
+            viewModel.load(bvid)
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("视频详情") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                    }
+                }
+            )
+        }
+    ) { padding ->
+        DetailContent(
+            videoInfo = uiState.videoInfo,
+            isLoading = uiState.isLoading,
+            error = uiState.error,
+            comments = uiState.comments,
+            onPlay = {
+                if (AppSettings.wifiOnlyPlayback && !AppSettings.isWifiConnected(context)) {
+                    confirmMobilePlay = true
+                } else {
+                    onPlay(bvid)
+                }
+            },
+            onUploaderClick = onUploaderClick,
+            onUserClick = onUserClick,
+            onOpenNote = onOpenNote,
+            modifier = Modifier.padding(padding),
+            replyThreads = uiState.replyThreads,
+            expandedReplies = uiState.expandedReplies,
+            onToggleReplies = { rpid -> uiState.videoInfo?.let { viewModel.toggleReplies(it.aid, rpid) } },
+            loadingMore = uiState.loadingMore,
+            hasMoreComments = uiState.hasMoreComments,
+            onLoadMoreComments = { uiState.videoInfo?.let { viewModel.loadMoreComments(it.aid) } },
+            pinnedComments = uiState.pinnedComments,
+            commentSortMode = uiState.commentSortMode,
+            loadingComments = uiState.loadingComments,
+            onSortComments = { mode -> uiState.videoInfo?.let { viewModel.setCommentSort(it.aid, mode) } },
+            togglingLikes = uiState.togglingLikes,
+            onToggleCommentLike = { rpid -> uiState.videoInfo?.let { viewModel.toggleCommentLike(it.aid, rpid) } },
+            isFavorited = uiState.isFavorited,
+            favoriteCount = uiState.favoriteCount,
+            isTogglingFavorite = uiState.isTogglingFavorite,
+            favStatusLoading = uiState.favStatusLoading,
+            onToggleFavorite = { uiState.videoInfo?.let { viewModel.onFavoriteClick(it.aid) } },
+            isLoggedIn = uiState.isLoggedIn,
+            isFollowed = uiState.isFollowed,
+            isTogglingFollow = uiState.isTogglingFollow,
+            followStatusLoading = uiState.followStatusLoading,
+            onFollowUploader = { mid ->
+                when (followActionForClick(uiState.isFollowed)) {
+                    FollowAction.Follow -> viewModel.toggleFollowUploader(mid)
+                    FollowAction.ConfirmUnfollow -> showUnfollowConfirm = true
+                }
+            },
+            onDownload = {
+                if (AppSettings.wifiOnlyDownload && !AppSettings.isWifiConnected(context)) {
+                    confirmMobileDownload = true
+                } else {
+                    startDownloadFlow()
+                }
+            },
+            ugcSeason = uiState.ugcSeason,
+            collectionEpisodes = uiState.collectionEpisodes,
+            collectionMeta = uiState.collectionMeta,
+            collectionHasMore = uiState.collectionHasMore,
+            collectionLoadingMore = uiState.collectionLoadingMore,
+            collectionSortDesc = uiState.collectionSortDesc,
+            onLoadCollection = { mid, seasonId -> viewModel.loadCollectionEpisodes(mid, seasonId) },
+            onLoadMoreCollection = { mid, seasonId -> viewModel.loadMoreCollectionEpisodes(mid, seasonId) },
+            onToggleCollectionSort = { mid, seasonId -> viewModel.toggleCollectionSort(mid, seasonId) },
+            onCollectionVideoClick = onCollectionVideoClick
+        )
+    }
+
+    if (showQualityDialog && uiState.videoInfo != null) {
+        val videoInfo = uiState.videoInfo!!
+        QualitySelectionDialog(
+            qualities = availableQualities,
+            onSelect = { quality ->
+                showQualityDialog = false
+                scope.launch {
+                    try {
+                        val api = BilibiliApi.create()
+                        val response = withContext(Dispatchers.IO) {
+                            api.getPlayUrl(bvid = bvid, cid = videoInfo.cid, qn = quality.quality)
+                        }
+                        if (response.code == 0) {
+                            val url = response.data?.durl?.firstOrNull()?.url
+                            if (url != null) {
+                                DownloadManager.getInstance(context).startDownload(
+                                    bvid = bvid,
+                                    cid = videoInfo.cid,
+                                    title = videoInfo.title,
+                                    cover = videoInfo.pic,
+                                    quality = quality.quality,
+                                    qualityDesc = quality.description,
+                                    url = url,
+                                    overrideWifiOnly = true,
+                                    aid = videoInfo.aid
+                                )
+                                Toast.makeText(context, "开始下载: ${videoInfo.title}", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(context, "获取下载链接失败", Toast.LENGTH_SHORT).show()
+                            }
+                        } else {
+                            Toast.makeText(context, "获取下载链接失败", Toast.LENGTH_SHORT).show()
+                        }
+                    } catch (e: Exception) {
+                        Toast.makeText(context, "下载失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            },
+            onDismiss = { showQualityDialog = false }
+        )
+    }
+
+    if (showMultiPDialog && uiState.videoInfo != null) {
+        val videoInfo = uiState.videoInfo!!
+        val pages = videoInfo.pages ?: emptyList()
+        PageSelectionDialog(
+            pages = pages,
+            qualities = multiPQualities,
+            selectedQuality = multiPSelectedQuality,
+            selectedPages = multiPSelectedPages,
+            onToggleAll = {
+                multiPSelectedPages = if (multiPSelectedPages.size == pages.size) {
+                    emptySet()
+                } else {
+                    pages.map { it.page }.toSet()
+                }
+            },
+            onTogglePage = { pageNum ->
+                multiPSelectedPages = if (pageNum in multiPSelectedPages) {
+                    multiPSelectedPages - pageNum
+                } else {
+                    multiPSelectedPages + pageNum
+                }
+            },
+            onSelectQuality = { quality ->
+                multiPSelectedQuality = quality
+            },
+            onConfirm = {
+                val quality = multiPSelectedQuality ?: return@PageSelectionDialog
+                val selected = pages.filter { it.page in multiPSelectedPages }
+                Log.d(BilibiliApp.TAG, "Batch download confirm: totalPages=${pages.size}, selectedPages=${selected.size}, selected=${selected.map { it.page }}")
+                if (selected.isEmpty()) return@PageSelectionDialog
+                showMultiPDialog = false
+                val queued = DownloadManager.getInstance(context).startBatchDownload(
+                    bvid = bvid,
+                    videoTitle = videoInfo.title,
+                    cover = videoInfo.pic,
+                    pages = selected.map {
+                        DownloadManager.BatchPageInfo(
+                            cid = it.cid,
+                            page = it.page,
+                            part = it.part,
+                            aid = videoInfo.aid
+                        )
+                    },
+                    quality = quality.quality,
+                    qualityDesc = quality.description
+                )
+                val message = if (queued == selected.size) {
+                    "已加入下载队列: ${queued} 个分P"
+                } else {
+                    "已加入 $queued 个分P，跳过 ${selected.size - queued} 个"
+                }
+                Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            },
+            onDismiss = { showMultiPDialog = false }
+        )
+    }
+
+    if (confirmMobilePlay) {
+        AlertDialog(
+            onDismissRequest = { confirmMobilePlay = false },
+            title = { Text("移动网络播放") },
+            text = { Text("当前为移动网络，播放将消耗流量，是否继续？") },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmMobilePlay = false
+                    onPlay(bvid)
+                }) {
+                    Text("继续")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmMobilePlay = false }) {
+                    Text("取消")
+                }
+            }
+        )
+    }
+
+    if (confirmMobileDownload) {
+        AlertDialog(
+            onDismissRequest = { confirmMobileDownload = false },
+            title = { Text("移动网络下载") },
+            text = { Text("当前为移动网络，下载将消耗流量，是否继续？") },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmMobileDownload = false
+                    startDownloadFlow()
+                }) {
+                    Text("继续")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmMobileDownload = false }) {
+                    Text("取消")
+                }
+            }
+        )
+    }
+
+    if (showUnfollowConfirm) {
+        val ownerName = uiState.videoInfo?.owner?.name ?: ""
+        AlertDialog(
+            onDismissRequest = { showUnfollowConfirm = false },
+            title = { Text("取消关注") },
+            text = { Text("确定取消关注「$ownerName」？") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showUnfollowConfirm = false
+                    uiState.videoInfo?.owner?.mid?.let { viewModel.toggleFollowUploader(it) }
+                }) {
+                    Text("确定", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showUnfollowConfirm = false }) {
+                    Text("取消")
+                }
+            }
+        )
+    }
+
+    val favError = uiState.favError
+    LaunchedEffect(favError) {
+        if (favError != null) {
+            Toast.makeText(context, favError, Toast.LENGTH_SHORT).show()
+            viewModel.clearFavError()
+        }
+    }
+
+    if (uiState.favPickerVisible && uiState.videoInfo != null) {
+        val aid = uiState.videoInfo!!.aid
+        FavFolderSelectionDialog(
+            folders = uiState.favFolders,
+            loading = uiState.favPickerLoading,
+            selectedFolderId = uiState.selectedFolderId,
+            busy = uiState.isTogglingFavorite,
+            covers = uiState.folderCovers,
+            onSelect = { viewModel.selectFavFolder(it) },
+            onConfirm = { viewModel.confirmFavorite(aid) },
+            onCreateFolder = { viewModel.openCreateFolder() },
+            onDismiss = { viewModel.dismissFavPicker() }
+        )
+    }
+
+    if (uiState.showCreateFolder && uiState.videoInfo != null) {
+        val aid = uiState.videoInfo!!.aid
+        CreateFolderDialog(
+            creating = uiState.creatingFolder,
+            onConfirm = { title, intro, privacy ->
+                viewModel.createFavFolder(aid, title, intro, privacy)
+            },
+            onDismiss = { viewModel.dismissCreateFolder() }
+        )
+    }
+}
+
+@Composable
+private fun QualitySelectionDialog(
+    qualities: List<QualityOption>,
+    onSelect: (QualityOption) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("选择画质") },
+        text = {
+            Column {
+                qualities.forEach { quality ->
+                    TextButton(
+                        onClick = { onSelect(quality) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(quality.description, modifier = Modifier.fillMaxWidth())
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        }
+    )
+}
+
+@Composable
+private fun FavFolderSelectionDialog(
+    folders: List<FavFolder>,
+    loading: Boolean,
+    selectedFolderId: Long?,
+    busy: Boolean,
+    covers: Map<Long, String>,
+    onSelect: (Long) -> Unit,
+    onConfirm: () -> Unit,
+    onCreateFolder: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = { if (!busy) onDismiss() },
+        title = { Text("选择收藏夹") },
+        text = {
+            when {
+                loading -> Row(verticalAlignment = Alignment.CenterVertically) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Text("加载中…")
+                }
+                folders.isEmpty() -> Text("还没有收藏夹，点击下方新建")
+                else -> LazyColumn(modifier = Modifier.heightIn(max = 400.dp)) {
+                    items(folders, key = { it.id }) { folder ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable(enabled = !busy) { onSelect(folder.id) }
+                        ) {
+                            RadioButton(
+                                selected = folder.id == selectedFolderId,
+                                onClick = { if (!busy) onSelect(folder.id) },
+                                enabled = !busy
+                            )
+                            val cover = covers[folder.id]
+                            if (!cover.isNullOrEmpty()) {
+                                AsyncImage(
+                                    model = cover,
+                                    contentDescription = folder.title,
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .clip(RoundedCornerShape(4.dp)),
+                                    contentScale = ContentScale.Crop
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.Folder,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(40.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            Spacer(Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = folder.title,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = "${folder.mediaCount}个视频",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onConfirm,
+                enabled = !busy && !loading && selectedFolderId != null
+            ) {
+                Text("收藏")
+            }
+        },
+        dismissButton = {
+            Row {
+                TextButton(onClick = onCreateFolder, enabled = !busy && !loading) {
+                    Text("新建收藏夹")
+                }
+                TextButton(onClick = onDismiss, enabled = !busy) {
+                    Text("取消")
+                }
+            }
+        }
+    )
+}
+
+@Composable
+private fun PageSelectionDialog(
+    pages: List<VideoPage>,
+    qualities: List<QualityOption>,
+    selectedQuality: QualityOption?,
+    selectedPages: Set<Int>,
+    onToggleAll: () -> Unit,
+    onTogglePage: (Int) -> Unit,
+    onSelectQuality: (QualityOption) -> Unit,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val allSelected = selectedPages.size == pages.size
+    var showQualityMenu by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(
+                        checked = allSelected,
+                        onCheckedChange = { onToggleAll() }
+                    )
+                    Text("全选", style = MaterialTheme.typography.titleMedium)
+                }
+                Box {
+                    TextButton(onClick = { showQualityMenu = true }) {
+                        Text(
+                            text = selectedQuality?.description ?: "画质",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Icon(
+                            Icons.Default.KeyboardArrowDown,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = showQualityMenu,
+                        onDismissRequest = { showQualityMenu = false }
+                    ) {
+                        qualities.forEach { quality ->
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        text = quality.description,
+                                        color = if (quality.quality == selectedQuality?.quality)
+                                            MaterialTheme.colorScheme.primary
+                                        else MaterialTheme.colorScheme.onSurface
+                                    )
+                                },
+                                onClick = {
+                                    onSelectQuality(quality)
+                                    showQualityMenu = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        text = {
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(0.dp),
+                modifier = Modifier.heightIn(max = 400.dp)
+            ) {
+                items(pages.size) { index ->
+                    val page = pages[index]
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onTogglePage(page.page) }
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = page.page in selectedPages,
+                            onCheckedChange = { onTogglePage(page.page) }
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "P${page.page}  ${page.part}",
+                                style = MaterialTheme.typography.bodyLarge,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            if (page.duration > 0) {
+                                Text(
+                                    text = formatDuration(page.duration),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onConfirm,
+                enabled = selectedPages.isNotEmpty()
+            ) {
+                Text("下载 ${selectedPages.size} 个分P")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        }
+    )
+}
+
+@Composable
+private fun DetailContent(
+    videoInfo: VideoInfo?,
+    isLoading: Boolean = false,
+    error: String? = null,
+    comments: List<cn.xfangfang.biliduo.data.model.CommentItem>?,
+    onPlay: () -> Unit,
+    onUploaderClick: (mid: Long) -> Unit = {},
+    onUserClick: (mid: Long) -> Unit = {},
+    modifier: Modifier = Modifier,
+    onOpenNote: (cvid: String) -> Unit = {},
+    replyThreads: Map<Long, ReplyThread> = emptyMap(),
+    expandedReplies: Set<Long> = emptySet(),
+    onToggleReplies: (rpid: Long) -> Unit = {},
+    loadingMore: Boolean = false,
+    hasMoreComments: Boolean = true,
+    onLoadMoreComments: () -> Unit = {},
+    pinnedComments: List<cn.xfangfang.biliduo.data.model.CommentItem> = emptyList(),
+    commentSortMode: Int = 3,
+    loadingComments: Boolean = false,
+    onSortComments: (Int) -> Unit = {},
+    togglingLikes: Set<Long> = emptySet(),
+    onToggleCommentLike: (rpid: Long) -> Unit = {},
+    isFavorited: Boolean = false,
+    favoriteCount: Long = 0,
+    isTogglingFavorite: Boolean = false,
+    favStatusLoading: Boolean = false,
+    onToggleFavorite: () -> Unit = {},
+    isLoggedIn: Boolean = false,
+    isFollowed: Boolean = false,
+    isTogglingFollow: Boolean = false,
+    followStatusLoading: Boolean = false,
+    onFollowUploader: (mid: Long) -> Unit = {},
+    onDownload: () -> Unit = {},
+    ugcSeason: UgcSeason? = null,
+    collectionEpisodes: List<SeasonArchiveItem> = emptyList(),
+    collectionMeta: cn.xfangfang.biliduo.data.model.SeasonMeta? = null,
+    collectionHasMore: Boolean = true,
+    collectionLoadingMore: Boolean = false,
+    collectionSortDesc: Boolean = true,
+    onLoadCollection: (mid: Long, seasonId: Long) -> Unit = { _, _ -> },
+    onLoadMoreCollection: (mid: Long, seasonId: Long) -> Unit = { _, _ -> },
+    onToggleCollectionSort: (mid: Long, seasonId: Long) -> Unit = { _, _ -> },
+    onCollectionVideoClick: (bvid: String) -> Unit = {}
+) {
+    val listState = rememberLazyListState()
+    val context = LocalContext.current
+
+    val nearBottom by remember {
+        derivedStateOf {
+            val layoutInfo = listState.layoutInfo
+            val lastVisible = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            val total = layoutInfo.totalItemsCount
+            total > 0 && lastVisible >= total - 5
+        }
+    }
+
+    LaunchedEffect(nearBottom, hasMoreComments, loadingMore, comments) {
+        if (nearBottom && hasMoreComments && !loadingMore && comments != null) {
+            delay(500)
+            if (hasMoreComments && !loadingMore) {
+                onLoadMoreComments()
+            }
+        }
+    }
+
+    val scope = rememberCoroutineScope()
+    val showScrollToTop by remember {
+        derivedStateOf { listState.firstVisibleItemIndex >= 6 }
+    }
+    val showScrollToComments by remember {
+        derivedStateOf { listState.firstVisibleItemIndex < 4 }
+    }
+
+    fun toggleRepliesWithAnchor(rpid: Long) {
+        if (rpid !in expandedReplies) {
+            onToggleReplies(rpid)
+            return
+        }
+        val first = listState.layoutInfo.visibleItemsInfo.firstOrNull()
+        val target = collapseScrollTargetIndex(
+            rpid = rpid,
+            isPinned = pinnedComments.any { it.rpid == rpid },
+            threadChildRpids = replyThreads[rpid]?.items?.map { it.rpid } ?: emptyList(),
+            firstVisibleKey = first?.key,
+            firstVisibleIndex = first?.index ?: 0
+        )
+        if (target == null) {
+            onToggleReplies(rpid)
+        } else {
+            scope.launch {
+                listState.scrollToItem(target)
+                onToggleReplies(rpid)
+            }
+        }
+    }
+
+    Box(modifier = modifier.fillMaxSize()) {
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            if (videoInfo != null) {
+                item {
+                    AsyncImage(
+                        model = fixPic(videoInfo.pic),
+                        contentDescription = videoInfo.title,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp),
+                        contentScale = ContentScale.Crop
+                    )
+                }
+
+                item {
+                    SelectionContainer {
+                        Text(
+                            text = videoInfo.title,
+                            style = MaterialTheme.typography.headlineSmall
+                        )
+                    }
+                }
+
+                item {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        DismissSelectionClickable(
+                            modifier = Modifier.weight(1f),
+                            onClick = { onUploaderClick(videoInfo.owner.mid) }
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                            AsyncImage(
+                                model = fixPic(videoInfo.owner.face),
+                                contentDescription = videoInfo.owner.name,
+                                modifier = Modifier.size(40.dp),
+                                contentScale = ContentScale.Crop
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            SelectionContainer {
+                                Text(
+                                    text = videoInfo.owner.name,
+                                    style = MaterialTheme.typography.bodyLarge
+                                )
+                            }
+                            }
+                        }
+                        if (isLoggedIn) {
+                            TextButton(
+                                onClick = { onFollowUploader(videoInfo.owner.mid) },
+                                enabled = !isTogglingFollow && !followStatusLoading,
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                if (followStatusLoading) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(16.dp),
+                                        strokeWidth = 2.dp
+                                    )
+                                } else {
+                                    Text(
+                                        text = followButtonLabel(isFollowed),
+                                        style = MaterialTheme.typography.labelMedium
+                                    )
+                                }
+                            }
+                        }
+                        Button(onClick = onPlay) {
+                            Icon(Icons.Default.PlayArrow, contentDescription = null)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("播放")
+                        }
+                    }
+                }
+
+                item {
+                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        StatChip("播放", formatCount(videoInfo.stat.view))
+                        StatChip("点赞", formatCount(videoInfo.stat.like))
+                        StatChip("弹幕", formatCount(videoInfo.stat.danmaku))
+                        StatChip("评论", formatCount(videoInfo.stat.reply))
+                    }
+                }
+
+                item {
+                    val dateStr = formatPubdate(videoInfo.pubdate)
+                    Text(
+                        text = "发布日期：$dateStr",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                item {
+                    var expanded by remember { mutableStateOf(false) }
+                    var isTruncated by remember { mutableStateOf(false) }
+
+                    Column {
+                        SelectionContainer {
+                            Text(
+                                text = videoInfo.desc,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = if (expanded) Int.MAX_VALUE else 3,
+                                overflow = TextOverflow.Ellipsis,
+                                onTextLayout = { if (!expanded) isTruncated = it.hasVisualOverflow }
+                            )
+                        }
+                        if (isTruncated) {
+                            TextButton(onClick = { expanded = !expanded }) {
+                                Text(if (expanded) "收起" else "展开全部")
+                            }
+                        }
+                    }
+                }
+
+                item {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(
+                            onClick = onToggleFavorite,
+                            enabled = favoriteButtonEnabled(
+                                isToggling = isTogglingFavorite,
+                                loading = favStatusLoading
+                            )
+                        ) {
+                            if (favStatusLoading) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(24.dp),
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = if (isFavorited) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                                    contentDescription = if (isFavorited) "取消收藏" else "收藏",
+                                    tint = if (isFavorited) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        Text(
+                            text = formatCount(favoriteCount),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        IconButton(onClick = onDownload) {
+                            Icon(
+                                imageVector = Icons.Outlined.FileDownload,
+                                contentDescription = "下载",
+                                modifier = Modifier.size(26.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Spacer(modifier = Modifier.weight(1f))
+                        IconButton(onClick = {
+                            val title = videoInfo.title
+                            val url = "https://www.bilibili.com/video/${videoInfo.bvid}"
+                            val shareText = "【$title】$url"
+                            val intent = Intent(Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(Intent.EXTRA_TEXT, shareText)
+                            }
+                            try {
+                                context.startActivity(Intent.createChooser(intent, "分享到"))
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "未找到可分享的应用", Toast.LENGTH_SHORT).show()
+                            }
+                        }) {
+                            Icon(
+                                imageVector = Icons.Outlined.Share,
+                                contentDescription = "分享",
+                                modifier = Modifier.size(24.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                if (ugcSeason != null) {
+                    item(key = "ugc_season") {
+                        val totalEpisodes = collectionMeta?.total
+                            ?: ugcSeason.sections?.sumOf { it.episodes?.size ?: 0 } ?: 0
+                        val mid = videoInfo?.owner?.mid
+                        val seasonId = ugcSeason.id
+
+                        var showCollectionSheet by remember { mutableStateOf(false) }
+
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    if (mid != null && seasonId > 0) {
+                                        showCollectionSheet = true
+                                    }
+                                }
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.AutoMirrored.Outlined.PlaylistPlay,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "合集：${ugcSeason.title}",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    modifier = Modifier.weight(1f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                if (totalEpisodes > 0) {
+                                    Text(
+                                        text = "${totalEpisodes}集",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+
+                        if (showCollectionSheet && mid != null && seasonId > 0) {
+                            // Full episode list from ugcSeason (already loaded with videoInfo)
+                            val allEpisodes = remember(ugcSeason) {
+                                ugcSeason.sections?.flatMap { section ->
+                                    section.episodes?.map { ep ->
+                                        SeasonArchiveItem(
+                                            bvid = ep.bvid,
+                                            title = ep.arc?.title ?: ep.title,
+                                            pic = ep.arc?.pic ?: "",
+                                            duration = ep.arc?.duration ?: ep.page?.duration ?: 0,
+                                            pubdate = ep.arc?.pubdate ?: 0,
+                                            stat = ep.arc?.stat
+                                        )
+                                    } ?: emptyList()
+                                } ?: emptyList()
+                            }
+                            CollectionBottomSheet(
+                                seasonTitle = ugcSeason.title,
+                                episodes = allEpisodes,
+                                currentBvid = videoInfo?.bvid ?: "",
+                                onDismiss = { showCollectionSheet = false },
+                                onEpisodeClick = { bvid ->
+                                    showCollectionSheet = false
+                                    if (bvid.isNotBlank() && bvid != videoInfo?.bvid) {
+                                        onCollectionVideoClick(bvid)
+                                    }
+                                }
+                            )
+                        }
+                    }
+                }
+
+                item(key = "comments_header") {
+                    Column {
+                        Text(
+                            text = "评论 (${videoInfo.stat.reply})",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            FilterChip(
+                                selected = commentSortMode == 3,
+                                onClick = { onSortComments(3) },
+                                label = { Text("热门") }
+                            )
+                            FilterChip(
+                                selected = commentSortMode == 2,
+                                onClick = { onSortComments(2) },
+                                label = { Text("最新") }
+                            )
+                        }
+                    }
+                }
+
+                if (loadingComments) {
+                    item(key = "comments_loading") {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(Modifier.size(24.dp))
+                        }
+                    }
+                }
+
+                if (pinnedComments.isNotEmpty()) {
+                    pinnedComments.forEach { comment ->
+                        val rpid = comment.rpid
+                        val thread = replyThreads[rpid]
+                        val isExpanded = rpid in expandedReplies
+                        item(key = "pinned_$rpid") {
+                            CommentCard(
+                                comment = comment,
+                                thread = thread,
+                                isExpanded = isExpanded,
+                                isPinned = true,
+                                isLiked = comment.action == 1,
+                                isTogglingLike = comment.rpid in togglingLikes,
+                                onToggle = { toggleRepliesWithAnchor(rpid) },
+                                onUserClick = onUserClick,
+                                onOpenNote = onOpenNote,
+                                onToggleLike = {
+                                    if (isLoggedIn) onToggleCommentLike(comment.rpid)
+                                    else Toast.makeText(context, "请先登录", Toast.LENGTH_SHORT).show()
+                                }
+                            )
+                        }
+                        if (isExpanded && thread != null) {
+                            thread.items.forEach { reply ->
+                                item(key = "pinned_r_$rpid:${reply.rpid}") {
+                                    ReplyRow(
+                                        reply = reply,
+                                        onUserClick = onUserClick,
+                                        onOpenNote = onOpenNote,
+                                        isLiked = reply.action == 1,
+                                        isTogglingLike = reply.rpid in togglingLikes,
+                                        onToggleLike = {
+                                            if (isLoggedIn) onToggleCommentLike(reply.rpid)
+                                            else Toast.makeText(context, "请先登录", Toast.LENGTH_SHORT).show()
+                                        }
+                                    )
+                                }
+                            }
+                            item(key = "pinned_collapse_$rpid") {
+                                TextButton(
+                                    onClick = { toggleRepliesWithAnchor(rpid) },
+                                    modifier = Modifier.padding(start = 32.dp)
+                                ) {
+                                    Text("收起回复")
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (comments != null) {
+                    comments.forEach { comment ->
+                        val rpid = comment.rpid
+                        val thread = replyThreads[rpid]
+                        val isExpanded = rpid in expandedReplies
+
+                        item(key = rpid) {
+                            CommentCard(
+                                comment = comment,
+                                thread = thread,
+                                isExpanded = isExpanded,
+                                isPinned = false,
+                                isLiked = comment.action == 1,
+                                isTogglingLike = comment.rpid in togglingLikes,
+                                onToggle = { toggleRepliesWithAnchor(rpid) },
+                                onUserClick = onUserClick,
+                                onOpenNote = onOpenNote,
+                                onToggleLike = {
+                                    if (isLoggedIn) onToggleCommentLike(comment.rpid)
+                                    else Toast.makeText(context, "请先登录", Toast.LENGTH_SHORT).show()
+                                }
+                            )
+                        }
+
+                        if (isExpanded && thread != null) {
+                            thread.items.forEach { reply ->
+                                item(key = "r_$rpid:${reply.rpid}") {
+                                    ReplyRow(
+                                        reply = reply,
+                                        onUserClick = onUserClick,
+                                        onOpenNote = onOpenNote,
+                                        isLiked = reply.action == 1,
+                                        isTogglingLike = reply.rpid in togglingLikes,
+                                        onToggleLike = {
+                                            if (isLoggedIn) onToggleCommentLike(reply.rpid)
+                                            else Toast.makeText(context, "请先登录", Toast.LENGTH_SHORT).show()
+                                        }
+                                    )
+                                }
+                            }
+                            item(key = "collapse_$rpid") {
+                                TextButton(
+                                    onClick = { toggleRepliesWithAnchor(rpid) },
+                                    modifier = Modifier.padding(start = 32.dp)
+                                ) {
+                                    Text("收起回复")
+                                }
+                            }
+                        }
+                    }
+                }
+
+                item(key = "bottom") {
+                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        when {
+                            loadingMore -> CircularProgressIndicator(Modifier.size(24.dp))
+                            hasMoreComments -> TextButton(onClick = onLoadMoreComments) {
+                                Text("加载更多评论", style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (videoInfo == null) {
+            when {
+                isLoading -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator()
+                    }
+                }
+                error != null -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("加载失败：$error")
+                    }
+                }
+            }
+        } else {
+            if (showScrollToTop) {
+                FloatingActionButton(
+                    onClick = { scope.launch { listState.scrollToItem(0) } },
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(16.dp),
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                ) {
+                    Icon(Icons.Default.KeyboardArrowUp, contentDescription = "回到顶部")
+                }
+            }
+
+            if (showScrollToComments) {
+                FloatingActionButton(
+                    onClick = { scope.launch { listState.scrollToItem(commentsHeaderIndex(ugcSeason != null)) } },
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(16.dp),
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                ) {
+                    Icon(Icons.Default.KeyboardArrowDown, contentDescription = "跳至评论区")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CommentCard(
+    comment: cn.xfangfang.biliduo.data.model.CommentItem,
+    thread: ReplyThread?,
+    isExpanded: Boolean,
+    isPinned: Boolean = false,
+    isLiked: Boolean = false,
+    isTogglingLike: Boolean = false,
+    onToggle: () -> Unit,
+    onUserClick: (mid: Long) -> Unit = {},
+    onOpenNote: (cvid: String) -> Unit = {},
+    onToggleLike: () -> Unit = {}
+) {
+    val isNote = comment.isNoteComment()
+    val noteCvid = if (isNote) comment.getNoteCvid() else null
+    DismissSelectionCard(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = if (comment.rcount > 0) ({ onToggle() }) else null,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Column(modifier = Modifier.padding(8.dp)) {
+            Row {
+                AsyncImage(
+                    model = fixPic(comment.member.avatar),
+                    contentDescription = comment.member.uname,
+                    modifier = Modifier.size(32.dp),
+                    contentScale = ContentScale.Crop
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = comment.member.uname,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier
+                                .weight(1f, fill = false)
+                                .clickable { onUserClick(comment.member.mid) }
+                        )
+                        if (isPinned) {
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = MaterialTheme.colorScheme.primary,
+                                contentColor = Color.White
+                            ) {
+                                Text(
+                                    text = "置顶",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                )
+                            }
+                        }
+                        if (isNote) {
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = MaterialTheme.colorScheme.primary,
+                                contentColor = Color.White
+                            ) {
+                                Text(
+                                    text = "笔记",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = formatTimestamp(comment.ctime),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    SelectionContainer {
+                        CommentText(
+                            message = comment.getNotePreview(),
+                            emote = comment.content.emote,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                    comment.content.pictures?.let { pictures ->
+                        CommentPicturesRow(pictures = pictures)
+                    }
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (comment.rcount > 0) {
+                            Text(
+                                text = when {
+                                    thread?.isLoading == true -> "加载中..."
+                                    thread?.hasMore == false && isExpanded -> "${comment.rcount} 条回复"
+                                    isExpanded -> "收起回复"
+                                    else -> "${comment.rcount} 条回复"
+                                },
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        if (isNote && noteCvid != null) {
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                text = "📒 查看笔记 >",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.clickable { onOpenNote(noteCvid) }
+                            )
+                        }
+                        Spacer(modifier = Modifier.weight(1f))
+                        CommentLikeButton(
+                            liked = isLiked,
+                            likeCount = comment.like,
+                            enabled = !isTogglingLike,
+                            onClick = onToggleLike
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReplyRow(
+    reply: cn.xfangfang.biliduo.data.model.CommentItem,
+    onUserClick: (mid: Long) -> Unit = {},
+    onOpenNote: (cvid: String) -> Unit = {},
+    isLiked: Boolean = false,
+    isTogglingLike: Boolean = false,
+    onToggleLike: () -> Unit = {}
+) {
+    val isNote = reply.isNoteComment()
+    val noteCvid = if (isNote) reply.getNoteCvid() else null
+    Row(modifier = Modifier.padding(start = 32.dp)) {
+        AsyncImage(
+            model = fixPic(reply.member.avatar),
+            contentDescription = reply.member.uname,
+            modifier = Modifier.size(24.dp),
+            contentScale = ContentScale.Crop
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = reply.member.uname,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .weight(1f, fill = false)
+                        .clickable { onUserClick(reply.member.mid) }
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = formatTimestamp(reply.ctime),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            SelectionContainer {
+                CommentText(
+                    message = reply.getNotePreview(),
+                    emote = reply.content.emote,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+            reply.content.pictures?.let { pictures ->
+                CommentPicturesRow(pictures = pictures)
+            }
+            if (isNote && noteCvid != null) {
+                Text(
+                    text = "📒 查看笔记 >",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onOpenNote(noteCvid) }
+                        .padding(top = 2.dp)
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                CommentLikeButton(
+                    liked = isLiked,
+                    likeCount = reply.like,
+                    compact = true,
+                    enabled = !isTogglingLike,
+                    onClick = onToggleLike
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CommentLikeButton(
+    liked: Boolean,
+    likeCount: Int,
+    enabled: Boolean,
+    compact: Boolean = false,
+    onClick: () -> Unit
+) {
+    TextButton(
+        onClick = onClick,
+        enabled = enabled,
+        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
+    ) {
+        Icon(
+            imageVector = if (liked) Icons.Filled.ThumbUp else Icons.Outlined.ThumbUp,
+            contentDescription = if (liked) "取消点赞" else "点赞",
+            modifier = Modifier.size(if (compact) 14.dp else 16.dp),
+            tint = if (liked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.width(3.dp))
+        Text(
+            text = formatCount(likeCount.toLong()),
+            style = if (compact) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelMedium,
+            color = if (liked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun CommentPicturesRow(pictures: List<cn.xfangfang.biliduo.data.model.CommentPicture>) {
+    var showViewer by remember { mutableStateOf(false) }
+    var initialIndex by remember { mutableStateOf(0) }
+
+    Row(
+        modifier = Modifier
+            .padding(top = 4.dp)
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        pictures.forEachIndexed { index, picture ->
+            val ratio = if (picture.imgWidth > 0 && picture.imgHeight > 0)
+                picture.imgWidth.toFloat() / picture.imgHeight.toFloat() else 1f
+            AsyncImage(
+                model = fixPic(picture.imgSrc),
+                contentDescription = null,
+                modifier = Modifier
+                    .height(80.dp)
+                    .aspectRatio(ratio, matchHeightConstraintsFirst = true)
+                    .clip(RoundedCornerShape(4.dp))
+                    .clickable {
+                        initialIndex = index
+                        showViewer = true
+                    },
+                contentScale = ContentScale.Crop
+            )
+        }
+    }
+
+    if (showViewer) {
+        CommentImageViewer(
+            pictures = pictures,
+            initialIndex = initialIndex,
+            onClose = { showViewer = false }
+        )
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun CommentImageViewer(
+    pictures: List<cn.xfangfang.biliduo.data.model.CommentPicture>,
+    initialIndex: Int,
+    onClose: () -> Unit
+) {
+    Dialog(
+        onDismissRequest = onClose,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false
+        )
+    ) {
+        val context = LocalContext.current
+        val scope = rememberCoroutineScope()
+        var showActions by remember { mutableStateOf(false) }
+        var currentScale by remember { mutableStateOf(1f) }
+        val pagerState = rememberPagerState(
+            initialPage = initialIndex,
+            pageCount = { pictures.size }
+        )
+
+        val savePermissionLauncher = rememberLauncherForActivityResult(
+            ActivityResultContracts.RequestPermission()
+        ) { granted ->
+            if (granted) {
+                scope.launch {
+                    CommentImageActions.saveToGallery(context, fullResPic(pictures[pagerState.currentPage].imgSrc))
+                }
+            } else {
+                Toast.makeText(context, "需要存储权限才能保存图片", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        LaunchedEffect(pagerState.currentPage) {
+            currentScale = 1f
+        }
+
+        Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.9f))) {
+            HorizontalPager(
+                state = pagerState,
+                userScrollEnabled = currentScale <= 1.01f,
+                modifier = Modifier.fillMaxSize()
+            ) { page ->
+                ZoomableImage(
+                    model = fullResPic(pictures[page].imgSrc),
+                    contentDescription = null,
+                    onTap = {
+                        if (showActions) showActions = false else onClose()
+                    },
+                    onLongPress = { showActions = true },
+                    onScaleChanged = { currentScale = it }
+                )
+            }
+
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                if (showActions) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    ) {
+                        ViewerActionButton(
+                            icon = Icons.Outlined.FileDownload,
+                            label = "保存",
+                            onClick = {
+                                showActions = false
+                                val url = fullResPic(pictures[pagerState.currentPage].imgSrc)
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                    scope.launch {
+                                        CommentImageActions.saveToGallery(context, url)
+                                    }
+                                } else if (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
+                                    scope.launch {
+                                        CommentImageActions.saveToGallery(context, url)
+                                    }
+                                } else {
+                                    savePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                                }
+                            }
+                        )
+                        ViewerActionButton(
+                            icon = Icons.Outlined.ContentCopy,
+                            label = "复制",
+                            onClick = {
+                                showActions = false
+                                scope.launch {
+                                    CommentImageActions.copyToClipboard(context, fullResPic(pictures[pagerState.currentPage].imgSrc))
+                                }
+                            }
+                        )
+                    }
+                }
+                Text(
+                    text = "${pagerState.currentPage + 1} / ${pictures.size}",
+                    color = Color.White,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ZoomableImage(
+    model: Any?,
+    contentDescription: String?,
+    onTap: () -> Unit,
+    onLongPress: () -> Unit = {},
+    onScaleChanged: (Float) -> Unit = {},
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val request = remember(model) {
+        ImageRequest.Builder(context)
+            .data(model)
+            .size(4096)
+            .build()
+    }
+    // telephoto:捏合缩放/双击切换/拖动/单击/长按全部内置,并自动把未缩放时的
+    // 横滑让位给外层 HorizontalPager 翻页、放大后拖动归自己
+    val zoomState = rememberZoomableState(
+        zoomSpec = ZoomSpec(maxZoomFactor = 3f)
+    )
+
+    LaunchedEffect(model) {
+        zoomState.resetZoom(SnapSpec())
+    }
+
+    // zoomFraction:0=完全缩小(未放大),>0=已放大。用于驱动外层 Pager 的翻页开关
+    LaunchedEffect(zoomState) {
+        snapshotFlow { zoomState.zoomFraction }
+            .collect { fraction -> onScaleChanged(fraction ?: 0f) }
+    }
+
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .zoomable(
+                state = zoomState,
+                onClick = { onTap() },
+                onLongClick = { onLongPress() },
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        AsyncImage(
+            model = request,
+            contentDescription = contentDescription,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Fit
+        )
+    }
+}
+
+@Composable
+private fun ViewerActionButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    onClick: () -> Unit
+) {
+    val shape = RoundedCornerShape(24.dp)
+    Surface(
+        onClick = onClick,
+        shape = shape,
+        color = Color.Black.copy(alpha = 0.4f),
+        contentColor = Color.White
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                modifier = Modifier.size(18.dp)
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelLarge
+            )
+        }
+    }
+}
+
+@Composable
+private fun StatChip(label: String, value: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleSmall
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CollectionBottomSheet(
+    seasonTitle: String,
+    episodes: List<SeasonArchiveItem>,
+    currentBvid: String,
+    onDismiss: () -> Unit,
+    onEpisodeClick: (String) -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val screenHeight = LocalConfiguration.current.screenHeightDp.dp
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = screenHeight * 0.6f)
+        ) {
+            var sortDesc by remember { mutableStateOf(true) }
+            val sortedEpisodes = remember(episodes, sortDesc) {
+                if (sortDesc) episodes.sortedByDescending { it.pubdate }
+                else episodes.sortedBy { it.pubdate }
+            }
+
+            // Title bar
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "合集：$seasonTitle（${episodes.size}集）",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                TextButton(onClick = { sortDesc = !sortDesc }) {
+                    Icon(
+                        if (sortDesc) Icons.Outlined.ArrowDownward else Icons.Outlined.ArrowUpward,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(if (sortDesc) "最新" else "最旧")
+                }
+            }
+
+            HorizontalDivider()
+
+            // Episode list
+            if (sortedEpisodes.isEmpty()) {
+                Text(
+                    text = "（暂无分集）",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(16.dp)
+                )
+            } else {
+                val listState = rememberLazyListState()
+                var isFirstSort by remember { mutableStateOf(true) }
+
+                // Scroll to current video (one-shot on first open)
+                LaunchedEffect(Unit) {
+                    val index = sortedEpisodes.indexOfFirst { it.bvid == currentBvid }
+                    Log.d(BilibiliApp.TAG, "scroll to current: bvid=$currentBvid size=${sortedEpisodes.size} index=$index")
+                    if (index > 0) {
+                        listState.scrollToItem(index)
+                        Log.d(BilibiliApp.TAG, "scrolled to index $index")
+                    }
+                }
+
+                // Scroll to top on sort toggle (skip first)
+                LaunchedEffect(sortDesc) {
+                    if (isFirstSort) {
+                        isFirstSort = false
+                    } else {
+                        listState.scrollToItem(0)
+                    }
+                }
+
+                LazyColumn(state = listState) {
+                    items(
+                        count = sortedEpisodes.size,
+                        key = { sortedEpisodes[it].bvid }
+                    ) { index ->
+                        val item = sortedEpisodes[index]
+                        BottomSheetEpisodeRow(
+                            item = item,
+                            isCurrent = item.bvid == currentBvid,
+                            onClick = { onEpisodeClick(item.bvid) }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BottomSheetEpisodeRow(
+    item: SeasonArchiveItem,
+    isCurrent: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = !isCurrent) { onClick() }
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Cover image with duration badge
+        val coverUrl = item.pic.let { pic ->
+            when {
+                pic.startsWith("//") -> "https:$pic"
+                pic.startsWith("http://") -> "https:${pic.removePrefix("http:")}"
+                else -> pic
+            }
+        }
+        if (coverUrl.isNotBlank()) {
+            Box {
+                AsyncImage(
+                    model = coverUrl,
+                    contentDescription = item.title,
+                    modifier = Modifier
+                        .size(width = 120.dp, height = 68.dp)
+                        .clip(RoundedCornerShape(6.dp)),
+                    contentScale = ContentScale.Crop
+                )
+                val duration = item.duration
+                if (duration > 0) {
+                    Text(
+                        text = formatDuration(duration),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White,
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(topStart = 4.dp))
+                            .padding(horizontal = 4.dp, vertical = 1.dp)
+                    )
+                }
+            }
+        } else {
+            if (isCurrent) {
+                Icon(
+                    Icons.Filled.PlayArrow,
+                    contentDescription = "当前播放",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+            } else {
+                Spacer(modifier = Modifier.size(20.dp))
+            }
+        }
+
+        Spacer(modifier = Modifier.width(8.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = item.title.ifBlank { item.bvid },
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (isCurrent) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.onSurface,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Row(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = "${formatCount(item.stat?.view ?: 0)}播放",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                if (item.pubdate > 0) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = formatPubdateCompact(item.pubdate),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        softWrap = false
+                    )
+                }
+            }
+        }
+    }
+}

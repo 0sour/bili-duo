@@ -1,0 +1,618 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>动态图文 · 双屏联动交互示意</title>
+<style>
+  html,body { margin:0; background:#17181b; color:#f2f2f4;
+    font-family:"Noto Sans SC","Microsoft YaHei",system-ui,sans-serif; }
+  body { padding: 16px 18px 24px; }
+  #standalone-root { width: min(1280px, 100%); }
+  .local-switch { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 12px; }
+  .local-switch button { font: inherit; font-size:12px; color:#a6a6ae; background:rgba(255,255,255,.06);
+    border:1px solid rgba(255,255,255,.12); border-radius:999px; padding:6px 12px; cursor:pointer; }
+  .local-switch button.on { color:#1a0710; background:#fb7299; border-color:#fb7299; }
+  
+</style>
+</head>
+<body>
+
+<div id="standalone-root">
+<div id="dynamic-dual-demo">
+  <div class="demo-head">
+    <div class="demo-title"><b>动态图文 · 双屏联动</b><span>点击下屏卡片 / 图片，观察上屏状态</span></div>
+    <div class="demo-state" id="demo-state"><i></i><span>列表预览</span></div>
+  </div>
+
+  <div class="demo-screens">
+    <section class="screen-wrap">
+      <div class="screen-label"><b>上屏</b><span>1920 × 1080 · 只读</span></div>
+      <div class="top-screen" id="top-screen">
+        <div class="top-bg"></div>
+        <div class="top-grid"></div>
+        <header class="top-head">
+          <div class="brand"><span class="brand-logo"><i></i><i></i><b></b></span><strong>Bili-Duo</strong></div>
+          <span class="top-pill"><i></i><span id="top-pill-text">PREVIEW · 上屏预览</span></span>
+        </header>
+
+        <div class="top-state state-preview active" data-top="preview">
+          <div class="preview-split">
+            <div class="mosaic">
+              <div class="mosaic-hero p1"><span>饼干的下午</span></div>
+              <div class="mosaic-side"><div class="p2"></div><div class="p3"><em>+2</em></div></div>
+            </div>
+            <div class="preview-copy">
+              <div class="eyebrow"><i></i>DYNAMIC / 图文动态</div>
+              <h1>今天出去做饼干噜<br>是七夕的礼物哦</h1>
+              <div class="byline"><span class="avatar">甜</span><div><b>甜夕sweet</b><small>8分钟前 · 4 张图片</small></div></div>
+              <p>做到现在还没做完。最近每天都有好多小奖状贴啵啵间，感觉被吸夕猫的爱意狠狠包围噜。</p>
+              <div class="meta"><span>评论 0</span><span>转发 0</span><span>赞 18</span><b>聚焦卡片 · 按 A 阅读</b></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="top-state state-detail" data-top="detail">
+          <div class="detail-split">
+            <div class="detail-copy">
+              <div class="eyebrow"><i></i>DYNAMIC / 图文阅读</div>
+              <h1>今天的饼干<br>与七夕礼物</h1>
+              <p>今天出去做饼干噜（是七夕的礼物哦）~做到现在还没做完。最近每天都有好多小奖状贴啵啵间，感觉被吸夕猫的爱意狠狠包围噜。</p>
+              <p class="dim">感谢@鲜榨甜橙一杯 姐姐的咩咩，真的好可爱；感谢@烙弓 宝贝的咩咩，是好久不见的老朋友啦。</p>
+              <div class="byline"><span class="avatar">甜</span><div><b>甜夕sweet</b><small>8分钟前 · 图文</small></div></div>
+              <div class="meta"><span>评论 0</span><span>转发 0</span><span>赞 18</span><b>下屏滚动阅读 · B 返回</b></div>
+            </div>
+            <div class="detail-visual">
+              <div class="hero p1" id="top-detail-hero"><span id="top-detail-count">1 / 4</span></div>
+              <div class="hero-strip">
+                <div class="p2"></div><div class="p3"></div><div class="p4"><em>+1</em></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="top-state state-gallery" data-top="gallery">
+          <div class="gallery-backdrop p1" id="top-gallery-backdrop"></div>
+          <div class="gallery-shade"></div>
+          <div class="gallery-frame p1" id="top-gallery-frame">
+            <span class="frame-caption" id="top-gallery-caption">插画 1 · 饼干的下午</span>
+          </div>
+          <div class="gallery-copy">
+            <div class="eyebrow"><i></i><span id="top-gallery-byline">甜夕sweet · 8分钟前</span></div>
+            <h2>今天的饼干与礼物</h2>
+            <p>下屏方向键切换图片 · B 关闭画册</p>
+          </div>
+          <div class="gallery-dots" id="top-gallery-dots"><i class="on"></i><i></i><i></i><i></i></div>
+        </div>
+
+        <div class="top-state state-text" data-top="text">
+          <div class="quote-mark">“</div>
+          <div class="text-copy">
+            <div class="eyebrow"><i></i>DYNAMIC / 纯文字</div>
+            <h1>今天出去做饼干噜<br>做到现在还没做完。</h1>
+            <p>最近每天都有好多小奖状贴啵啵间，感觉被吸夕猫的爱意狠狠包围噜。感谢@鲜榨甜橙一杯 姐姐的咩咩，真的好可爱。</p>
+            <div class="byline"><span class="avatar av-b">明</span><div><b>明日方舟终末地</b><small>2天前 · 动态</small></div></div>
+          </div>
+          <div class="text-side">
+            <div class="quote-rule"></div>
+            <span class="side-label">NO IMAGES</span>
+            <span class="side-note">没有配图时，上屏用排版呈现正文，而不是留一块空封面。</span>
+            <div class="side-stats"><b>306</b><small>评论</small><b>226</b><small>转发</small><b>1678</b><small>赞</small></div>
+          </div>
+        </div>
+
+        <footer class="top-note"><span>上屏只读 · 下屏操作</span><span id="top-note-state">PREVIEW</span></footer>
+      </div>
+    </section>
+
+    <section class="screen-wrap bottom-wrap">
+      <div class="screen-label"><b>下屏</b><span>1280 × 960 · 可操作</span></div>
+      <div class="bottom-screen" id="bottom-screen">
+        <div class="bottom-shell">
+          <aside class="rail">
+            <div class="logo"><span></span><span></span><b></b></div>
+            <div class="rail-item"><em>⌂</em><small>首页</small></div>
+            <div class="rail-item active"><em>▤</em><small>动态</small></div>
+            <div class="rail-item"><em>⌕</em><small>搜索</small></div>
+            <div class="rail-item"><em>◉</em><small>个人</small></div>
+          </aside>
+          <main class="bottom-main">
+            <header class="bottom-head">
+              <strong>动态</strong>
+              <div class="chips"><span class="chip on">全部</span><span class="chip">视频</span><span class="chip">图文</span></div>
+              <span class="refresh">↻ 刷新</span>
+            </header>
+            <div class="feed">
+              <button class="dyn-card focused" id="card-image" aria-label="打开甜夕sweet的图文动态">
+                <div class="author"><span class="avatar">甜</span><div class="who"><b>甜夕sweet</b><small>8分钟前 · 图文</small></div><span class="kind">图文</span></div>
+                <p>今天出去做饼干噜（是七夕的礼物哦）~做到现在还没做完。最近每天都有好多小奖状贴啵啵间。</p>
+                <div class="thumbs"><span class="pic p1"></span><span class="pic p2"></span><span class="pic p3"><em>+1</em></span></div>
+                <div class="stat"><span>评论 0</span><span>转发 0</span><span>赞 18</span><b>按 A 阅读</b></div>
+              </button>
+              <button class="dyn-card text-card" id="card-text" aria-label="打开明日方舟终末地的纯文字动态">
+                <div class="author"><span class="avatar av-b">明</span><div class="who"><b>明日方舟终末地</b><small>2天前 · 动态</small></div><span class="kind">动态</span></div>
+                <p>互动抽奖 #明日方舟终末地# #丹青渡# 关注并转发此动态，我们将于12月1日抽取10位管理员送出角色亚克力立牌。</p>
+                <div class="stat"><span>评论 306</span><span>转发 226</span><span>赞 1678</span><b>按 A 阅读</b></div>
+              </button>
+            </div>
+          </main>
+        </div>
+
+        <div class="bottom-layer detail-layer" id="detail-layer">
+          <header class="layer-head">
+            <button class="back-btn" id="detail-back" aria-label="返回动态列表">←</button>
+            <div class="layer-title"><b>动态详情</b><small>甜夕sweet · 8分钟前</small></div>
+            <span class="kind">图文</span>
+          </header>
+          <div class="detail-body">
+            <div class="detail-text">
+              <div class="author"><span class="avatar">甜</span><div class="who"><b>甜夕sweet</b><small>8分钟前 · 图文</small></div></div>
+              <p>今天出去做饼干噜（是七夕的礼物哦）~做到现在还没做完。最近每天都有好多小奖状贴啵啵间，感觉被吸夕猫的爱意狠狠包围噜。</p>
+              <p>感谢@鲜榨甜橙一杯 姐姐的咩咩，真的好可爱；感谢@烙弓 宝贝的咩咩，是好久不见的老朋友啦。</p>
+              <div class="detail-actions"><button class="pill" id="detail-view">查看原图</button><span>方向键滚动 · B 返回</span></div>
+            </div>
+            <div class="detail-pics">
+              <button class="big-pic p1" id="detail-hero" aria-label="打开图片画册"><span id="detail-count">1 / 4</span></button>
+              <div class="pic-row"><button class="pic p2" aria-label="第 2 张"></button><button class="pic p3" aria-label="第 3 张"></button><button class="pic p4" aria-label="第 4 张"><em>+1</em></button></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="bottom-layer text-layer" id="text-layer">
+          <header class="layer-head">
+            <button class="back-btn" id="text-back" aria-label="返回动态列表">←</button>
+            <div class="layer-title"><b>纯文字动态</b><small>明日方舟终末地 · 2天前</small></div>
+            <span class="kind">动态</span>
+          </header>
+          <div class="text-body">
+            <div class="author"><span class="avatar av-b">明</span><div class="who"><b>明日方舟终末地</b><small>2天前 · 动态</small></div></div>
+            <h2>互动抽奖 #明日方舟终末地# #丹青渡#</h2>
+            <p>关注@明日方舟终末地 并转发此动态，我们将于12月1日抽取10位管理员送出【明日方舟：终末地-角色亚克力立牌-明河】。</p>
+            <p>此剑既成，也到了报恩的时候。走吧，老伙计。该赴约了。</p>
+            <div class="text-stats"><span>评论 306</span><span>转发 226</span><span>赞 1678</span></div>
+          </div>
+        </div>
+
+        <div class="bottom-layer gallery-layer" id="gallery-layer">
+          <header class="gallery-head">
+            <button class="back-btn" id="gallery-back" aria-label="返回详情">←</button>
+            <div class="gallery-counter"><b id="gallery-counter">1 / 4</b><small>图片浏览</small></div>
+            <div class="gallery-title"><b>甜夕sweet</b><small>今天的饼干与礼物</small></div>
+            <button class="close-btn" id="gallery-close" aria-label="关闭画册">×</button>
+          </header>
+          <div class="gallery-main">
+            <button class="nav-arrow" id="gallery-prev" aria-label="上一张">‹</button>
+            <div class="gallery-image p1" id="gallery-image"><span id="gallery-caption">插画 1 · 饼干的下午</span></div>
+            <button class="nav-arrow" id="gallery-next" aria-label="下一张">›</button>
+          </div>
+          <div class="gallery-thumbs" id="gallery-thumbs">
+            <button class="gthumb p1 active" data-image="0" aria-label="第 1 张"></button>
+            <button class="gthumb p2" data-image="1" aria-label="第 2 张"></button>
+            <button class="gthumb p3" data-image="2" aria-label="第 3 张"></button>
+            <button class="gthumb p4" data-image="3" aria-label="第 4 张"></button>
+          </div>
+        </div>
+
+        <footer class="modebar">
+          <span class="dot"></span><span id="mode-label">浏览 · 手柄/触屏</span>
+          <span class="mode-hints">
+            <button id="demo-b">B 返回</button>
+            <button id="demo-a">A 确认</button>
+          </span>
+        </footer>
+      </div>
+    </section>
+  </div>
+</div>
+
+<style>
+  #dynamic-dual-demo { width: 100%; }
+  .demo-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin: 0 0 .8rem; }
+  .demo-title { display: flex; flex-direction: column; gap: .2rem; }
+  .demo-title b { font-size: 15px; font-weight: 500; color: #f5f5f7; }
+  .demo-title span { font-size: 11px; color: #8c8c97; }
+  .demo-state { display: flex; align-items: center; gap: .4rem; height: 26px; padding: 0 .7rem;
+    border: 1px solid rgba(255,255,255,.12); border-radius: 99px; color: #a9a9b4;
+    font-size: 11px; white-space: nowrap; background: rgba(255,255,255,.04); }
+  .demo-state i { width: 6px; height: 6px; border-radius: 50%; background: #fb7299; }
+  .demo-screens { display: grid; grid-template-columns: 1.45fr 1fr; gap: 1rem; align-items: start; }
+  .screen-wrap { min-width: 0; }
+  .screen-label { display: flex; align-items: baseline; gap: .5rem; margin: 0 0 .4rem 2px; }
+  .screen-label b { font-size: 12px; font-weight: 500; color: #d8d8de; }
+  .screen-label span { font-size: 10px; color: #73737f; }
+  .bottom-wrap { padding-top: 1.35rem; }
+
+  .top-screen, .bottom-screen { container-type: size; position: relative; width: 100%;
+    overflow: hidden; background: #0b0b0e; color: #f5f5f7;
+    font-family: "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif; }
+  .top-screen { aspect-ratio: 16 / 9; border-radius: 10px; }
+  .bottom-screen { aspect-ratio: 4 / 3; border-radius: 10px; }
+  .top-screen button, .bottom-screen button { font: inherit; color: inherit; border: 0; padding: 0; }
+  .top-screen h1, .top-screen h2, .top-screen p, .bottom-screen h2, .bottom-screen p { margin: 0; }
+
+  /* ---------- top screen ---------- */
+  .top-bg { position: absolute; inset: 0; background:
+      radial-gradient(48cqw 38cqh at 24% 34%, rgba(0,161,214,.13), transparent 68%),
+      radial-gradient(48cqw 38cqh at 72% 56%, rgba(251,114,153,.12), transparent 68%),
+      #0b0b0e; }
+  .top-grid { position: absolute; inset: 0; opacity: .34;
+    background-image: linear-gradient(rgba(255,255,255,.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.03) 1px, transparent 1px);
+    background-size: 4.2cqw 4.2cqw;
+    -webkit-mask-image: radial-gradient(circle at 55% 50%, #000 0%, transparent 76%);
+            mask-image: radial-gradient(circle at 55% 50%, #000 0%, transparent 76%); }
+  .top-head { position: absolute; left: 3.2cqw; top: 3cqh; right: 3.2cqw;
+    display: flex; align-items: center; justify-content: space-between; z-index: 5; }
+  .brand { display: flex; align-items: center; gap: .85cqw; }
+  .brand strong { font-size: 1.4cqw; letter-spacing: .02em; font-weight: 500; }
+  .brand-logo { position: relative; width: 2.45cqw; height: 2.45cqw; border-radius: .58cqw;
+    background: #000; border: 1px solid rgba(255,255,255,.14); flex: none; }
+  .brand-logo i { position: absolute; left: .52cqw; width: 1.38cqw; height: .8cqw;
+    border: 1px solid #fb7299; border-radius: .17cqw; }
+  .brand-logo i:first-child { top: .4cqw; }
+  .brand-logo i:nth-child(2) { top: 1.25cqw; }
+  .brand-logo b { position: absolute; left: 1.17cqw; top: 1.02cqw; width: 0; height: 0;
+    border-top: .22cqw solid transparent; border-bottom: .22cqw solid transparent;
+    border-left: .34cqw solid #fff; }
+  .top-pill { display: flex; align-items: center; gap: .42cqw; height: 2.15cqw;
+    padding: 0 1cqw; border-radius: 99px; border: 1px solid rgba(255,255,255,.14);
+    background: rgba(20,20,24,.72); color: #a9a9b4; font-size: .72cqw;
+    letter-spacing: .1em; white-space: nowrap; }
+  .top-pill > i { width: .43cqw; height: .43cqw; border-radius: 50%;
+    background: #fb7299; box-shadow: 0 0 0 .28cqw rgba(251,114,153,.12); }
+  .top-note { position: absolute; left: 3.2cqw; right: 3.2cqw; bottom: 2.8cqh;
+    display: flex; justify-content: space-between; color: rgba(255,255,255,.3);
+    font-size: .68cqw; letter-spacing: .13em; z-index: 5; }
+  .top-state { position: absolute; inset: 0; opacity: 0; pointer-events: none;
+    transition: opacity .2s ease; }
+  .top-state.active { opacity: 1; pointer-events: auto; }
+  .eyebrow { display: flex; align-items: center; gap: .62cqw; color: #fb7299;
+    font-size: max(9px, 1cqw); letter-spacing: .1em; font-weight: 500; }
+  .eyebrow i { width: 1.2cqw; height: .1cqw; background: #fb7299; border-radius: 1px; }
+  .top-screen h1 { font-size: max(16px, 2.4cqw); line-height: 1.26; font-weight: 500; letter-spacing: -.02em; }
+  .top-screen p { font-size: max(10px, 1.18cqw); line-height: 1.7; color: #a9a9b4; }
+  .avatar { width: 2.55cqw; height: 2.55cqw; border-radius: 50%; flex: none;
+    display: grid; place-items: center; font-size: .92cqw; font-weight: 500;
+    color: #28162f; background: linear-gradient(135deg,#f3c7d8,#b48cf2);
+    border: 1px solid rgba(255,255,255,.16); }
+  .av-b { background: linear-gradient(135deg,#8ed9c1,#4a8fb0); color: #0c2228; }
+  .byline { display: flex; align-items: center; gap: .75cqw; }
+  .byline b { display: block; font-size: max(10px, 1.15cqw); font-weight: 500; }
+  .byline small { display: block; margin-top: .22cqh; color: #73737f; font-size: max(8px, .82cqw); }
+  .meta { display: flex; align-items: center; gap: 1.4cqw; color: #73737f;
+    font-size: max(8px, .82cqw); }
+  .meta b { margin-left: auto; color: #fb7299; font-weight: 500; }
+  .p1 { background: radial-gradient(circle at 35% 38%, #ffe6b9 0 17%, transparent 18%),
+    radial-gradient(circle at 68% 44%, #c5e7c3 0 22%, transparent 23%),
+    linear-gradient(135deg,#f4b5c7 0 45%, #7fb6a2 46% 100%); }
+  .p2 { background: radial-gradient(circle at 62% 35%, #ffd9e6 0 16%, transparent 17%),
+    linear-gradient(150deg,#5a7a9d 0 40%, #d2a0b6 41% 70%, #f5dfbf 71% 100%); }
+  .p3 { background: linear-gradient(120deg,#d9b4ec 0 30%, #f1d3a4 31% 60%, #9fb9e8 61% 100%); }
+  .p4 { background: linear-gradient(140deg,#8dc7bc 0 35%, #f4c7b4 36% 65%, #d7a4c4 66% 100%); }
+
+  .preview-split { position: absolute; left: 3.2cqw; right: 3.2cqw; top: 8.4cqh;
+    bottom: 7.2cqh; display: grid; grid-template-columns: 1.18fr .82fr; gap: 3cqw; }
+  .mosaic { display: grid; grid-template-columns: 1fr .42fr; gap: .85cqw; min-height: 0; }
+  .mosaic-hero { border-radius: 1.1cqw; position: relative; overflow: hidden;
+    border: 1px solid rgba(255,255,255,.12); }
+  .mosaic-hero span { position: absolute; left: .95cqw; bottom: 1.1cqh; color: #fff;
+    background: rgba(0,0,0,.5); border-radius: .38cqw; padding: .32cqh .65cqw;
+    font-size: .67cqw; }
+  .mosaic-side { display: grid; grid-template-rows: 1fr 1fr; gap: .85cqw; min-height: 0; }
+  .mosaic-side > div { border-radius: 1.1cqw; border: 1px solid rgba(255,255,255,.1);
+    position: relative; overflow: hidden; }
+  .mosaic-side em { position: absolute; right: .65cqw; bottom: .8cqh; color: #fff;
+    background: rgba(0,0,0,.55); border-radius: .32cqw; padding: .28cqh .5cqw;
+    font-style: normal; font-size: .62cqw; }
+  .preview-copy { display: flex; flex-direction: column; justify-content: center; gap: 1.2cqh; }
+  .preview-copy h1 { max-height: none; }
+  .preview-copy p { max-height: 8.2cqh; overflow: hidden; }
+  .preview-copy .meta { margin-top: .4cqh; }
+
+  .detail-split { position: absolute; left: 3.2cqw; right: 3.2cqw; top: 8.4cqh;
+    bottom: 7.2cqh; display: grid; grid-template-columns: .92fr 1.08fr; gap: 3cqw; }
+  .detail-copy { display: flex; flex-direction: column; justify-content: center; gap: 1.1cqh; }
+  .detail-copy h1 { font-size: 1.9cqw; }
+  .detail-copy p { max-height: 9cqh; overflow: hidden; }
+  .detail-copy .dim { color: #73737f; }
+  .detail-copy .meta { margin-top: .35cqh; }
+  .detail-visual { display: grid; grid-template-rows: 1fr 8.2cqh; gap: .85cqw; min-height: 0; }
+  .hero { border-radius: 1.1cqw; border: 1px solid rgba(255,255,255,.13);
+    position: relative; overflow: hidden; }
+  .hero span { position: absolute; right: .95cqw; bottom: 1cqh; color: #fff;
+    background: rgba(0,0,0,.55); border-radius: .38cqw; padding: .32cqh .65cqw;
+    font-size: .68cqw; }
+  .hero-strip { display: grid; grid-template-columns: repeat(3,1fr); gap: .85cqw; min-height: 0; }
+  .hero-strip > div { border-radius: .75cqw; position: relative; overflow: hidden;
+    border: 1px solid rgba(255,255,255,.1); }
+  .hero-strip em { position: absolute; inset: 0; display: grid; place-items: center;
+    color: #fff; background: rgba(0,0,0,.3); font-style: normal; font-size: .78cqw; }
+
+  .state-gallery .gallery-backdrop { position: absolute; inset: -6%; filter: blur(3.1cqw) saturate(.9);
+    opacity: .42; transform: scale(1.08); }
+  .state-gallery .gallery-shade { position: absolute; inset: 0;
+    background: linear-gradient(180deg, rgba(11,11,14,.52) 0%, rgba(11,11,14,.12) 42%,
+      rgba(11,11,14,.82) 100%); }
+  .state-gallery .gallery-frame { position: absolute; left: 50%; top: 8.4cqh; transform: translateX(-50%);
+    width: 67cqw; height: 71cqh; border-radius: 1.1cqw; overflow: hidden;
+    border: 1px solid rgba(255,255,255,.18); box-shadow: 0 2.2cqw 6cqw rgba(0,0,0,.6); }
+  .state-gallery .gallery-frame::after { content: ""; position: absolute; inset: 0;
+    background: linear-gradient(180deg, transparent 58%, rgba(0,0,0,.52) 100%); }
+  .frame-caption { position: absolute; left: 1.1cqw; bottom: 1.2cqh; z-index: 2;
+    color: #fff; font-size: .7cqw; background: rgba(0,0,0,.45); border-radius: .38cqw;
+    padding: .32cqh .65cqw; }
+  .gallery-copy { position: absolute; left: 3.2cqw; bottom: 7.4cqh; z-index: 3; max-width: 38cqw; }
+  .gallery-copy h2 { font-size: 1.55cqw; margin-top: .45cqh; font-weight: 500; }
+  .gallery-copy p { margin-top: .3cqh; font-size: .76cqw; color: rgba(255,255,255,.55); }
+  .gallery-dots { position: absolute; left: 50%; bottom: 3.1cqh; transform: translateX(-50%);
+    display: flex; gap: .5cqw; z-index: 3; }
+  .gallery-dots i { width: .46cqw; height: .46cqw; border-radius: 50%;
+    background: rgba(255,255,255,.28); }
+  .gallery-dots i.on { width: 1.15cqw; border-radius: 99px; background: #fb7299; }
+
+  .state-text .top-bg { background:
+      radial-gradient(52cqw 46cqh at 30% 40%, rgba(251,114,153,.13), transparent 66%),
+      radial-gradient(44cqw 40cqh at 82% 68%, rgba(0,161,214,.1), transparent 68%),
+      #0b0b0e; }
+  .state-text .quote-mark { position: absolute; right: 3cqw; top: 15cqh;
+    color: rgba(251,114,153,.07); font-family: Georgia, serif; font-size: 30cqw;
+    line-height: 1; pointer-events: none; }
+  .state-text .text-copy { position: absolute; left: 7cqw; top: 26cqh; width: 56cqw; }
+  .state-text h1 { margin-top: 1.4cqh; font-size: 2.3cqw; line-height: 1.36; }
+  .state-text .text-copy p { margin-top: 1.7cqh; max-width: 46cqw; }
+  .state-text .byline { margin-top: 2.2cqh; }
+  .text-side { position: absolute; right: 4cqw; top: 26cqh; width: 22cqw;
+    display: flex; flex-direction: column; gap: 1cqh; }
+  .quote-rule { width: 100%; height: 1px; background: rgba(255,255,255,.1); }
+  .side-label { color: #fb7299; font-size: .7cqw; letter-spacing: .16em; }
+  .side-note { color: #73737f; font-size: .8cqw; line-height: 1.7; }
+  .side-stats { margin-top: 1cqh; display: grid; grid-template-columns: auto 1fr auto 1fr auto 1fr;
+    gap: .45cqw; align-items: baseline; }
+  .side-stats b { color: #f5f5f7; font-size: 1.3cqw; font-weight: 500; }
+  .side-stats small { color: #73737f; font-size: .66cqw; }
+
+  /* ---------- bottom screen ---------- */
+  .bottom-shell { position: absolute; inset: 0; display: grid;
+    grid-template-columns: 10cqw 1fr; grid-template-rows: 1fr 5.8cqh; }
+  .rail { grid-column: 1; grid-row: 1; background: #0c0c0d; display: flex;
+    flex-direction: column; align-items: center; gap: .8cqh; padding-top: 1.4cqh;
+    border-right: 1px solid rgba(255,255,255,.03); overflow: hidden; }
+  .logo { position: relative; width: 6.2cqw; height: 6.2cqw; border-radius: 1.45cqw;
+    background: #000; border: 1px solid rgba(255,255,255,.12); margin-bottom: .6cqh; flex: none; }
+  .logo span { position: absolute; left: 1.3cqw; width: 3.45cqw; height: 2.05cqw;
+    border: 1px solid #fb7299; border-radius: .45cqw; }
+  .logo span:first-child { top: 1.05cqw; }
+  .logo span:nth-child(2) { top: 3.15cqw; }
+  .logo b { position: absolute; left: 2.95cqw; top: 2.55cqw; width: 0; height: 0;
+    border-top: .54cqw solid transparent; border-bottom: .54cqw solid transparent;
+    border-left: .88cqw solid #fff; }
+  .rail-item { width: 8cqw; border-radius: 1.25cqw; padding: 1.05cqh 0 .8cqh;
+    display: flex; flex-direction: column; align-items: center; gap: .35cqh; color: #a6a6ae; }
+  .rail-item em { font-style: normal; font-size: 2.4cqw; line-height: 1; }
+  .rail-item small { font-size: max(9px, 1.4cqw); line-height: 1.1; }
+  .rail-item.active { color: #fb7299; background: rgba(255,255,255,.07); }
+  .bottom-main { grid-column: 2; grid-row: 1; min-width: 0; min-height: 0;
+    display: flex; flex-direction: column; }
+  .bottom-head { height: 8.4cqh; flex: none; display: flex; align-items: center;
+    gap: 1.3cqw; padding: 1.1cqh 1.5cqw; }
+  .bottom-head strong { font-size: 2.2cqw; font-weight: 500; }
+  .chips { display: flex; gap: .8cqw; }
+  .chip { height: 4cqh; padding: 0 1.45cqw; display: inline-flex; align-items: center;
+    border-radius: 99px; background: rgba(255,255,255,.06); color: #a6a6ae;
+    font-size: max(10px, 1.45cqw); border: 1px solid rgba(255,255,255,.08); white-space: nowrap; }
+  .chip.on { color: #fb7299; background: rgba(251,114,153,.18); border-color: rgba(251,114,153,.8); }
+  .refresh { margin-left: auto; height: 4cqh; padding: 0 1.3cqw; display: inline-flex;
+    align-items: center; border-radius: 99px; background: rgba(255,255,255,.06);
+    color: #a6a6ae; font-size: max(10px, 1.45cqw); white-space: nowrap; }
+  .feed { flex: 1; min-height: 0; overflow: hidden; padding: 1.35cqw 1.7cqw 0;
+    display: flex; flex-direction: column; gap: 1.6cqh; }
+  .dyn-card { position: relative; flex: none; text-align: left; overflow: visible; background: #17171a;
+    border-radius: 1.4cqw; padding: 1.8cqw 2cqw 1.45cqw; display: block; }
+  .dyn-card.focused::after { content: ""; position: absolute; inset: -.62cqw;
+    border-radius: 1.85cqw; border: .26cqw solid rgba(255,255,255,.96);
+    box-shadow: 0 0 0 .5cqw rgba(0,0,0,.6); pointer-events: none; }
+  .author { display: flex; align-items: center; gap: 1cqw; }
+  .bottom-screen .avatar { width: 3.4cqw; height: 3.4cqw; font-size: 1.5cqw; }
+  .who { display: flex; flex-direction: column; gap: .3cqh; min-width: 0; }
+  .who b { font-size: max(10px, 2.1cqw); font-weight: 500; }
+  .who small { color: #73737f; font-size: max(9px, 1.35cqw); }
+  .kind { margin-left: auto; color: #fb7299; background: rgba(251,114,153,.12);
+    border-radius: .5cqw; padding: .3cqh .75cqw; font-size: max(9px, 1.3cqw); }
+  .dyn-card p { margin-top: 1.25cqh; font-size: max(10px, 2.1cqw); line-height: 1.55;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .thumbs { display: grid; grid-template-columns: repeat(3,1fr); gap: .75cqw; margin-top: 1.3cqh; }
+  .pic { position: relative; display: block; aspect-ratio: 16 / 10; border-radius: .8cqw;
+    overflow: hidden; }
+  .pic em { position: absolute; right: .55cqw; bottom: .6cqh; color: #fff;
+    background: rgba(0,0,0,.5); border-radius: .3cqw; padding: .25cqh .45cqw;
+    font-style: normal; font-size: max(8px, 1.15cqw); }
+  .stat { display: flex; gap: 1.8cqw; align-items: center; color: #73737f;
+    font-size: max(9px, 1.35cqw); margin-top: 1.2cqh; }
+  .stat b { margin-left: auto; color: #fb7299; font-weight: 500; }
+  .text-card p { -webkit-line-clamp: 2; }
+
+  .modebar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 6; height: 5.8cqh; background: #141418;
+    display: flex; align-items: center; gap: .7cqw; padding: 0 1.5cqw;
+    color: #f5f5f7; font-size: max(9px, 1.4cqw); }
+  .modebar .dot { width: .65cqw; height: .65cqw; border-radius: 50%; background: #6fb7ff; flex: none; }
+  .mode-hints { margin-left: auto; display: flex; gap: 1.3cqw; align-items: center; }
+  .mode-hints button { color: #73737f; background: transparent; font-size: inherit; }
+
+  .bottom-layer { position: absolute; inset: 0 0 5.8cqh 10cqw; background: #0f0f0f;
+    display: flex; flex-direction: column; opacity: 0; pointer-events: none;
+    transform: translateX(3%); transition: opacity .18s ease, transform .18s ease; z-index: 3; }
+  .bottom-layer.open { opacity: 1; pointer-events: auto; transform: translateX(0); }
+  .layer-head { height: 8.4cqh; flex: none; display: flex; align-items: center;
+    gap: 1.1cqw; padding: 0 1.6cqw; border-bottom: 1px solid rgba(255,255,255,.06); }
+  .back-btn, .close-btn { width: 4.2cqw; height: 4.2cqw; border-radius: 50%;
+    background: rgba(255,255,255,.06); display: grid; place-items: center;
+    font-size: 2.1cqw; flex: none; }
+  .layer-title { display: flex; flex-direction: column; gap: .3cqh; }
+  .layer-title b { font-size: 2.1cqw; font-weight: 500; }
+  .layer-title small { font-size: max(9px, 1.35cqw); color: #73737f; }
+  .layer-head .kind { margin-left: auto; }
+  .detail-body { flex: 1; min-height: 0; display: grid; grid-template-columns: 1.08fr 1fr;
+    gap: 1.7cqw; padding: 1.7cqw; }
+  .detail-text { min-width: 0; display: flex; flex-direction: column; gap: 1.1cqh; }
+  .detail-text p { font-size: max(10px, 2cqw); line-height: 1.6; color: #d8d8de; }
+  .detail-actions { margin-top: auto; display: flex; align-items: center; gap: 1cqw; }
+  .pill { color: #1a0710; background: #fb7299; border-radius: 99px; padding: .7cqh 1.4cqw;
+    font-size: max(10px, 1.5cqw); font-weight: 500; }
+  .detail-actions span { color: #73737f; font-size: max(9px, 1.3cqw); }
+  .detail-pics { min-width: 0; display: flex; flex-direction: column; gap: .75cqw; }
+  .big-pic { flex: 1; border-radius: .95cqw; position: relative; min-height: 0; }
+  .big-pic span { position: absolute; right: .85cqw; bottom: .7cqh; color: #fff;
+    background: rgba(0,0,0,.55); border-radius: .4cqw; padding: .25cqh .55cqw;
+    font-size: max(8px, 1.2cqw); }
+  .pic-row { height: 8.2cqh; display: grid; grid-template-columns: repeat(3,1fr); gap: .75cqw; }
+  .pic-row .pic { aspect-ratio: auto; height: 100%; }
+
+  .text-body { flex: 1; min-height: 0; padding: 2cqw; }
+  .text-body h2 { margin-top: 1.5cqh; font-size: 2.5cqw; line-height: 1.4; font-weight: 500; }
+  .text-body p { margin-top: 1.2cqh; font-size: max(10px, 2.1cqw); line-height: 1.75; color: #c9c9d0; }
+  .text-stats { margin-top: 2cqh; display: flex; gap: 2.5cqw; color: #73737f;
+    font-size: max(10px, 1.45cqw); }
+
+  .gallery-layer { background: #0b0b0e; }
+  .gallery-head { height: 7.4cqh; flex: none; display: flex; align-items: center;
+    gap: 1.5cqw; padding: 0 1.6cqw; border-bottom: 1px solid rgba(255,255,255,.06); }
+  .gallery-counter { display: flex; flex-direction: column; gap: .2cqh; min-width: 5.2cqw; }
+  .gallery-counter b { color: #fb7299; font-size: max(11px, 1.6cqw); font-weight: 500; }
+  .gallery-counter small { color: #73737f; font-size: max(8px, 1.2cqw); }
+  .gallery-title { display: flex; flex-direction: column; gap: .2cqh; min-width: 0; }
+  .gallery-title b { font-size: 1.9cqw; font-weight: 500; }
+  .gallery-title small { color: #73737f; font-size: max(9px, 1.3cqw); }
+  .gallery-head .close-btn { margin-left: auto; }
+  .gallery-main { flex: 1; min-height: 0; display: flex; align-items: center;
+    justify-content: center; gap: 1cqw; padding: 1.4cqw 1.6cqw 0; }
+  .gallery-image { width: 76%; height: 100%; border-radius: .95cqw; position: relative; }
+  .gallery-image span { position: absolute; left: 1cqw; bottom: .9cqh; color: #fff;
+    background: rgba(0,0,0,.5); border-radius: .45cqw; padding: .35cqh .75cqw;
+    font-size: max(9px, 1.3cqw); }
+  .nav-arrow { width: 4.4cqw; height: 4.4cqw; border-radius: 50%; background: rgba(255,255,255,.07);
+    display: grid; place-items: center; font-size: 2.6cqw; flex: none; }
+  .gallery-thumbs { flex: none; height: 8.4cqh; display: flex; gap: .75cqw; padding: .8cqh 1.6cqw; }
+  .gthumb { flex: 1; border-radius: .65cqw; opacity: .55; border: .18cqw solid transparent; }
+  .gthumb.active { opacity: 1; border-color: #fff;
+    box-shadow: 0 0 0 .2cqw #0b0b0e, 0 0 0 .38cqw rgba(255,255,255,.95); }
+
+  @media (max-width: 900px) {
+    .demo-screens { grid-template-columns: 1fr; }
+    .bottom-wrap { padding-top: 0; width: 82%; justify-self: center; }
+  }
+</style>
+
+<script>
+  (() => {
+    const state = { mode: "list", image: 0 };
+    const captions = ["插画 1 · 饼干的下午", "插画 2 · 礼物包装", "插画 3 · 桌面一角", "插画 4 · 花与卡片"];
+    const topStates = {
+      list: document.querySelector('[data-top="preview"]'),
+      detail: document.querySelector('[data-top="detail"]'),
+      gallery: document.querySelector('[data-top="gallery"]'),
+      text: document.querySelector('[data-top="text"]'),
+    };
+    const topPill = document.getElementById("top-pill-text");
+    const topNote = document.getElementById("top-note-state");
+    const stateChip = document.getElementById("demo-state").querySelector("span");
+    const detailLayer = document.getElementById("detail-layer");
+    const textLayer = document.getElementById("text-layer");
+    const galleryLayer = document.getElementById("gallery-layer");
+    const modeLabel = document.getElementById("mode-label");
+    const cardImage = document.getElementById("card-image");
+    const cardText = document.getElementById("card-text");
+    const detailHero = document.getElementById("detail-hero");
+    const detailCount = document.getElementById("detail-count");
+    const topDetailHero = document.getElementById("top-detail-hero");
+    const topDetailCount = document.getElementById("top-detail-count");
+    const galleryImage = document.getElementById("gallery-image");
+    const galleryCaption = document.getElementById("gallery-caption");
+    const galleryCounter = document.getElementById("gallery-counter");
+    const topGalleryFrame = document.getElementById("top-gallery-frame");
+    const topGalleryBackdrop = document.getElementById("top-gallery-backdrop");
+    const topGalleryCaption = document.getElementById("top-gallery-caption");
+    const topDots = Array.from(document.querySelectorAll("#top-gallery-dots i"));
+    const galleryThumbs = Array.from(document.querySelectorAll("#gallery-thumbs .gthumb"));
+
+    function setMode(mode) {
+      state.mode = mode;
+      const topKey = mode === "gallery" ? "gallery" : mode === "text" ? "text" : mode === "detail" ? "detail" : "list";
+      Object.entries(topStates).forEach(([key, el]) => el.classList.toggle("active", key === topKey));
+      detailLayer.classList.toggle("open", mode === "detail");
+      textLayer.classList.toggle("open", mode === "text");
+      galleryLayer.classList.toggle("open", mode === "gallery");
+      cardImage.classList.toggle("focused", mode === "list");
+      stateChip.textContent = mode === "list" ? "列表预览" : mode === "detail" ? "详情阅读" : mode === "gallery" ? "图片画册" : "纯文字";
+      topPill.textContent = mode === "list" ? "PREVIEW · 上屏预览" : mode === "detail" ? "DETAIL · 动态详情" : mode === "gallery" ? "GALLERY · 图片 " + (state.image + 1) + " / 4" : "TEXT · 纯文字动态";
+      topNote.textContent = mode === "list" ? "PREVIEW" : mode === "detail" ? "DETAIL" : mode === "gallery" ? "GALLERY" : "TEXT";
+      modeLabel.textContent = mode === "list" ? "浏览 · 手柄/触屏" : mode === "detail" ? "动态详情 · 可滚动" : mode === "gallery" ? "图片浏览 · 方向键切换" : "纯文字动态 · 可滚动";
+      document.querySelectorAll("#detail-layer .detail-pics .pic").forEach((el) => {
+        el.style.opacity = mode === "detail" ? "1" : "";
+      });
+      renderImage();
+    }
+
+    function renderImage() {
+      const n = state.image + 1;
+      const cls = "p" + n;
+      galleryImage.className = "gallery-image " + cls;
+      galleryCaption.textContent = captions[state.image];
+      galleryCounter.textContent = n + " / 4";
+      topGalleryFrame.className = "gallery-frame " + cls;
+      topGalleryBackdrop.className = "gallery-backdrop " + cls;
+      topGalleryCaption.textContent = captions[state.image];
+      topDetailHero.className = "hero " + cls;
+      detailHero.className = "big-pic " + cls;
+      detailCount.textContent = n + " / 4";
+      topDetailCount.textContent = n + " / 4";
+      topDots.forEach((dot, i) => dot.classList.toggle("on", i === state.image));
+      galleryThumbs.forEach((thumb, i) => thumb.classList.toggle("active", i === state.image));
+      topPill.textContent = state.mode === "gallery" ? "GALLERY · 图片 " + n + " / 4" : topPill.textContent;
+    }
+
+    cardImage.addEventListener("click", () => {
+      if (state.mode !== "list") return;
+      state.image = 0;
+      setMode("detail");
+    });
+    cardText.addEventListener("click", () => {
+      if (state.mode !== "list") return;
+      setMode("text");
+    });
+    document.getElementById("detail-back").addEventListener("click", () => setMode("list"));
+    document.getElementById("text-back").addEventListener("click", () => setMode("list"));
+    document.getElementById("detail-view").addEventListener("click", () => setMode("gallery"));
+    detailHero.addEventListener("click", () => setMode("gallery"));
+    document.getElementById("gallery-close").addEventListener("click", () => setMode("detail"));
+    document.getElementById("gallery-back").addEventListener("click", () => setMode("detail"));
+    document.getElementById("gallery-prev").addEventListener("click", () => {
+      state.image = (state.image + 3) % 4;
+      renderImage();
+    });
+    document.getElementById("gallery-next").addEventListener("click", () => {
+      state.image = (state.image + 1) % 4;
+      renderImage();
+    });
+    galleryThumbs.forEach((thumb, i) => thumb.addEventListener("click", () => {
+      state.image = i;
+      renderImage();
+    }));
+    document.getElementById("demo-a").addEventListener("click", () => {
+      if (state.mode === "list") { state.image = 0; setMode("detail"); }
+      else if (state.mode === "detail") setMode("gallery");
+    });
+    document.getElementById("demo-b").addEventListener("click", () => {
+      if (state.mode === "gallery") setMode("detail");
+      else if (state.mode === "detail" || state.mode === "text") setMode("list");
+    });
+
+    setMode("list");
+  })();
+</script>
+
+</div>
+<script>
+
+</script>
+</body>
+</html>
