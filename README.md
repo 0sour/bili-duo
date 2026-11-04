@@ -1,6 +1,24 @@
-# Bili-Duo
+<p align="center">
+  <img src="docs/images/app-icon.png" width="112" alt="Bili-Duo app icon">
+</p>
 
-**双屏 B 站客户端**，为 Retroid Pocket Duo、AYN Thor 这类上下双屏 Android 掌机设计。
+<h1 align="center">Bili-Duo</h1>
+
+<p align="center">
+  <strong>双屏 B 站客户端</strong><br>
+  为 Retroid Pocket Duo、AYN Thor 这类上下双屏 Android 掌机设计
+</p>
+
+<p align="center">
+  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc4-FB7299">
+  <img alt="status" src="https://img.shields.io/badge/status-untested%20RC-orange">
+  <img alt="Android" src="https://img.shields.io/badge/Android-24%2B-3DDC84?logo=android&logoColor=white">
+  <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-1.9.23-7F52FF?logo=kotlin&logoColor=white">
+  <img alt="Compose" src="https://img.shields.io/badge/Jetpack%20Compose-2024.04-4285F4?logo=jetpackcompose&logoColor=white">
+  <img alt="Media3" src="https://img.shields.io/badge/Media3-1.4.1-FF6D00">
+  <img alt="tests" src="https://img.shields.io/badge/tests-210%20passing-brightgreen">
+  <img alt="license" src="https://img.shields.io/badge/license-MIT-blue">
+</p>
 
 上屏只负责视频画面，下屏用一块 `Presentation` 承载完整 UI；手柄和触摸共用同一棵
 Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，也没有上屏 OSD。
@@ -8,6 +26,8 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
 > 当前版本：**0.2.0-rc4**（versionCode 5）  
 > 状态：功能完整的 **未测试 RC**，210 个单元测试通过，已在 MuMu 与 Duo 真机做核心
 > 路径验证，尚未完成全流程回归。
+
+## 界面预览
 
 | 首页（排行） | 直播 |
 | --- | --- |
@@ -67,6 +87,21 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
   `redactHeader(Cookie/Set-Cookie/Authorization)`，不打印 token、验证码或响应 body。
 - Release 构建启用 R8；Retrofit suspend 泛型的 keep 规则见
   [`app/proguard-rules.pro`](app/proguard-rules.pro)。
+
+### 技术栈
+
+| 层 | 选型 |
+| --- | --- |
+| 语言 | **Kotlin 1.9.23**（主体，`app/src` 约 3.7 万行，含测试）；XML 资源；设计原型用少量 HTML/CSS/JS |
+| UI | Jetpack Compose + Material3、Navigation Compose |
+| 播放 | Media3 / ExoPlayer 1.4.1（DASH、HLS）、OkHttp DataSource |
+| 网络 | Retrofit 2.9 + Gson、OkHttp 4.12、WebSocket（直播弹幕/SC） |
+| 图片 | Coil 2.6（含 GIF）、telephoto-zoomable |
+| 登录 | ZXing 二维码、极验 Geetest WebView |
+| 构建 | Gradle 8.7、AGP 8.4.0、JDK 17、R8 |
+| 测试 | JUnit4，210 个单元测试 |
+| 架构 | Activity + Presentation、MVVM + StateFlow、单一 `PlayerController` |
+| 界面语言 | 简体中文（当前未做多语言资源） |
 
 ---
 
