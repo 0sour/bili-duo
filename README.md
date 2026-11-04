@@ -29,15 +29,17 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
 
 ## 界面预览
 
-| 首页（排行） | 直播 |
-| --- | --- |
-| ![首页](docs/images/home.png) | ![直播](docs/images/live.png) |
+每张图为上下屏对照：上方是 1920×1080 上屏，下方是 1280×960 下屏。
 
-| 视频播放控制台 |  |
+| 首页 · 排行（焦点预览） | 番剧 / 影视（PGC） |
 | --- | --- |
-| ![播放控制台](docs/images/player-console.png) | 下屏左栏是播放控制，右栏是评论 / 推荐 / 简介 / 分P；上屏只显示视频。 |
+| ![首页双屏](docs/images/pairs/home.png) | ![番剧双屏](docs/images/pairs/anime.png) |
+| **直播列表（下滚收起二级行）** | **视频播放 · 弹幕 + 控制台** |
+| ![直播列表双屏](docs/images/pairs/live.png) | ![视频播放双屏](docs/images/pairs/player.png) |
+| **直播播放 · 实时弹幕 / SC** | |
+| ![直播播放双屏](docs/images/pairs/live-console.png) | |
 
-截图使用匿名状态下的公开推荐/直播流，不包含任何账号数据。
+截图使用公开推荐 / 直播流，不包含账号资料。
 
 ---
 
