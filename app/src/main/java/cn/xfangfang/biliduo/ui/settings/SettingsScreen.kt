@@ -106,6 +106,9 @@ private val settingsCategories = listOf(
     SettingsCategory("关于", Icons.Outlined.Info),
 )
 
+private const val REPOSITORY_URL = "https://github.com/0sour/bili-duo"
+private const val ISSUES_URL = "https://github.com/0sour/bili-duo/issues"
+
 private val danmakuOpacityOptions = listOf(0.3f, 0.5f, 0.7f, 0.9f, 1f)
 private val danmakuSpeedOptions = listOf(0.7f, 1f, 1.4f, 1.8f)
 private val danmakuSizeOptions = listOf(13f, 16f, 20f, 24f)
@@ -243,6 +246,9 @@ fun SettingsScreen(
 
     fun sendFeedback() {
         val intent = Intent(Intent.ACTION_SENDTO, Uri.parse(FeedbackEmail.mailtoUri())).apply {
+            // The settings UI lives in a Presentation, not an Activity; without
+            // NEW_TASK Android throws AndroidRuntimeException on startActivity.
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             putExtra(Intent.EXTRA_EMAIL, arrayOf(FeedbackEmail.RECIPIENT))
             putExtra(Intent.EXTRA_SUBJECT, FeedbackEmail.subject(feedbackType, BuildConfig.VERSION_NAME))
             putExtra(
@@ -261,6 +267,18 @@ fun SettingsScreen(
             feedbackVisible = false
         } catch (_: ActivityNotFoundException) {
             Toast.makeText(context, "未找到邮件应用，无法发送反馈", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    fun openRepository(url: String = REPOSITORY_URL) {
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+            // Presentation context is not an Activity; NEW_TASK is required.
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        try {
+            context.startActivity(intent)
+        } catch (_: ActivityNotFoundException) {
+            Toast.makeText(context, "未找到浏览器，无法打开链接", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -346,6 +364,8 @@ fun SettingsScreen(
                             feedbackContact = ""
                             feedbackVisible = true
                         },
+                        onOpenRepository = { openRepository() },
+                        onOpenIssues = { openRepository(ISSUES_URL) },
                     )
                 }
             }
@@ -578,13 +598,28 @@ private fun AboutSettings(
     firstFocus: FocusRequester,
     feedbackFocus: FocusRequester,
     onFeedback: () -> Unit,
+    onOpenRepository: () -> Unit,
+    onOpenIssues: () -> Unit,
 ) {
     SettingsSection("关于 Bili-Duo")
     SettingsInfoRow("版本", "v${BuildConfig.VERSION_NAME}", focusRequester = firstFocus)
+    SettingsInfoRow("状态", "未测试 RC")
+    SettingsActionRow(
+        title = "开源仓库",
+        subtitle = "github.com/0sour/bili-duo",
+        icon = Icons.Outlined.Language,
+        onClick = onOpenRepository,
+    )
     SettingsInfoRow("许可证", "MIT License · NOTICE")
     SettingsInfoRow("上游", "bilibili-pure-apk（MIT）")
     Spacer(Modifier.height(10.dp))
     SettingsSection("反馈")
+    SettingsActionRow(
+        title = "GitHub Issues",
+        subtitle = "问题反馈与功能建议",
+        icon = Icons.Outlined.Language,
+        onClick = onOpenIssues,
+    )
     SettingsActionRow(
         title = "用户反馈",
         subtitle = "Bug 反馈与功能建议",

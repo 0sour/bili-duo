@@ -4,18 +4,19 @@
 `*.apk`），需要时本地 `./gradlew assembleDebug` / `assembleRelease` 生成，或从
 GitHub Releases 下载。
 
-## 0.2.0-rc4（2026-11-04）
+## 0.2.0-rc5（2026-11-04）
 
-- `bili-duo-0.2.0-rc4-release.apk`
+- `bili-duo-0.2.0-rc5-release.apk`
   - R8 minify + resource shrink，正式 release keystore 签名。
   - 签名证书 SHA-256：
     `ad0cf2f6e3d39ea5e2351f7275ad57fe2f99cd782e75931925687c2034c54adf`
-  - APK SHA-256：`de8d60d13d0f8fdb2712b1075b1505c26de9b6db753c91acae1ca13362c9116f`
-- `bili-duo-0.2.0-rc4-debug.apk`
+  - APK SHA-256：`061fc899996cc3339b58b6346e595a0f8919b564c3730aaf5ce876abb946f77f`
+- `bili-duo-0.2.0-rc5-debug.apk`
   - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
-  - SHA-256：`940f4c5fd978948e8a800487cabf66537a3f4dc62f2592b42ec37b374e31c22a`
+  - SHA-256：`ee976352c0aef13978c6eb1e0650bb60f01a85be6f71e135d021fc737af3e199`
 
-rc4 变更：直播页向下滚动时自动收起「子分区」和「关注的主播」两行，回到顶部再展开。
+rc5 变更：设置「关于」新增版本状态、开源仓库与 GitHub Issues 入口；修复在
+Presentation 中 `startActivity` 缺少 `FLAG_ACTIVITY_NEW_TASK` 导致的崩溃。
 
 ## 签名配置
 

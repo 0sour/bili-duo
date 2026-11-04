@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc4-FB7299">
+  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc5-FB7299">
   <img alt="status" src="https://img.shields.io/badge/status-untested%20RC-orange">
   <img alt="Android" src="https://img.shields.io/badge/Android-24%2B-3DDC84?logo=android&logoColor=white">
   <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-1.9.23-7F52FF?logo=kotlin&logoColor=white">
@@ -23,7 +23,7 @@
 上屏只负责视频画面，下屏用一块 `Presentation` 承载完整 UI；手柄和触摸共用同一棵
 Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，也没有上屏 OSD。
 
-> 当前版本：**0.2.0-rc4**（versionCode 5）  
+> 当前版本：**0.2.0-rc5**（versionCode 6）  
 > 状态：功能完整的 **未测试 RC**，210 个单元测试通过，已在 MuMu 与 Duo 真机做核心
 > 路径验证，尚未完成全流程回归。
 
@@ -113,7 +113,7 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
 
 - **单元测试**：210 个用例通过（`./gradlew testDebugUnitTest`）。
 - **MuMu（1280×960 / 320dpi）**：双屏壳层、首页、搜索、播放控制台、直播列表与
-  HLS 播放、动态空态/登录态、单屏回退提示、rc4 签名包安装与冷启动。
+  HLS 播放、动态空态/登录态、单屏回退提示、rc5 签名包安装与冷启动。
 - **Retroid Pocket Duo 真机**：
   - 双屏冷启动、上屏视频、下屏触摸与系统 IME、后台恢复。
   - 视频：初始聚焦播放键、A 暂停、进度 ±10s/seek、X 弹幕、START 清晰度、
@@ -254,7 +254,7 @@ keyPassword=CHANGE_ME
 ### 测试产物
 
 `dist/` 只保留构建说明；APK 通过 GitHub Releases 或本地构建分发，不进入 Git 历史。
-当前 rc4 的哈希与说明见 [`dist/README.md`](dist/README.md)。
+当前 rc5 的哈希与说明见 [`dist/README.md`](dist/README.md)。
 
 ---
 
