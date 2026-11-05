@@ -29,6 +29,7 @@ docs/CLASS_DIAGRAM.md
 
 # Local test artifacts / screenshots
 .tmp/
+.tmp-shots/
 .zcode/
 
 # Build and signing artifacts

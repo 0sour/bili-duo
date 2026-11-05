@@ -4,6 +4,26 @@
 `*.apk`），需要时本地 `./gradlew assembleDebug` / `assembleRelease` 生成，或从
 GitHub Releases 下载。
 
+## 0.2.0-rc14（2026-11-05）
+
+- `bili-duo-0.2.0-rc14-release.apk`
+  - R8 minify + resource shrink，正式 release keystore 签名。
+  - APK SHA-256：`69536d3a6e01cbfa738c1e2e3787d9db79ac878da1531957f0e5fbe4a9c1ec09`
+- `bili-duo-0.2.0-rc14-debug.apk`
+  - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
+  - SHA-256：`d360b84a2a219c2761c1fb70ce8d0313a4b84b48da6103f9f6e4a4027fafaae9`
+
+rc14 变更：字幕开关与设置移入齿轮菜单。
+- 齿轮 overlay 改为「播放设置」，顶部「弹幕 / 字幕」分栏；字幕分栏含
+  「显示字幕 / 字幕轨道 / 字号 / 背景 / 位置」。
+- 字号（小/标准/大/特大）、背景（无/淡/标准/深）、位置（靠下/标准/靠上）
+  为全局样式，持久化在 `bili_prefs`。
+- 移除 chips 行「字幕 开/关」，清晰度/倍速/弹幕/音量/齿轮不再被裁切；
+  浮层高度上限 360→400dp，弹幕分栏 7 行完整显示。
+- 分栏在 tab 上按 Left/Right 切换；菜单内 Left/Right 不落到背后控制台。
+单测 221；Duo 实测字幕开关、AI 字幕轨、字号/背景/位置实时生效（测试后恢复
+默认并关闭字幕）。
+
 ## 0.2.0-rc13（2026-11-05）
 
 - `bili-duo-0.2.0-rc13-release.apk`

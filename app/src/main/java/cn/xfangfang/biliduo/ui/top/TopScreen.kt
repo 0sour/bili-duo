@@ -113,6 +113,9 @@ fun TopScreenHost(
             TopSubtitleOverlay(
                 player = controller.player,
                 cues = playerUi.subtitleCues,
+                textSizeSp = playerUi.subtitleTextSizeSp,
+                backgroundAlpha = playerUi.subtitleBackgroundAlpha,
+                bottomPaddingDp = playerUi.subtitleBottomPaddingDp,
             )
         }
         if (!playback.hasRenderedFrame || topState.mode == TopScreenMode.DYNAMIC) {
@@ -128,6 +131,9 @@ fun TopScreenHost(
 private fun TopSubtitleOverlay(
     player: Player,
     cues: List<SubtitleCue>,
+    textSizeSp: Float,
+    backgroundAlpha: Float,
+    bottomPaddingDp: Int,
 ) {
     var positionMs by remember(player) { mutableLongStateOf(player.currentPosition) }
     LaunchedEffect(player, cues) {
@@ -141,18 +147,18 @@ private fun TopSubtitleOverlay(
     } ?: return
 
     Box(
-        modifier = Modifier.fillMaxSize().padding(bottom = 58.dp),
+        modifier = Modifier.fillMaxSize().padding(bottom = bottomPaddingDp.dp),
         contentAlignment = Alignment.BottomCenter,
     ) {
         Text(
             text = cue.content,
             color = Color.White,
-            fontSize = 22.sp,
+            fontSize = textSizeSp.sp,
             fontWeight = FontWeight.Medium,
             textAlign = TextAlign.Center,
             modifier = Modifier
                 .clip(RoundedCornerShape(6.dp))
-                .background(Color.Black.copy(alpha = 0.55f))
+                .background(Color.Black.copy(alpha = backgroundAlpha))
                 .padding(horizontal = 14.dp, vertical = 6.dp),
         )
     }

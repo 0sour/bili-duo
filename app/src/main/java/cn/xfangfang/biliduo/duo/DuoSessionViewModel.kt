@@ -23,7 +23,8 @@ enum class DuoMode {
 enum class DuoOverlay {
     QUALITY,
     SPEED,
-    DANMAKU,
+    /** Playback settings: danmaku and subtitle options. */
+    SETTINGS,
     DANMAKU_SEND,
     COMMENT_SEND,
     COMMENT_DELETE,

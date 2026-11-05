@@ -14,6 +14,7 @@ import cn.xfangfang.biliduo.data.local.PlaybackProgressManager
 import cn.xfangfang.biliduo.data.local.QueueAction
 import cn.xfangfang.biliduo.data.local.SubtitlePreference
 import cn.xfangfang.biliduo.data.local.SubtitlePreferenceManager
+import cn.xfangfang.biliduo.data.local.SubtitleStylePreference
 import cn.xfangfang.biliduo.data.model.*
 import cn.xfangfang.biliduo.data.download.DownloadManager
 import cn.xfangfang.biliduo.data.repository.BilibiliRepository
@@ -56,6 +57,9 @@ data class PlayerUiState(
     val subtitleEnabled: Boolean = false,
     val subtitleOffsetX: Float = 0f,
     val subtitleOffsetY: Float = 0f,
+    val subtitleTextSizeSp: Float = SubtitleStylePreference.DEFAULT_TEXT_SIZE_SP,
+    val subtitleBackgroundAlpha: Float = SubtitleStylePreference.DEFAULT_BACKGROUND_ALPHA,
+    val subtitleBottomPaddingDp: Int = SubtitleStylePreference.DEFAULT_BOTTOM_PADDING_DP,
     val danmaku: List<DanmakuItem> = emptyList(),
     val danmakuEnabled: Boolean = true,
     val danmakuOpacity: Float = 0.9f,
@@ -103,6 +107,7 @@ class PlayerViewModel(
 
     init {
         val saved = danmakuPreferenceManager.load()
+        val subtitleStyle = subtitlePreferenceManager.loadStyle()
         _uiState.value = _uiState.value.copy(
             danmakuEnabled = saved.enabled,
             danmakuOpacity = saved.opacity,
@@ -111,6 +116,9 @@ class PlayerViewModel(
             danmakuArea = saved.area,
             danmakuBlockedWords = saved.blockedWords,
             danmakuMaxOnScreen = saved.maxOnScreen,
+            subtitleTextSizeSp = subtitleStyle.textSizeSp,
+            subtitleBackgroundAlpha = subtitleStyle.backgroundAlpha,
+            subtitleBottomPaddingDp = subtitleStyle.bottomPaddingDp,
         )
         viewModelScope.launch { repository.flushPendingReports(pendingReportManager) }
     }
@@ -1013,5 +1021,31 @@ class PlayerViewModel(
                 offsetY = offsetY
             ))
         }
+    }
+
+    fun setSubtitleTextSize(textSizeSp: Float) {
+        _uiState.value = _uiState.value.copy(subtitleTextSizeSp = textSizeSp)
+        saveSubtitleStyle()
+    }
+
+    fun setSubtitleBackgroundAlpha(alpha: Float) {
+        _uiState.value = _uiState.value.copy(subtitleBackgroundAlpha = alpha)
+        saveSubtitleStyle()
+    }
+
+    fun setSubtitleBottomPadding(bottomPaddingDp: Int) {
+        _uiState.value = _uiState.value.copy(subtitleBottomPaddingDp = bottomPaddingDp)
+        saveSubtitleStyle()
+    }
+
+    private fun saveSubtitleStyle() {
+        val state = _uiState.value
+        subtitlePreferenceManager.saveStyle(
+            SubtitleStylePreference(
+                textSizeSp = state.subtitleTextSizeSp,
+                backgroundAlpha = state.subtitleBackgroundAlpha,
+                bottomPaddingDp = state.subtitleBottomPaddingDp,
+            )
+        )
     }
 }

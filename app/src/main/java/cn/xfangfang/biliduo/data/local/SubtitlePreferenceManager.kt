@@ -10,10 +10,29 @@ data class SubtitlePreference(
     val offsetY: Float
 )
 
+/**
+ * Global subtitle appearance, shared by every video. The per-page preference
+ * above only remembers which track was on for a given aid/cid.
+ */
+data class SubtitleStylePreference(
+    val textSizeSp: Float = DEFAULT_TEXT_SIZE_SP,
+    val backgroundAlpha: Float = DEFAULT_BACKGROUND_ALPHA,
+    val bottomPaddingDp: Int = DEFAULT_BOTTOM_PADDING_DP,
+) {
+    companion object {
+        const val DEFAULT_TEXT_SIZE_SP = 22f
+        const val DEFAULT_BACKGROUND_ALPHA = 0.55f
+        const val DEFAULT_BOTTOM_PADDING_DP = 58
+    }
+}
+
 class SubtitlePreferenceManager(private val prefs: SharedPreferences) {
 
     companion object {
         private const val KEY_PREFIX = "subtitle_"
+        private const val KEY_STYLE_TEXT_SIZE = "subtitle_style_text_size"
+        private const val KEY_STYLE_BACKGROUND = "subtitle_style_background_alpha"
+        private const val KEY_STYLE_BOTTOM = "subtitle_style_bottom_padding"
     }
 
     private fun pageKey(aid: Long, cid: Long) = "$KEY_PREFIX${aid}_$cid"
@@ -42,6 +61,29 @@ class SubtitlePreferenceManager(private val prefs: SharedPreferences) {
         }
         prefs.edit()
             .putString(pageKey(aid, cid), obj.toString())
+            .apply()
+    }
+
+    fun loadStyle(): SubtitleStylePreference = SubtitleStylePreference(
+        textSizeSp = prefs.getFloat(
+            KEY_STYLE_TEXT_SIZE,
+            SubtitleStylePreference.DEFAULT_TEXT_SIZE_SP
+        ),
+        backgroundAlpha = prefs.getFloat(
+            KEY_STYLE_BACKGROUND,
+            SubtitleStylePreference.DEFAULT_BACKGROUND_ALPHA
+        ),
+        bottomPaddingDp = prefs.getInt(
+            KEY_STYLE_BOTTOM,
+            SubtitleStylePreference.DEFAULT_BOTTOM_PADDING_DP
+        ),
+    )
+
+    fun saveStyle(style: SubtitleStylePreference) {
+        prefs.edit()
+            .putFloat(KEY_STYLE_TEXT_SIZE, style.textSizeSp)
+            .putFloat(KEY_STYLE_BACKGROUND, style.backgroundAlpha)
+            .putInt(KEY_STYLE_BOTTOM, style.bottomPaddingDp)
             .apply()
     }
 }

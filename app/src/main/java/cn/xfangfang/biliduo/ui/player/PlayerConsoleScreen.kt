@@ -1171,24 +1171,6 @@ fun PlayerConsoleScreen(
                         modifier = chipDown,
                         onClick = { vm.toggleDanmaku() },
                     )
-                    if (ui.availableSubtitles.isNotEmpty()) {
-                        ConsoleChip(
-                            text = if (ui.subtitleEnabled) "字幕 开" else "字幕 关",
-                            active = ui.subtitleEnabled,
-                            modifier = chipDown,
-                            onClick = {
-                                val subs = ui.availableSubtitles
-                                if (!ui.subtitleEnabled) {
-                                    vm.selectSubtitle(subs.firstOrNull())
-                                } else {
-                                    val index = subs.indexOfFirst { it.id == ui.currentSubtitle?.id }
-                                    vm.selectSubtitle(
-                                        if (index >= 0 && index < subs.lastIndex) subs[index + 1] else null
-                                    )
-                                }
-                            },
-                        )
-                    }
                     ConsoleChip(
                         text = "音量 ${(playback.volume * 100).toInt()}%",
                         active = false,
@@ -1202,11 +1184,11 @@ fun PlayerConsoleScreen(
                     )
                     ConsoleIconChip(
                         icon = Icons.Filled.Settings,
-                        description = "弹幕设置",
+                        description = "播放设置",
                         modifier = chipDown.then(Modifier.focusRequester(settingsFocus)),
                         onClick = {
                             pendingOverlayFocus = settingsFocus
-                            session.openOverlay(DuoOverlay.DANMAKU)
+                            session.openOverlay(DuoOverlay.SETTINGS)
                         },
                     )
                 }
@@ -1743,12 +1725,16 @@ fun PlayerConsoleScreen(
         }
     }
 
-    if (overlay == DuoOverlay.DANMAKU) {
-        val firstFocus = remember { FocusRequester() }
+    if (overlay == DuoOverlay.SETTINGS) {
+        val danmakuFirstFocus = remember { FocusRequester() }
+        val subtitleFirstFocus = remember { FocusRequester() }
+        val sectionTabFocus = remember { List(2) { FocusRequester() } }
         val blockedFieldFocus = remember { FocusRequester() }
+        var settingsSection by remember { mutableIntStateOf(0) }
         var editingBlocked by remember { mutableStateOf(false) }
         var blockedDraft by remember { mutableStateOf("") }
         val keyboard = LocalSoftwareKeyboardController.current
+        val hasSubtitles = ui.availableSubtitles.isNotEmpty()
 
         fun applyBlockedWords() {
             vm.setDanmakuBlockedWords(parseBlockedDanmakuWords(blockedDraft))
@@ -1756,10 +1742,54 @@ fun PlayerConsoleScreen(
             keyboard?.hide()
         }
 
+        fun selectSection(section: Int, focusContent: Boolean) {
+            settingsSection = section
+            scope.launch {
+                delay(80L)
+                runCatching {
+                    when {
+                        !focusContent -> sectionTabFocus[section].requestFocus()
+                        section == 0 -> danmakuFirstFocus.requestFocus()
+                        hasSubtitles -> subtitleFirstFocus.requestFocus()
+                        else -> sectionTabFocus[1].requestFocus()
+                    }
+                }
+            }
+        }
+
+        fun handleSectionKey(event: androidx.compose.ui.input.key.KeyEvent, current: Int): Boolean {
+            if (event.type != KeyEventType.KeyDown) return false
+            return when (event.key) {
+                Key.DirectionLeft -> {
+                    if (current != 0) selectSection(0, focusContent = false)
+                    true
+                }
+                Key.DirectionRight -> {
+                    if (current != 1) selectSection(1, focusContent = false)
+                    true
+                }
+                else -> false
+            }
+        }
+
+        fun cycleSubtitleTrack() {
+            val subs = ui.availableSubtitles
+            if (subs.isEmpty()) return
+            val index = subs.indexOfFirst { it.id == ui.currentSubtitle?.id }
+            val next = when {
+                index < 0 -> subs.first()
+                ui.subtitleEnabled -> subs[(index + 1) % subs.size]
+                else -> subs[index]
+            }
+            if (next.id != ui.currentSubtitle?.id || !ui.subtitleEnabled) {
+                vm.selectSubtitle(next)
+            }
+        }
+
         LaunchedEffect(focusEpoch, editingBlocked) {
             delay(120L)
             runCatching {
-                if (editingBlocked) blockedFieldFocus.requestFocus() else firstFocus.requestFocus()
+                if (editingBlocked) blockedFieldFocus.requestFocus() else danmakuFirstFocus.requestFocus()
             }
         }
         LaunchedEffect(editingBlocked) {
@@ -1780,8 +1810,19 @@ fun PlayerConsoleScreen(
         }
 
         OverlayCard(
-            title = if (editingBlocked) "屏蔽词" else "弹幕设置",
+            title = if (editingBlocked) "屏蔽词" else "播放设置",
             onDismiss = { session.closeOverlay() },
+            // The settings menu is a single column; Left/Right must not move
+            // focus to the console behind the scrim. The section tabs handle
+            // their own Left/Right first (preview key).
+            modifier = if (editingBlocked) {
+                Modifier
+            } else {
+                Modifier.onKeyEvent { event ->
+                    event.type == KeyEventType.KeyDown &&
+                        (event.key == Key.DirectionLeft || event.key == Key.DirectionRight)
+                }
+            },
         ) {
             if (editingBlocked) {
                 Column(Modifier.fillMaxWidth()) {
@@ -1840,66 +1881,155 @@ fun PlayerConsoleScreen(
                 }
             } else {
                 Column(Modifier.fillMaxWidth()) {
-                    DanmakuSettingRow(
-                        label = "显示弹幕",
-                        value = if (ui.danmakuEnabled) "开" else "关",
-                        focusRequester = firstFocus,
-                        onClick = { vm.setDanmakuEnabled(!ui.danmakuEnabled) },
-                    )
-                    DanmakuSettingRow(
-                        label = "不透明度",
-                        value = "${(ui.danmakuOpacity * 100).toInt()}%",
-                        onClick = {
-                            vm.setDanmakuOpacity(
-                                nextDanmakuValue(ui.danmakuOpacity, danmakuOpacityOptions)
-                            )
-                        },
-                    )
-                    DanmakuSettingRow(
-                        label = "弹幕速度",
-                        value = danmakuSpeedLabel(ui.danmakuSpeed),
-                        onClick = {
-                            vm.setDanmakuSpeed(
-                                nextDanmakuValue(ui.danmakuSpeed, danmakuSpeedOptions)
-                            )
-                        },
-                    )
-                    DanmakuSettingRow(
-                        label = "字号",
-                        value = danmakuSizeLabel(ui.danmakuTextSize),
-                        onClick = {
-                            vm.setDanmakuTextSize(
-                                nextDanmakuValue(ui.danmakuTextSize, danmakuTextSizeOptions)
-                            )
-                        },
-                    )
-                    DanmakuSettingRow(
-                        label = "显示区域",
-                        value = danmakuAreaLabel(ui.danmakuArea),
-                        onClick = {
-                            vm.setDanmakuArea(
-                                nextDanmakuValue(ui.danmakuArea, danmakuAreaOptions)
-                            )
-                        },
-                    )
-                    DanmakuSettingRow(
-                        label = "屏蔽词",
-                        value = if (ui.danmakuBlockedWords.isEmpty()) {
-                            "未设置"
-                        } else {
-                            "${ui.danmakuBlockedWords.size} 个"
-                        },
-                        onClick = { editingBlocked = true },
-                    )
-                    DanmakuSettingRow(
-                        label = "同屏上限",
-                        value = danmakuMaxOnScreenLabel(ui.danmakuMaxOnScreen),
-                        onClick = {
-                            vm.setDanmakuMaxOnScreen(
-                                nextDanmakuMaxOnScreen(ui.danmakuMaxOnScreen)
-                            )
-                        },
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        ConsoleChip(
+                            text = "弹幕",
+                            active = settingsSection == 0,
+                            modifier = Modifier
+                                .focusRequester(sectionTabFocus[0])
+                                .focusProperties { down = danmakuFirstFocus }
+                                .onPreviewKeyEvent { event -> handleSectionKey(event, 0) },
+                            onClick = { selectSection(0, focusContent = true) },
+                        )
+                        ConsoleChip(
+                            text = "字幕",
+                            active = settingsSection == 1,
+                            modifier = Modifier
+                                .focusRequester(sectionTabFocus[1])
+                                .focusProperties {
+                                    down = if (hasSubtitles) {
+                                        subtitleFirstFocus
+                                    } else {
+                                        FocusRequester.Cancel
+                                    }
+                                }
+                                .onPreviewKeyEvent { event -> handleSectionKey(event, 1) },
+                            onClick = { selectSection(1, focusContent = true) },
+                        )
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    if (settingsSection == 0) {
+                        DanmakuSettingRow(
+                            label = "显示弹幕",
+                            value = if (ui.danmakuEnabled) "开" else "关",
+                            focusRequester = danmakuFirstFocus,
+                            modifier = Modifier.focusProperties { up = sectionTabFocus[0] },
+                            onClick = { vm.setDanmakuEnabled(!ui.danmakuEnabled) },
+                        )
+                        DanmakuSettingRow(
+                            label = "不透明度",
+                            value = "${(ui.danmakuOpacity * 100).toInt()}%",
+                            onClick = {
+                                vm.setDanmakuOpacity(
+                                    nextDanmakuValue(ui.danmakuOpacity, danmakuOpacityOptions)
+                                )
+                            },
+                        )
+                        DanmakuSettingRow(
+                            label = "弹幕速度",
+                            value = danmakuSpeedLabel(ui.danmakuSpeed),
+                            onClick = {
+                                vm.setDanmakuSpeed(
+                                    nextDanmakuValue(ui.danmakuSpeed, danmakuSpeedOptions)
+                                )
+                            },
+                        )
+                        DanmakuSettingRow(
+                            label = "字号",
+                            value = danmakuSizeLabel(ui.danmakuTextSize),
+                            onClick = {
+                                vm.setDanmakuTextSize(
+                                    nextDanmakuValue(ui.danmakuTextSize, danmakuTextSizeOptions)
+                                )
+                            },
+                        )
+                        DanmakuSettingRow(
+                            label = "显示区域",
+                            value = danmakuAreaLabel(ui.danmakuArea),
+                            onClick = {
+                                vm.setDanmakuArea(
+                                    nextDanmakuValue(ui.danmakuArea, danmakuAreaOptions)
+                                )
+                            },
+                        )
+                        DanmakuSettingRow(
+                            label = "屏蔽词",
+                            value = if (ui.danmakuBlockedWords.isEmpty()) {
+                                "未设置"
+                            } else {
+                                "${ui.danmakuBlockedWords.size} 个"
+                            },
+                            onClick = { editingBlocked = true },
+                        )
+                        DanmakuSettingRow(
+                            label = "同屏上限",
+                            value = danmakuMaxOnScreenLabel(ui.danmakuMaxOnScreen),
+                            modifier = Modifier.focusProperties { down = FocusRequester.Cancel },
+                            onClick = {
+                                vm.setDanmakuMaxOnScreen(
+                                    nextDanmakuMaxOnScreen(ui.danmakuMaxOnScreen)
+                                )
+                            },
+                        )
+                    } else if (!hasSubtitles) {
+                        Text(
+                            text = "当前视频没有字幕",
+                            color = DuoTextSecondary,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 12.dp),
+                        )
+                    } else {
+                        DanmakuSettingRow(
+                            label = "显示字幕",
+                            value = if (ui.subtitleEnabled) "开" else "关",
+                            focusRequester = subtitleFirstFocus,
+                            modifier = Modifier.focusProperties { up = sectionTabFocus[1] },
+                            onClick = { vm.toggleSubtitle() },
+                        )
+                        DanmakuSettingRow(
+                            label = "字幕轨道",
+                            value = ui.currentSubtitle?.displayName ?: "未选择",
+                            onClick = { cycleSubtitleTrack() },
+                        )
+                        DanmakuSettingRow(
+                            label = "字号",
+                            value = subtitleSizeLabel(ui.subtitleTextSizeSp),
+                            onClick = {
+                                vm.setSubtitleTextSize(
+                                    nextSubtitleValue(
+                                        ui.subtitleTextSizeSp,
+                                        subtitleTextSizeOptions
+                                    )
+                                )
+                            },
+                        )
+                        DanmakuSettingRow(
+                            label = "背景",
+                            value = subtitleBackgroundLabel(ui.subtitleBackgroundAlpha),
+                            onClick = {
+                                vm.setSubtitleBackgroundAlpha(
+                                    nextSubtitleValue(
+                                        ui.subtitleBackgroundAlpha,
+                                        subtitleBackgroundOptions
+                                    )
+                                )
+                            },
+                        )
+                        DanmakuSettingRow(
+                            label = "位置",
+                            value = subtitlePositionLabel(ui.subtitleBottomPaddingDp),
+                            modifier = Modifier.focusProperties { down = FocusRequester.Cancel },
+                            onClick = {
+                                vm.setSubtitleBottomPadding(
+                                    nextSubtitleBottomPadding(ui.subtitleBottomPaddingDp)
+                                )
+                            },
+                        )
+                    }
                 }
             }
         }
@@ -3266,7 +3396,7 @@ private fun OverlayCard(
         Column(
             modifier = Modifier
                 .width(380.dp)
-                .heightIn(max = 360.dp)
+                .heightIn(max = 400.dp)
                 .clip(RoundedCornerShape(10.dp))
                 .background(DuoSurface)
                 .clickable { /* consume */ }
@@ -3461,10 +3591,11 @@ private fun DanmakuSettingRow(
     label: String,
     value: String,
     focusRequester: FocusRequester? = null,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .duoFocusRing(RoundedCornerShape(6.dp))
             .clip(RoundedCornerShape(6.dp))
@@ -3488,6 +3619,9 @@ private val danmakuSpeedOptions = listOf(0.7f, 1f, 1.4f, 1.8f)
 private val danmakuTextSizeOptions = listOf(13f, 16f, 20f, 24f)
 private val danmakuAreaOptions = listOf(0.3f, 0.55f, 0.8f, 1f)
 private val danmakuMaxOnScreenOptions = listOf(0, 30, 60, 100)
+private val subtitleTextSizeOptions = listOf(18f, 22f, 26f, 30f)
+private val subtitleBackgroundOptions = listOf(0f, 0.35f, 0.55f, 0.8f)
+private val subtitleBottomPaddingOptions = listOf(32, 58, 90)
 
 @Composable
 private fun OverlayActionButton(
@@ -3547,6 +3681,36 @@ private fun danmakuAreaLabel(value: Float): String = when {
     value <= 0.65f -> "1/2"
     value <= 0.9f -> "3/4"
     else -> "全屏"
+}
+
+private fun subtitleSizeLabel(value: Float): String = when {
+    value <= 19f -> "小"
+    value <= 23f -> "标准"
+    value <= 27f -> "大"
+    else -> "特大"
+}
+
+private fun subtitleBackgroundLabel(value: Float): String = when {
+    value <= 0.01f -> "无"
+    value <= 0.4f -> "淡"
+    value <= 0.6f -> "标准"
+    else -> "深"
+}
+
+private fun subtitlePositionLabel(value: Int): String = when {
+    value <= 40 -> "靠下"
+    value <= 70 -> "标准"
+    else -> "靠上"
+}
+
+private fun nextSubtitleValue(current: Float, options: List<Float>): Float {
+    val index = options.indexOfFirst { kotlin.math.abs(it - current) < 0.01f }
+    return options[(index + 1).mod(options.size)]
+}
+
+private fun nextSubtitleBottomPadding(current: Int): Int {
+    val index = subtitleBottomPaddingOptions.indexOf(current)
+    return subtitleBottomPaddingOptions[(index + 1).mod(subtitleBottomPaddingOptions.size)]
 }
 
 @Composable

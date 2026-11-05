@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc13-FB7299">
+  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc14-FB7299">
   <img alt="status" src="https://img.shields.io/badge/status-untested%20RC-orange">
   <img alt="Android" src="https://img.shields.io/badge/Android-24%2B-3DDC84?logo=android&logoColor=white">
   <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-1.9.23-7F52FF?logo=kotlin&logoColor=white">
@@ -23,7 +23,7 @@
 上屏只负责视频画面，下屏用一块 `Presentation` 承载完整 UI；手柄和触摸共用同一棵
 Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，也没有上屏 OSD。
 
-> 当前版本：**0.2.0-rc13**（versionCode 14）
+> 当前版本：**0.2.0-rc14**（versionCode 15）
 > 状态：功能完整的 **未测试 RC**，221 个单元测试通过，已在 MuMu 与 Duo 真机做核心
 > 路径验证，尚未完成全流程回归。
 
@@ -77,7 +77,8 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
 - **弹幕**：按 cid 拉取 XML（手动解 raw deflate）、上屏 Canvas 渲染、滚动/顶部/
   底部泳道、暂停冻结、seek 重建；下屏开关、透明度/速度/字号/显示区域、屏蔽词、
   同屏上限；普通视频支持发送与撤回。
-- **字幕**：多字幕轨选择、开关、上屏只读字幕层；偏好持久化。
+- **字幕**：多字幕轨选择、开关、上屏只读字幕层；控制台「播放设置」内可调字号/
+  背景/位置，样式全局持久化。
 - **直播**：分区 chips（一级 + 子分区）、关注主播行、双列房间、HLS 播放、
   双栏控制台、实时弹幕/SC、清晰度/音量、直播信息；网格下滚时收起二级筛选行。
 - **动态**：关注动态流、全部/视频/图文筛选、UP 主筛选、视频直达播放、图文详情/
@@ -140,7 +141,7 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
   - 搜索视频/用户切换、用户行上屏人物卡、A 进入 UP 主空间。
   - 关注/搜索用户行聚焦：上屏显示资料、粉丝/视频数、最近动态与最近视频。
   - UP 主空间深色资料卡、视频/合集 chip、资料卡聚焦后的上屏动态/视频预览。
-  - 评论图片全屏、弹幕开关/设置、字幕开关、PGC 切集、UP 主空间。
+  - 评论图片全屏、弹幕开关/设置、字幕设置、PGC 切集、UP 主空间。
   - 评论发布/回复/删除：根评论发布后刷新出现、楼中楼回复、删除确认后从列表移除；
     测试评论已全部删除，账号状态还原。
   - 下载：清晰度 + 当前/全部分P 选择、单条与批量下载、进度/速度/剩余时间、
@@ -153,6 +154,9 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
   - rc12 修复：UGC 视频按 R1 切到「分P」不再崩溃（Gson 缺失 badge 字段为 null）。
   - rc13 焦点导航：播放键 Up → 进度条 → 返回键；左侧 chips Down 不再跳右栏；
     左右栏顶部/底部越界无反应；右栏分P/相关最后一项 Down 停住（Duo 验证）。
+  - rc14 字幕设置：字幕开关移入齿轮「播放设置」菜单（弹幕/字幕分栏），新增字幕
+    轨道、字号、背景、位置；去掉 chips 行字幕按钮后清晰度/倍速/弹幕/音量/齿轮
+    不再被裁切（Duo 验证）。
   - 登录、个人中心、历史/收藏/关注只读浏览；弹幕发送→撤回闭环。
 
 ### 未实现（代码层面）
@@ -297,7 +301,7 @@ keyPassword=CHANGE_ME
 ### 测试产物
 
 `dist/` 只保留构建说明；APK 通过 GitHub Releases 或本地构建分发，不进入 Git 历史。
-当前 rc13 的哈希与说明见 [`dist/README.md`](dist/README.md)。
+当前 rc14 的哈希与说明见 [`dist/README.md`](dist/README.md)。
 
 ---
 
