@@ -4,6 +4,20 @@
 `*.apk`），需要时本地 `./gradlew assembleDebug` / `assembleRelease` 生成，或从
 GitHub Releases 下载。
 
+## 0.2.0-rc19（2026-11-05）
+
+- `bili-duo-0.2.0-rc19-release.apk`
+  - R8 minify + resource shrink，正式 release keystore 签名。
+  - APK SHA-256：`533942b467039d758f29232ff162a75448333b00d55cf9fe269b702cf11dda0e`
+- `bili-duo-0.2.0-rc19-debug.apk`
+  - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
+  - SHA-256：`8e31071a33f06310d5abf231893270fe30d457537c50d46abfdb6f2d1b38bf1f`
+
+rc19 变更：进度条焦点环与暂停/播放按钮顶部重叠约 1.75dp。
+- 进度条外层 30dp Box 的焦点环外伸 5.75dp，后面只有 4dp 间距。
+- 时间行与进度条之间加 4dp，进度条与 transport 行之间由 4dp 改为 10dp。
+Duo 真机验证进度条选中时环底部与播放键有明显空隙。
+
 ## 0.2.0-rc18（2026-11-05）
 
 - `bili-duo-0.2.0-rc18-release.apk`

@@ -916,6 +916,7 @@ fun PlayerConsoleScreen(
                     )
                 }
                 var sliderFocused by remember { mutableStateOf(false) }
+                Spacer(Modifier.height(4.dp))
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -969,7 +970,9 @@ fun PlayerConsoleScreen(
                     )
                 }
 
-                Spacer(Modifier.height(4.dp))
+                // The slider ring extends ~5.75dp outside its 30dp box; keep
+                // enough gap so it never touches the play/pause button.
+                Spacer(Modifier.height(10.dp))
                 val transportNav = Modifier.focusProperties {
                     up = sliderFocus
                     down = if (!ui.isPgc) danmakuSendFocus else qualityFocus

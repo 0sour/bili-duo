@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc18-FB7299">
+  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc19-FB7299">
   <img alt="status" src="https://img.shields.io/badge/status-untested%20RC-orange">
   <img alt="Android" src="https://img.shields.io/badge/Android-24%2B-3DDC84?logo=android&logoColor=white">
   <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-1.9.23-7F52FF?logo=kotlin&logoColor=white">
@@ -23,7 +23,7 @@
 上屏只负责视频画面，下屏用一块 `Presentation` 承载完整 UI；手柄和触摸共用同一棵
 Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，也没有上屏 OSD。
 
-> 当前版本：**0.2.0-rc18**（versionCode 19）
+> 当前版本：**0.2.0-rc19**（versionCode 20）
 > 状态：功能完整的 **未测试 RC**，221 个单元测试通过，已在 MuMu 与 Duo 真机做核心
 > 路径验证，尚未完成全流程回归。
 
@@ -168,6 +168,8 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
     左边；横向滚动内容内侧加 8dp 内边距，1080P60 chip 选中时环完整（Duo 验证）。
   - rc18 评论图片：缩略图可聚焦但缺少 `duoFocusRing`，选中时没有指示器；补上
     4dp 圆角焦点环（Duo 验证评论截图选中态）。
+  - rc19 进度条焦点环：环底部与暂停/播放按钮顶部重叠约 1.75dp；进度条上下各留
+    4dp/10dp 间距，环与按钮完全分开（Duo 验证）。
   - 登录、个人中心、历史/收藏/关注只读浏览；弹幕发送→撤回闭环。
 
 ### 未实现（代码层面）
@@ -312,7 +314,7 @@ keyPassword=CHANGE_ME
 ### 测试产物
 
 `dist/` 只保留构建说明；APK 通过 GitHub Releases 或本地构建分发，不进入 Git 历史。
-当前 rc18 的哈希与说明见 [`dist/README.md`](dist/README.md)。
+当前 rc19 的哈希与说明见 [`dist/README.md`](dist/README.md)。
 
 ---
 
