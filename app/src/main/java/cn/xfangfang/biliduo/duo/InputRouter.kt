@@ -2,9 +2,7 @@ package cn.xfangfang.biliduo.duo
 
 import android.os.SystemClock
 import android.util.Log
-import android.view.InputDevice
 import android.view.KeyEvent
-import android.view.MotionEvent
 import cn.xfangfang.biliduo.BilibiliApp
 import cn.xfangfang.biliduo.BuildConfig
 
@@ -23,7 +21,6 @@ class InputRouter(
     private val handledDown = mutableSetOf<Int>()
     private val forwardedDown = mutableSetOf<Int>()
     private val lastDownAt = mutableMapOf<Int, Long>()
-    private val rightStickStepper = RightStickTabStepper()
 
     fun dispatch(event: KeyEvent): Boolean {
         return when (event.action) {
@@ -36,39 +33,6 @@ class InputRouter(
             }
             else -> false
         }
-    }
-
-    /**
-     * Right stick vertical axis. In the player it cycles the right pane tabs
-     * (comment / related / intro / parts); the top Activity has no other use
-     * for analog input. Returns true for joystick motion so it is not
-     * re-dispatched to the Activity's default handling.
-     */
-    fun dispatchMotion(event: MotionEvent): Boolean {
-        if (event.action != MotionEvent.ACTION_MOVE) return false
-        val source = event.source
-        val fromGamepad =
-            (source and InputDevice.SOURCE_JOYSTICK) != 0 ||
-                (source and InputDevice.SOURCE_GAMEPAD) != 0
-        if (!fromGamepad) return false
-
-        if (session.mode.value != DuoMode.PLAYER || session.overlay.value != null) {
-            rightStickStepper.reset()
-            return true
-        }
-
-        val rz = event.getAxisValue(MotionEvent.AXIS_RZ)
-        val ry = event.getAxisValue(MotionEvent.AXIS_RY)
-        val y = if (kotlin.math.abs(rz) >= kotlin.math.abs(ry)) rz else ry
-        val now = event.eventTime.takeIf { it > 0L } ?: SystemClock.uptimeMillis()
-        val step = rightStickStepper.onAxis(y, now)
-        if (step != null) {
-            if (BuildConfig.DEBUG) {
-                Log.d(BilibiliApp.TAG, "InputRouter: right stick step=$step y=$y")
-            }
-            session.emitTabScroll(step)
-        }
-        return true
     }
 
     private fun onDown(event: KeyEvent): Boolean {

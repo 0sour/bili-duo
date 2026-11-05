@@ -9,7 +9,6 @@ import android.os.Bundle
 import android.hardware.input.InputManager
 import android.view.InputDevice
 import android.view.KeyEvent
-import android.view.MotionEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -241,16 +240,6 @@ class MainActivity : ComponentActivity() {
             return true
         }
         return super.dispatchKeyEvent(event)
-    }
-
-    override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
-        if (secondScreenAvailable &&
-            ::inputRouter.isInitialized &&
-            inputRouter.dispatchMotion(event)
-        ) {
-            return true
-        }
-        return super.dispatchGenericMotionEvent(event)
     }
 
     private fun handleOpenDownloadsIntent(intent: Intent?) {

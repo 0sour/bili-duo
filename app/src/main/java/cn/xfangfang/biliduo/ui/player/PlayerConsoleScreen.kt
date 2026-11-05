@@ -823,12 +823,6 @@ fun PlayerConsoleScreen(
         }
     }
 
-    // Right stick up/down from the top Activity. Reuses cycleTab so the tab
-    // underline and the focus ring move together.
-    LaunchedEffect(session) {
-        session.tabScroll.collect { step -> cycleTab(step) }
-    }
-
     val currentIndex = ui.pages.indexOfFirst { it.cid == ui.currentPage?.cid }
     val hasPrev = currentIndex > 0
     val hasNext = currentIndex in 0 until ui.pages.size - 1
@@ -1316,7 +1310,7 @@ fun PlayerConsoleScreen(
                 Spacer(Modifier.weight(1f))
                 Text(
                     text = "方向键选择 · A 确认 · B 返回\n" +
-                        "LB/RB / 右摇杆 切换 tab · X 弹幕 · START 菜单",
+                        "LB/RB 切换 tab · X 弹幕 · START 菜单",
                     color = DuoTextTertiary,
                     fontSize = 9.5.sp,
                     lineHeight = 14.sp,
