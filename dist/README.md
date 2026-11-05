@@ -10,10 +10,10 @@ GitHub Releases 下载。
   - R8 minify + resource shrink，正式 release keystore 签名。
   - 签名证书 SHA-256：
     `ad0cf2f6e3d39ea5e2351f7275ad57fe2f99cd782e75931925687c2034c54adf`
-  - APK SHA-256：`f2db1be29d58cd457b51a6410e1a99601fab9f3311ecbf74b6061fdfcadbed2a`
+  - APK SHA-256：`a6ee2f1c06f2931a3cb4c18d37c6ea791209acc308eb18e7f0ca3f844467420a`
 - `bili-duo-0.2.0-rc6-debug.apk`
   - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
-  - SHA-256：`057bd53af52d30339589b062bede2a6075016353e0eb6844e84a9d079e2c7685`
+  - SHA-256：`b0bfc21443553a62be64c6aabd8de8099a49f50845d7d2521050415be50e903c`
 
 rc6 变更：评论 tab 新增「写评论」入口、评论/回复发布、删除自己的评论和删除确认；
 `x/v2/reply/add` / `reply/del`，需要登录。评论发布尚未在真机实测（会公开发布，

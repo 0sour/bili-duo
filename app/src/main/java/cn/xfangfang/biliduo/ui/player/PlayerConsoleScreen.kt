@@ -548,6 +548,7 @@ fun PlayerConsoleScreen(
                     repliesByRoot = emptyMap()
                     repliesPage = emptyMap()
                     expandedComments = emptySet()
+                    loadComments(0)
                 } else {
                     repliesByRoot = repliesByRoot - root.rpid
                     repliesPage = repliesPage - root.rpid
