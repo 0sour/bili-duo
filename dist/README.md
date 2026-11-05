@@ -4,6 +4,20 @@
 `*.apk`），需要时本地 `./gradlew assembleDebug` / `assembleRelease` 生成，或从
 GitHub Releases 下载。
 
+## 0.2.0-rc18（2026-11-05）
+
+- `bili-duo-0.2.0-rc18-release.apk`
+  - R8 minify + resource shrink，正式 release keystore 签名。
+  - APK SHA-256：`ee419e880745c46486f187d867350137fe3cdcc77fdd5bbd14fe085eb9dbd4e4`
+- `bili-duo-0.2.0-rc18-debug.apk`
+  - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
+  - SHA-256：`97635f861643996a24a78ea1eb2a3026e7b833e3a45337b8c9b46cfb1d985a02`
+
+rc18 变更：评论区图片缩略图可聚焦但没有焦点指示器。
+- `CommentPicturesRow` 只加了 `duoClickable`，漏了 `duoFocusRing`；补上
+  4dp 圆角白环（放在 `clip` 前）。评论与回复共用该组件。
+Duo 真机验证评论内截图选中时四边焦点环完整；测试观看历史已删除。
+
 ## 0.2.0-rc17（2026-11-05）
 
 - `bili-duo-0.2.0-rc17-release.apk`

@@ -2983,6 +2983,7 @@ private fun CommentPicturesRow(
                 modifier = Modifier
                     .height(64.dp)
                     .aspectRatio(ratio, matchHeightConstraintsFirst = true)
+                    .duoFocusRing(RoundedCornerShape(4.dp))
                     .clip(RoundedCornerShape(4.dp))
                     .background(DuoSurfaceHigh)
                     .duoClickable { onOpenImages(pictures, index) },
