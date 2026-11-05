@@ -672,6 +672,9 @@ private fun topGlyphIcon(glyph: TopGlyph): ImageVector = when (glyph) {
 @Composable
 private fun TopPersonScreen(person: TopPersonUi) {
     val accent = Color(person.accent.toInt())
+    val rich = person.stats.isNotEmpty() ||
+        person.recentVideos.isNotEmpty() ||
+        person.recentMoments.isNotEmpty()
     TopBackdrop(person.avatarUrl, accent) {
         Column(Modifier.fillMaxSize().padding(horizontal = 42.dp, vertical = 26.dp)) {
             TopSceneHeader(
@@ -684,18 +687,18 @@ private fun TopPersonScreen(person: TopPersonUi) {
             ) {
                 Column(Modifier.weight(1.12f)) {
                     TopEyebrow(person.eyebrow, accent)
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(10.dp))
                     Text(
                         text = person.name,
                         color = TopText,
-                        fontSize = 38.sp,
-                        lineHeight = 42.sp,
+                        fontSize = if (rich) 32.sp else 38.sp,
+                        lineHeight = if (rich) 36.sp else 42.sp,
                         fontWeight = FontWeight.Bold,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
                     if (person.subtitle.isNotBlank()) {
-                        Spacer(Modifier.height(8.dp))
+                        Spacer(Modifier.height(6.dp))
                         Text(
                             text = person.subtitle,
                             color = TopSecondary,
@@ -704,19 +707,42 @@ private fun TopPersonScreen(person: TopPersonUi) {
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
+                    if (person.stats.isNotEmpty()) {
+                        Spacer(Modifier.height(14.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(26.dp)) {
+                            person.stats.take(3).forEach { stat ->
+                                Column {
+                                    Text(
+                                        text = stat.value,
+                                        color = TopText,
+                                        fontSize = 20.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                    )
+                                    Spacer(Modifier.height(3.dp))
+                                    Text(
+                                        text = stat.label,
+                                        color = TopTertiary,
+                                        fontSize = 8.sp,
+                                        maxLines = 1,
+                                    )
+                                }
+                            }
+                        }
+                    }
                     if (person.description.isNotBlank()) {
-                        Spacer(Modifier.height(13.dp))
+                        Spacer(Modifier.height(10.dp))
                         Text(
                             text = person.description,
                             color = TopSecondary,
                             fontSize = 11.sp,
-                            lineHeight = 17.sp,
-                            maxLines = 4,
+                            lineHeight = 16.sp,
+                            maxLines = if (rich) 2 else 4,
                             overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.widthIn(max = 300.dp),
+                            modifier = Modifier.widthIn(max = 340.dp),
                         )
                     }
-                    Spacer(Modifier.height(18.dp))
+                    Spacer(Modifier.height(12.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                         if (person.badge.isNotBlank()) {
                             TopPill(person.badge, accent, filled = true)
@@ -724,59 +750,216 @@ private fun TopPersonScreen(person: TopPersonUi) {
                         TopPill("下屏焦点联动", accent)
                     }
                 }
-                Box(
+                Column(
                     modifier = Modifier.weight(0.88f).fillMaxHeight(),
-                    contentAlignment = Alignment.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
                 ) {
+                    val avatarSize = if (rich) 186.dp else 208.dp
                     Box(
-                        Modifier
-                            .size(290.dp)
-                            .background(
-                                Brush.radialGradient(
-                                    listOf(accent.copy(alpha = 0.20f), Color.Transparent)
-                                )
-                            )
-                    )
-                    Box(
-                        Modifier
-                            .size(244.dp)
-                            .clip(CircleShape)
-                            .border(1.dp, accent.copy(alpha = 0.26f), CircleShape)
-                    )
-                    Box(
-                        modifier = Modifier
-                            .size(208.dp)
-                            .clip(CircleShape)
-                            .background(TopSurface)
-                            .border(2.dp, accent.copy(alpha = 0.78f), CircleShape),
+                        modifier = Modifier.size(avatarSize + if (rich) 54.dp else 82.dp),
                         contentAlignment = Alignment.Center,
                     ) {
-                        if (person.avatarUrl.isNotBlank()) {
+                        Box(
+                            Modifier
+                                .size(avatarSize + if (rich) 26.dp else 36.dp)
+                                .background(
+                                    Brush.radialGradient(
+                                        listOf(accent.copy(alpha = 0.20f), Color.Transparent)
+                                    )
+                                )
+                        )
+                        Box(
+                            Modifier
+                                .size(avatarSize)
+                                .clip(CircleShape)
+                                .background(TopSurface)
+                                .border(2.dp, accent.copy(alpha = 0.78f), CircleShape),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            if (person.avatarUrl.isNotBlank()) {
+                                AsyncImage(
+                                    model = fixPic(person.avatarUrl),
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize().clip(CircleShape),
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = topGlyphIcon(person.glyph),
+                                    contentDescription = null,
+                                    tint = accent,
+                                    modifier = Modifier.size(64.dp),
+                                )
+                            }
+                        }
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopCenter)
+                                .offset(y = if (rich) 11.dp else 22.dp)
+                                .size(8.dp)
+                                .background(accent, CircleShape)
+                        )
+                    }
+                }
+            }
+            if (person.recentMoments.isNotEmpty() || person.recentVideos.isNotEmpty()) {
+                Spacer(Modifier.height(12.dp))
+                Row(verticalAlignment = Alignment.Bottom) {
+                    if (person.recentMoments.isNotEmpty()) {
+                        TopPersonMoments(
+                            moments = person.recentMoments,
+                            accent = accent,
+                            modifier = Modifier.width(
+                                if (person.recentVideos.isEmpty()) 460.dp else 300.dp
+                            ),
+                        )
+                        Spacer(Modifier.width(14.dp))
+                    }
+                    if (person.recentVideos.isNotEmpty()) {
+                        TopPersonVideos(
+                            videos = person.recentVideos,
+                            accent = accent,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            TopSceneFooter("上屏只读 · 不响应触摸或手柄", "下屏选择，上屏展示")
+        }
+    }
+}
+
+@Composable
+private fun TopPersonMoments(
+    moments: List<TopPersonMoment>,
+    accent: Color,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(9.dp))
+            .background(TopSurface.copy(alpha = 0.92f))
+            .border(1.dp, TopLine, RoundedCornerShape(9.dp))
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = "最近动态",
+                color = accent,
+                fontSize = 8.sp,
+                letterSpacing = 1.2.sp,
+                fontWeight = FontWeight.Medium,
+            )
+            Spacer(Modifier.weight(1f))
+            Text(
+                text = "${moments.size} 条",
+                color = TopTertiary,
+                fontSize = 7.sp,
+            )
+        }
+        moments.take(2).forEach { moment ->
+            Spacer(Modifier.height(7.dp))
+            Row(verticalAlignment = Alignment.Top) {
+                Box(
+                    Modifier
+                        .padding(top = 4.dp)
+                        .size(4.dp)
+                        .background(accent.copy(alpha = 0.8f), CircleShape)
+                )
+                Spacer(Modifier.width(7.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        text = moment.text.ifBlank { "（无文字动态）" },
+                        color = TopSecondary,
+                        fontSize = 9.sp,
+                        lineHeight = 13.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (moment.meta.isNotBlank()) {
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            text = moment.meta,
+                            color = TopTertiary,
+                            fontSize = 7.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TopPersonVideos(
+    videos: List<TopPersonVideo>,
+    accent: Color,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = "最近视频",
+                color = accent,
+                fontSize = 8.sp,
+                letterSpacing = 1.2.sp,
+                fontWeight = FontWeight.Medium,
+            )
+            Spacer(Modifier.weight(1f))
+            Text(
+                text = "RECENT · ${videos.size}",
+                color = TopTertiary,
+                fontSize = 7.sp,
+            )
+        }
+        Spacer(Modifier.height(7.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            videos.take(3).forEach { video ->
+                Column(Modifier.weight(1f)) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(72.dp)
+                            .clip(RoundedCornerShape(7.dp))
+                            .background(TopSurface3),
+                    ) {
+                        if (video.coverUrl.isNotBlank()) {
                             AsyncImage(
-                                model = fixPic(person.avatarUrl),
+                                model = fixPic(video.coverUrl),
                                 contentDescription = null,
                                 contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize().clip(CircleShape),
+                                modifier = Modifier.fillMaxSize(),
                             )
-                        } else {
-                            Icon(
-                                imageVector = topGlyphIcon(person.glyph),
-                                contentDescription = null,
-                                tint = accent,
-                                modifier = Modifier.size(80.dp),
+                        }
+                        if (video.meta.isNotBlank()) {
+                            Text(
+                                text = video.meta,
+                                color = Color.White,
+                                fontSize = 7.sp,
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .padding(4.dp)
+                                    .clip(RoundedCornerShape(3.dp))
+                                    .background(Color(0x99000000))
+                                    .padding(horizontal = 4.dp, vertical = 1.dp),
                             )
                         }
                     }
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopCenter)
-                            .offset(y = 22.dp)
-                            .size(8.dp)
-                            .background(accent, CircleShape)
+                    Spacer(Modifier.height(5.dp))
+                    Text(
+                        text = video.title,
+                        color = TopSecondary,
+                        fontSize = 9.sp,
+                        lineHeight = 12.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
-            TopSceneFooter("上屏只读 · 不响应触摸或手柄", "下屏选择，上屏展示")
         }
     }
 }

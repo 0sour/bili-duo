@@ -2,7 +2,9 @@ package cn.xfangfang.biliduo.ui.channel
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -17,6 +19,7 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
@@ -26,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -38,10 +42,15 @@ import coil.compose.AsyncImage
 import cn.xfangfang.biliduo.data.model.SeasonArchiveItem
 import cn.xfangfang.biliduo.data.model.SeasonSummary
 import cn.xfangfang.biliduo.data.model.SpaceAccInfo
+import cn.xfangfang.biliduo.data.model.UserCardData
 import cn.xfangfang.biliduo.data.model.UserVideoItem
 import cn.xfangfang.biliduo.duo.DuoSessionViewModel
 import cn.xfangfang.biliduo.ui.common.DuoConfirmOverlay
+import cn.xfangfang.biliduo.ui.common.DuoIconAction
+import cn.xfangfang.biliduo.ui.common.DuoPageHeader
 import cn.xfangfang.biliduo.ui.common.DuoPalette
+import cn.xfangfang.biliduo.ui.common.DuoPillButton
+import cn.xfangfang.biliduo.ui.common.DuoSearchField
 import cn.xfangfang.biliduo.ui.common.ScrollToTopFab
 import cn.xfangfang.biliduo.ui.duo.duoClickable
 import cn.xfangfang.biliduo.ui.duo.duoFocusRing
@@ -49,6 +58,7 @@ import cn.xfangfang.biliduo.ui.duo.duoTabCycling
 import cn.xfangfang.biliduo.ui.detail.FollowAction
 import cn.xfangfang.biliduo.ui.top.TopAmbientUi
 import cn.xfangfang.biliduo.ui.top.TopGlyph
+import cn.xfangfang.biliduo.ui.top.TopPersonUi
 import cn.xfangfang.biliduo.ui.top.TopPreviewUi
 import cn.xfangfang.biliduo.ui.detail.followActionForClick
 import cn.xfangfang.biliduo.ui.detail.followButtonLabel
@@ -67,6 +77,7 @@ fun ChannelScreen(
     onBack: () -> Unit,
     onVideoClick: (bvid: String) -> Unit,
     onVideoFocused: (TopPreviewUi) -> Unit = {},
+    onTopPerson: (TopPersonUi) -> Unit = {},
     onFocusCleared: () -> Unit = {},
     onTopAmbient: (TopAmbientUi) -> Unit = {},
     session: DuoSessionViewModel? = null,
@@ -76,11 +87,31 @@ fun ChannelScreen(
     var isSearching by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var showUnfollowConfirm by remember { mutableStateOf(false) }
+    var profileFocused by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
     val followFocus = remember { FocusRequester() }
     val firstVideoFocus = remember { FocusRequester() }
     val scope = rememberCoroutineScope()
     val keyboardController = LocalSoftwareKeyboardController.current
+
+    fun channelPerson(): TopPersonUi = buildChannelPersonUi(
+        mid = mid,
+        info = uiState.spaceAccInfo,
+        card = uiState.userCard,
+        videos = uiState.videos,
+        moments = uiState.moments,
+    )
+
+    LaunchedEffect(
+        uiState.spaceAccInfo?.name,
+        uiState.userCard?.follower,
+        uiState.userCard?.archive_count,
+        uiState.videos.size,
+        uiState.moments.size,
+        profileFocused,
+    ) {
+        if (profileFocused) onTopPerson(channelPerson())
+    }
 
     fun closeUnfollowConfirm() {
         showUnfollowConfirm = false
@@ -173,90 +204,76 @@ fun ChannelScreen(
         Modifier
     }
 
-    Scaffold(
-        modifier = tabShortcut,
-        topBar = {
-            TopAppBar(
-                navigationIcon = {
-                    IconButton(
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(DuoPalette.Bg)
+            .then(tabShortcut),
+    ) {
+        DuoPageHeader(
+            title = when {
+                inSeason -> uiState.seasonMeta?.name ?: "合集"
+                uiState.viewMode == ChannelViewMode.SEARCH -> "搜索结果"
+                else -> "UP 主空间"
+            },
+            onBack = {
+                when {
+                    inSearch -> {
+                        isSearching = false
+                        viewModel.clearSearch()
+                    }
+                    inSeason -> viewModel.backFromSeason()
+                    else -> onBack()
+                }
+            },
+            actions = {
+                if (!inSeason) {
+                    DuoIconAction(
+                        icon = if (isSearching) Icons.Default.Close else Icons.Default.Search,
+                        contentDescription = if (isSearching) "取消搜索" else "搜索",
+                        tint = if (isSearching) DuoPalette.Pink else DuoPalette.Text,
                         onClick = {
-                            when {
-                                inSearch -> {
-                                    isSearching = false
+                            if (isSearching) {
+                                isSearching = false
+                                if (uiState.viewMode == ChannelViewMode.SEARCH) {
                                     viewModel.clearSearch()
                                 }
-                                inSeason -> viewModel.backFromSeason()
-                                else -> onBack()
+                            } else {
+                                isSearching = true
                             }
                         },
-                        modifier = Modifier.duoFocusRing(CircleShape),
-                    ) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = if (isSearching) "取消" else "返回"
-                        )
-                    }
-                },
-                title = {
-                    if (isSearching) {
-                        OutlinedTextField(
-                            value = searchQuery,
-                            onValueChange = { searchQuery = it },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .focusRequester(focusRequester),
-                            placeholder = { Text("搜索UP主视频/合集") },
-                            singleLine = true,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                unfocusedBorderColor = Color.Transparent,
-                                focusedBorderColor = Color.Transparent,
-                                unfocusedContainerColor = Color.Transparent,
-                                focusedContainerColor = Color.Transparent,
-                            ),
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                            keyboardActions = KeyboardActions(
-                                onSearch = {
-                                    if (searchQuery.isNotBlank()) {
-                                        isSearching = false
-                                        keyboardController?.hide()
-                                        viewModel.search(searchQuery.trim())
-                                    }
-                                }
-                            ),
-                            trailingIcon = {
-                                if (searchQuery.isNotEmpty()) {
-                                    IconButton(
-                                        onClick = { searchQuery = "" },
-                                        modifier = Modifier.duoFocusRing(CircleShape),
-                                    ) {
-                                        Icon(Icons.Default.Clear, contentDescription = "清除")
-                                    }
-                                }
-                            }
-                        )
-                    } else if (inSeason) {
-                        Text(uiState.seasonMeta?.name ?: "合集")
-                    } else if (uiState.viewMode == ChannelViewMode.SEARCH) {
-                        Text("搜索结果")
-                    } else {
-                        Text("UP主视频")
-                    }
-                },
-                actions = {
-                    if (!isSearching) {
-                        IconButton(
-                            onClick = { isSearching = true },
-                            modifier = Modifier.duoFocusRing(CircleShape),
-                        ) {
-                            Icon(Icons.Default.Search, contentDescription = "搜索")
-                        }
-                    }
+                    )
                 }
-            )
+            },
+        )
+        if (isSearching) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .padding(horizontal = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                DuoSearchField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = "搜索 UP 主视频 / 合集",
+                    focusRequester = focusRequester,
+                    modifier = Modifier.weight(1f),
+                    onSubmit = {
+                        if (searchQuery.isNotBlank()) {
+                            isSearching = false
+                            keyboardController?.hide()
+                            viewModel.search(searchQuery.trim())
+                        }
+                    },
+                    onClear = { searchQuery = "" },
+                )
+            }
         }
-    ) { padding ->
+
         val listState = rememberLazyListState()
-        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+        Box(modifier = Modifier.fillMaxSize().weight(1f)) {
             ChannelBody(
                 uiState = uiState,
                 onVideoClick = onVideoClick,
@@ -276,6 +293,10 @@ fun ChannelScreen(
                             ownerLabel = "UP 主",
                         )
                     )
+                },
+                onProfileFocused = { focused ->
+                    profileFocused = focused
+                    if (focused) onTopPerson(channelPerson())
                 },
                 onSeasonClick = { seasonId, firstBvid -> viewModel.openSeason(seasonId, firstBvid) },
                 onSwitchMode = { mode -> viewModel.switchMode(mode) },
@@ -318,6 +339,7 @@ internal fun ChannelBody(
     onVideoClick: (bvid: String) -> Unit,
     onRetry: () -> Unit = {},
     onVideoFocused: (UserVideoItem) -> Unit = {},
+    onProfileFocused: (Boolean) -> Unit = {},
     onSeasonClick: (seasonId: Long, firstBvid: String?) -> Unit,
     onSwitchMode: (ChannelViewMode) -> Unit,
     onLoadMore: () -> Unit,
@@ -350,40 +372,37 @@ internal fun ChannelBody(
 
     Column(modifier = modifier.fillMaxSize()) {
         if (uiState.spaceAccInfo?.name?.isNotBlank() == true) {
-            UpInfoCard(
+            UpProfileCard(
+                mid = uiState.mid,
                 spaceAccInfo = uiState.spaceAccInfo!!,
+                userCard = uiState.userCard,
                 isLoggedIn = uiState.isLoggedIn,
                 isFollowed = uiState.isFollowed,
                 isTogglingFollow = uiState.isTogglingFollow,
                 followStatusLoading = uiState.followStatusLoading,
                 onToggleFollow = onToggleFollow,
                 followFocus = followFocus,
-                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp),
+                onFocusChanged = onProfileFocused,
+                modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 6.dp),
             )
         }
 
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize().weight(1f),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 6.dp, bottom = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         item(key = "mode_tabs") {
             if (uiState.viewMode == ChannelViewMode.VIDEOS || uiState.viewMode == ChannelViewMode.SEASONS) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(
-                        selected = !seasonsSelected,
-                        onClick = { onSwitchMode(ChannelViewMode.VIDEOS) },
-                        label = { Text("视频") },
-                        modifier = Modifier.duoFocusRing(RoundedCornerShape(8.dp)),
-                    )
-                    FilterChip(
-                        selected = seasonsSelected,
-                        onClick = { onSwitchMode(ChannelViewMode.SEASONS) },
-                        label = { Text("合集") },
-                        modifier = Modifier.duoFocusRing(RoundedCornerShape(8.dp)),
-                    )
-                }
+                ChannelModeTabs(
+                    videosSelected = !seasonsSelected,
+                    videoCount = uiState.userCard?.archive_count?.takeIf { it > 0 }
+                        ?: uiState.videos.size,
+                    seasonCount = uiState.seasons.size.takeIf { uiState.seasons.isNotEmpty() },
+                    onSelectVideos = { onSwitchMode(ChannelViewMode.VIDEOS) },
+                    onSelectSeasons = { onSwitchMode(ChannelViewMode.SEASONS) },
+                )
             }
         }
 
@@ -437,9 +456,9 @@ internal fun ChannelBody(
                     }
                     else -> {
                         item(key = "vheader") {
-                            Text(
-                                text = "共 ${uiState.videos.size} 个视频",
-                                style = MaterialTheme.typography.titleMedium
+                            ChannelSectionHeader(
+                                title = "视频",
+                                meta = "共 ${uiState.userCard?.archive_count?.takeIf { it > 0 } ?: uiState.videos.size} 个",
                             )
                         }
                         itemsIndexed(uiState.videos, key = { _, video -> video.bvid }) { index, video ->
@@ -453,17 +472,21 @@ internal fun ChannelBody(
                         item(key = "vbottom") {
                             Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                                 when {
-                                    uiState.loadingMore -> CircularProgressIndicator(Modifier.size(24.dp))
+                                    uiState.loadingMore -> CircularProgressIndicator(
+                                        Modifier.size(24.dp),
+                                        color = DuoPalette.Pink,
+                                        strokeWidth = 2.dp,
+                                    )
                                     uiState.hasMore -> TextButton(
                                         onClick = onLoadMore,
                                         modifier = Modifier.duoFocusRing(RoundedCornerShape(6.dp)),
                                     ) {
-                                        Text("加载更多", style = MaterialTheme.typography.bodySmall)
+                                        Text("加载更多", color = DuoPalette.Secondary, fontSize = 11.sp)
                                     }
                                     else -> Text(
                                         text = "已全部加载",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        color = DuoPalette.Tertiary,
+                                        fontSize = 10.sp,
                                     )
                                 }
                             }
@@ -476,23 +499,29 @@ internal fun ChannelBody(
                 if (uiState.isLoadingSeasons) {
                     item(key = "sloading") {
                         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator(Modifier.size(24.dp))
+                            CircularProgressIndicator(Modifier.size(24.dp), color = DuoPalette.Pink, strokeWidth = 2.dp)
                         }
                     }
                 } else if (uiState.seasonError != null) {
                     item(key = "serror") {
-                        Text("合集加载失败：${uiState.seasonError}")
+                        Text(
+                            text = "合集加载失败：${uiState.seasonError}",
+                            color = DuoPalette.Tertiary,
+                            fontSize = 11.sp,
+                        )
                     }
                 } else if (uiState.seasons.isEmpty()) {
                     item(key = "sempty") {
-                        Text("该UP主暂无合集", style = MaterialTheme.typography.bodyLarge)
+                        Text(
+                            text = "该 UP 主暂无合集",
+                            color = DuoPalette.Tertiary,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(top = 20.dp),
+                        )
                     }
                 } else {
                     item(key = "sheader") {
-                        Text(
-                            text = "共 ${uiState.seasons.size} 个合集",
-                            style = MaterialTheme.typography.titleMedium
-                        )
+                        ChannelSectionHeader(title = "合集", meta = "共 ${uiState.seasons.size} 个")
                     }
                     items(uiState.seasons, key = { it.meta?.seasonId ?: it.hashCode() }) { season ->
                         SeasonCard(season = season, onClick = {
@@ -508,22 +537,31 @@ internal fun ChannelBody(
                 if (uiState.isLoadingSeason) {
                     item(key = "sdloading") {
                         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator(Modifier.size(24.dp))
+                            CircularProgressIndicator(Modifier.size(24.dp), color = DuoPalette.Pink, strokeWidth = 2.dp)
                         }
                     }
                 } else if (uiState.seasonError != null) {
                     item(key = "sderror") {
-                        Text("加载失败：${uiState.seasonError}")
+                        Text(
+                            text = "加载失败：${uiState.seasonError}",
+                            color = DuoPalette.Tertiary,
+                            fontSize = 11.sp,
+                        )
                     }
                 } else if (uiState.seasonVideos.isEmpty()) {
                     item(key = "sdempty") {
-                        Text("该合集暂无视频", style = MaterialTheme.typography.bodyLarge)
+                        Text(
+                            text = "该合集暂无视频",
+                            color = DuoPalette.Tertiary,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(top = 20.dp),
+                        )
                     }
                 } else {
                     item(key = "sdheader") {
-                        Text(
-                            text = "共 ${uiState.seasonMeta?.total ?: uiState.seasonVideos.size} 个视频",
-                            style = MaterialTheme.typography.titleMedium
+                        ChannelSectionHeader(
+                            title = "选集",
+                            meta = "共 ${uiState.seasonMeta?.total ?: uiState.seasonVideos.size} 个视频",
                         )
                     }
                     items(uiState.seasonVideos, key = { it.bvid }) { item ->
@@ -536,15 +574,15 @@ internal fun ChannelBody(
                 if (uiState.isLoading) {
                     item(key = "schloading") {
                         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator(Modifier.size(24.dp))
+                            CircularProgressIndicator(Modifier.size(24.dp), color = DuoPalette.Pink, strokeWidth = 2.dp)
                         }
                     }
                 } else {
                     if (uiState.searchSeasons.isNotEmpty()) {
                         item(key = "sch_s_header") {
-                            Text(
-                                text = "合集 (${uiState.searchSeasons.size})",
-                                style = MaterialTheme.typography.titleMedium
+                            ChannelSectionHeader(
+                                title = "合集",
+                                meta = "${uiState.searchSeasons.size} 个",
                             )
                         }
                         items(uiState.searchSeasons, key = { "s_${it.meta?.seasonId ?: it.hashCode()}" }) { season ->
@@ -557,22 +595,27 @@ internal fun ChannelBody(
                     }
                     if (uiState.searchVideos.isNotEmpty()) {
                         item(key = "sch_v_header") {
-                            Text(
-                                text = "视频 (${uiState.searchVideos.size})",
-                                style = MaterialTheme.typography.titleMedium
+                            ChannelSectionHeader(
+                                title = "视频",
+                                meta = "${uiState.searchVideos.size} 个",
                             )
                         }
                         items(uiState.searchVideos, key = { "v_${it.bvid}" }) { video ->
                             ChannelVideoCard(
-                        video = video,
-                        onClick = { onVideoClick(video.bvid) },
-                        onFocus = { onVideoFocused(video) },
-                    )
+                                video = video,
+                                onClick = { onVideoClick(video.bvid) },
+                                onFocus = { onVideoFocused(video) },
+                            )
                         }
                     }
                     if (uiState.searchSeasons.isEmpty() && uiState.searchVideos.isEmpty()) {
                         item(key = "schempty") {
-                            Text("未找到相关内容", style = MaterialTheme.typography.bodyLarge)
+                            Text(
+                                text = "未找到相关内容",
+                                color = DuoPalette.Tertiary,
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(top = 20.dp),
+                            )
                         }
                     }
                 }
@@ -583,95 +626,251 @@ internal fun ChannelBody(
 }
 
 @Composable
-internal fun UpInfoCard(
+private fun ChannelSectionHeader(title: String, meta: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(30.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = title,
+            color = DuoPalette.Text,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = meta,
+            color = DuoPalette.Tertiary,
+            fontSize = 9.sp,
+        )
+    }
+}
+
+@Composable
+private fun ChannelModeTabs(
+    videosSelected: Boolean,
+    videoCount: Int?,
+    seasonCount: Int?,
+    onSelectVideos: () -> Unit,
+    onSelectSeasons: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(38.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ChannelModeTab(
+            label = "视频",
+            count = videoCount,
+            selected = videosSelected,
+            onClick = onSelectVideos,
+        )
+        Spacer(Modifier.width(8.dp))
+        ChannelModeTab(
+            label = "合集",
+            count = seasonCount,
+            selected = !videosSelected,
+            onClick = onSelectSeasons,
+        )
+        Spacer(Modifier.weight(1f))
+        Text(
+            text = "L1 / R1 切换",
+            color = DuoPalette.Tertiary,
+            fontSize = 9.sp,
+        )
+    }
+}
+
+@Composable
+private fun ChannelModeTab(
+    label: String,
+    count: Int?,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .height(30.dp)
+            .duoFocusRing(RoundedCornerShape(15.dp))
+            .clip(RoundedCornerShape(15.dp))
+            .background(if (selected) DuoPalette.Pink.copy(alpha = 0.16f) else DuoPalette.SurfaceHigh)
+            .border(
+                width = 1.dp,
+                color = if (selected) DuoPalette.Pink.copy(alpha = 0.45f) else Color.Transparent,
+                shape = RoundedCornerShape(15.dp),
+            )
+            .duoClickable(onClick = onClick)
+            .padding(horizontal = 13.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            color = if (selected) DuoPalette.Pink else DuoPalette.Secondary,
+            fontSize = 12.sp,
+            fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
+        )
+        if (count != null && count > 0) {
+            Spacer(Modifier.width(5.dp))
+            Text(
+                text = count.toString(),
+                color = if (selected) DuoPalette.Pink.copy(alpha = 0.8f) else DuoPalette.Tertiary,
+                fontSize = 9.sp,
+            )
+        }
+    }
+}
+
+@Composable
+internal fun UpProfileCard(
+    mid: Long,
     spaceAccInfo: SpaceAccInfo,
+    userCard: UserCardData?,
     isLoggedIn: Boolean = false,
     isFollowed: Boolean = false,
     isTogglingFollow: Boolean = false,
     followStatusLoading: Boolean = false,
     onToggleFollow: () -> Unit = {},
     followFocus: FocusRequester? = null,
+    onFocusChanged: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    Card(modifier = modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            if (spaceAccInfo.face.isNotBlank()) {
-                AsyncImage(
-                    model = fixPic(spaceAccInfo.face),
-                    contentDescription = spaceAccInfo.name,
-                    modifier = Modifier.size(48.dp),
-                    contentScale = ContentScale.Crop
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .background(
-                            MaterialTheme.colorScheme.surfaceVariant,
-                            CircleShape
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
+    val fans = userCard?.follower ?: 0
+    val archiveCount = userCard?.archive_count?.takeIf { it > 0 }
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .duoFocusRing(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(14.dp))
+            .background(DuoPalette.Surface)
+            .onFocusChanged { onFocusChanged(it.hasFocus) }
+            .focusable()
+            .padding(14.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(CircleShape)
+                    .background(DuoPalette.SurfaceHigh)
+                    .border(1.5.dp, DuoPalette.Pink.copy(alpha = 0.55f), CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (spaceAccInfo.face.isNotBlank()) {
+                    AsyncImage(
+                        model = fixPic(spaceAccInfo.face),
+                        contentDescription = spaceAccInfo.name,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize().clip(CircleShape),
+                    )
+                } else {
                     Icon(
                         Icons.Default.Person,
                         contentDescription = spaceAccInfo.name,
-                        modifier = Modifier.size(32.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        modifier = Modifier.size(30.dp),
+                        tint = DuoPalette.Secondary,
                     )
                 }
             }
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                SelectionContainer {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = spaceAccInfo.name,
-                        style = MaterialTheme.typography.titleMedium
+                        color = DuoPalette.Text,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
                     )
-                }
-                if (spaceAccInfo.sign.isNotBlank()) {
-                    Spacer(modifier = Modifier.height(2.dp))
-                    SelectionContainer {
+                    Spacer(Modifier.width(7.dp))
+                    Text(
+                        text = "UP 主",
+                        color = DuoPalette.Pink,
+                        fontSize = 8.sp,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(DuoPalette.Pink.copy(alpha = 0.12f))
+                            .padding(horizontal = 5.dp, vertical = 2.dp),
+                    )
+                    if (isFollowed) {
+                        Spacer(Modifier.width(4.dp))
                         Text(
-                            text = spaceAccInfo.sign,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
+                            text = "已关注",
+                            color = DuoPalette.Secondary,
+                            fontSize = 8.sp,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(DuoPalette.SurfaceHigh)
+                                .padding(horizontal = 5.dp, vertical = 2.dp),
                         )
                     }
                 }
+                Spacer(Modifier.height(3.dp))
+                Text(
+                    text = "UID $mid",
+                    color = DuoPalette.Tertiary,
+                    fontSize = 9.sp,
+                )
+                Spacer(Modifier.height(5.dp))
+                Text(
+                    text = spaceAccInfo.sign.ifBlank { "这个 UP 主还没有填写签名。" },
+                    color = DuoPalette.Secondary,
+                    fontSize = 11.sp,
+                    lineHeight = 15.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
             if (isLoggedIn) {
-                Spacer(modifier = Modifier.width(8.dp))
-                OutlinedButton(
-                    onClick = onToggleFollow,
+                Spacer(Modifier.width(10.dp))
+                DuoPillButton(
+                    text = if (followStatusLoading) "…" else followButtonLabel(isFollowed),
+                    primary = !isFollowed,
                     enabled = !isTogglingFollow && !followStatusLoading,
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                    modifier = Modifier
-                        .duoFocusRing(RoundedCornerShape(20.dp))
-                        .then(
-                            if (followFocus != null) Modifier.focusRequester(followFocus) else Modifier
-                        ),
-                ) {
-                    if (followStatusLoading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(16.dp),
-                            strokeWidth = 2.dp
-                        )
-                    } else {
-                        Text(
-                            text = followButtonLabel(isFollowed),
-                            style = MaterialTheme.typography.labelMedium
-                        )
-                    }
-                }
+                    focusRequester = followFocus,
+                    onClick = onToggleFollow,
+                )
             }
         }
+        Spacer(Modifier.height(12.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            ProfileStat(value = formatCount(fans.toLong()), label = "粉丝")
+            Spacer(Modifier.width(18.dp))
+            Box(Modifier.width(1.dp).height(24.dp).background(DuoPalette.Outline))
+            Spacer(Modifier.width(18.dp))
+            ProfileStat(
+                value = archiveCount?.let { formatCount(it.toLong()) } ?: "—",
+                label = "视频",
+            )
+            Spacer(Modifier.weight(1f))
+            Text(
+                text = "选中资料卡 · 上屏动态/视频",
+                color = DuoPalette.Tertiary,
+                fontSize = 8.sp,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProfileStat(value: String, label: String) {
+    Column {
+        Text(
+            text = value,
+            color = DuoPalette.Text,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Spacer(Modifier.height(1.dp))
+        Text(
+            text = label,
+            color = DuoPalette.Tertiary,
+            fontSize = 8.sp,
+        )
     }
 }
 

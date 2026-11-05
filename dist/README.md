@@ -4,6 +4,20 @@
 `*.apk`），需要时本地 `./gradlew assembleDebug` / `assembleRelease` 生成，或从
 GitHub Releases 下载。
 
+## 0.2.0-rc8（2026-11-05）
+
+- `bili-duo-0.2.0-rc8-release.apk`
+  - R8 minify + resource shrink，正式 release keystore 签名。
+  - APK SHA-256：`e4279cd28312ff5d5516662709f3418090ad82b9ea061530df6baa919c82dab9`
+- `bili-duo-0.2.0-rc8-debug.apk`
+  - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
+  - SHA-256：`dc02852a919522709e5b83fc670628bfdcc06f5d8a29680644d6354fdffbc10c`
+
+rc8 变更：聚焦关注/搜索用户列表的 UP 卡时，上屏显示资料、粉丝/视频数、
+最近动态与最近视频（220ms 防抖、按 mid 缓存）；UP 主空间改用深色资料卡、
+胶囊式视频/合集切换和计数；`TopPersonUi` 增加 mid/stats/近期内容，修正转发动态
+只显示“转发动态”占位。单测 210，已在 Duo 验证关注列表与搜索用户列表的上屏预览。
+
 ## 0.2.0-rc7（2026-11-05）
 
 - `bili-duo-0.2.0-rc7-release.apk`

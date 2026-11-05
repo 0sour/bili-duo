@@ -313,6 +313,7 @@ fun FollowingListScreen(
                                     onTopPerson(
                                         TopPersonUi(
                                             eyebrow = "FOLLOWING / 关注",
+                                            mid = focused.mid,
                                             name = focused.uname,
                                             subtitle = "UID ${focused.mid}",
                                             description = focused.sign.ifBlank { "这个 UP 主还没有填写签名。" },

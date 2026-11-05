@@ -689,6 +689,7 @@ fun MainScreen(
                         navController.navigate(Routes.player(bvid))
                     },
                     onVideoFocused = onTopVideoFocused,
+                    onTopPerson = onTopPerson,
                     onFocusCleared = onTopFocusCleared,
                     onTopAmbient = onTopAmbient,
                     session = duoSession,

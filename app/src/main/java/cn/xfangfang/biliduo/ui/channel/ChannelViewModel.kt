@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import cn.xfangfang.biliduo.BilibiliApp
 import cn.xfangfang.biliduo.data.api.BilibiliApi
+import cn.xfangfang.biliduo.data.model.DynamicCardUi
 import cn.xfangfang.biliduo.data.model.SeasonArchiveItem
 import cn.xfangfang.biliduo.data.model.SeasonMeta
 import cn.xfangfang.biliduo.data.model.SeasonSummary
@@ -12,6 +13,7 @@ import cn.xfangfang.biliduo.data.model.SpaceAccInfo
 import cn.xfangfang.biliduo.data.model.UserCardData
 import cn.xfangfang.biliduo.data.model.UserSpacePage
 import cn.xfangfang.biliduo.data.model.UserVideoItem
+import cn.xfangfang.biliduo.data.model.toCardUi
 import cn.xfangfang.biliduo.data.repository.BilibiliRepository
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,6 +34,7 @@ data class ChannelUiState(
     val loadingMore: Boolean = false,
     val spaceAccInfo: SpaceAccInfo? = null,
     val userCard: UserCardData? = null,
+    val moments: List<DynamicCardUi> = emptyList(),
     val isLoggedIn: Boolean = false,
     val isFollowed: Boolean = false,
     val isTogglingFollow: Boolean = false,
@@ -119,6 +122,17 @@ class ChannelViewModel(
             }
             .onFailure {
                 Log.e(BilibiliApp.TAG, "ChannelVM: loadSpaceInfo failed", it)
+            }
+        repository.getDynamicSpaceFeed(mid)
+            .onSuccess { feed ->
+                _uiState.value = _uiState.value.copy(
+                    moments = feed.items.orEmpty()
+                        .mapNotNull { it.toCardUi() }
+                        .take(3)
+                )
+            }
+            .onFailure {
+                Log.d(BilibiliApp.TAG, "ChannelVM: load space dynamics failed: ${it.message}")
             }
         withContext(NonCancellable) {
             repository.checkRelation(mid)

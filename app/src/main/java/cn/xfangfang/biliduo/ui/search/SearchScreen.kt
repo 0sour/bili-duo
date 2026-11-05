@@ -72,6 +72,7 @@ import cn.xfangfang.biliduo.ui.duo.duoTextFieldNavigation
 import cn.xfangfang.biliduo.ui.duo.duoFocusRing
 import cn.xfangfang.biliduo.ui.top.TopAmbientUi
 import cn.xfangfang.biliduo.ui.top.TopGlyph
+import cn.xfangfang.biliduo.ui.top.TopPersonStat
 import cn.xfangfang.biliduo.ui.top.TopPersonUi
 import cn.xfangfang.biliduo.ui.top.TopPreviewUi
 import cn.xfangfang.biliduo.util.fixPic
@@ -1133,6 +1134,7 @@ private fun SearchVideoItem.toTopPreview(): TopPreviewUi = TopPreviewUi(
 
 private fun SearchUserItem.toTopPerson(): TopPersonUi = TopPersonUi(
     eyebrow = "SEARCH / 用户",
+    mid = mid,
     name = uname,
     subtitle = buildString {
         append("UID $mid")
@@ -1142,4 +1144,8 @@ private fun SearchUserItem.toTopPerson(): TopPersonUi = TopPersonUi(
     badge = badgeLabel(),
     avatarUrl = avatar,
     glyph = TopGlyph.PERSON,
+    stats = listOf(
+        TopPersonStat(formatCount(fans), "粉丝"),
+        TopPersonStat(formatCount(videos), "视频"),
+    ),
 )

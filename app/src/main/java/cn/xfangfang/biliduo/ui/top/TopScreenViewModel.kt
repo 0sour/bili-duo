@@ -1,10 +1,16 @@
 package cn.xfangfang.biliduo.ui.top
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import cn.xfangfang.biliduo.BilibiliApp
 import cn.xfangfang.biliduo.data.model.VideoInfo
+import cn.xfangfang.biliduo.data.model.toCardUi
 import cn.xfangfang.biliduo.data.repository.BilibiliRepository
+import cn.xfangfang.biliduo.util.formatCount
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -50,8 +56,26 @@ enum class TopGlyph {
     DYNAMIC,
 }
 
+data class TopPersonStat(
+    val value: String,
+    val label: String,
+)
+
+data class TopPersonVideo(
+    val title: String,
+    val coverUrl: String = "",
+    val meta: String = "",
+)
+
+data class TopPersonMoment(
+    val text: String,
+    val meta: String = "",
+    val coverUrl: String = "",
+)
+
 data class TopPersonUi(
     val eyebrow: String = "PROFILE",
+    val mid: Long = 0,
     val name: String,
     val subtitle: String = "",
     val description: String = "",
@@ -59,6 +83,9 @@ data class TopPersonUi(
     val avatarUrl: String = "",
     val glyph: TopGlyph = TopGlyph.PERSON,
     val accent: Long = 0xFFFB7299,
+    val stats: List<TopPersonStat> = emptyList(),
+    val recentVideos: List<TopPersonVideo> = emptyList(),
+    val recentMoments: List<TopPersonMoment> = emptyList(),
 )
 
 data class TopPanelUi(
@@ -154,8 +181,20 @@ class TopScreenViewModel(
             size > 8
     }
 
+    private data class PersonRecent(
+        val stats: List<TopPersonStat> = emptyList(),
+        val videos: List<TopPersonVideo> = emptyList(),
+        val moments: List<TopPersonMoment> = emptyList(),
+    )
+
+    private val personRecentCache = object : LinkedHashMap<Long, PersonRecent>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Long, PersonRecent>?): Boolean =
+            size > 16
+    }
+
     private var detailJob: Job? = null
     private var clearJob: Job? = null
+    private var personJob: Job? = null
 
     fun onVideoFocused(seed: TopPreviewUi) {
         clearJob?.cancel()
@@ -209,7 +248,77 @@ class TopScreenViewModel(
         detailJob?.cancel()
         clearJob?.cancel()
         _state.value = TopScreenUiState(mode = TopScreenMode.PERSON, person = person)
+        val mid = person.mid
+        if (mid <= 0) return
+        if (person.recentVideos.isNotEmpty() || person.recentMoments.isNotEmpty()) return
+        personJob?.cancel()
+        val cached = personRecentCache[mid]
+        if (cached != null) {
+            _state.value = TopScreenUiState(
+                mode = TopScreenMode.PERSON,
+                person = person.withRecent(cached),
+            )
+            return
+        }
+        personJob = viewModelScope.launch {
+            delay(220)
+            val recent = loadPersonRecent(mid)
+            personRecentCache[mid] = recent
+            val current = _state.value
+            if (current.mode == TopScreenMode.PERSON && current.person?.mid == mid) {
+                _state.value = current.copy(person = current.person?.withRecent(recent))
+            }
+        }
     }
+
+    private suspend fun loadPersonRecent(mid: Long): PersonRecent = coroutineScope {
+        val cardDeferred = async { repository.getUserCard(mid).getOrNull() }
+        val videosDeferred = async { repository.getUserVideos(mid).getOrNull()?.first.orEmpty() }
+        val momentsDeferred = async {
+            repository.getDynamicSpaceFeed(mid).getOrNull()?.items.orEmpty()
+                .mapNotNull { it.toCardUi() }
+        }
+        val card = cardDeferred.await()
+        val videos = videosDeferred.await()
+        val moments = momentsDeferred.await()
+        Log.d(BilibiliApp.TAG, "person recent: mid=$mid videos=${videos.size} moments=${moments.size}")
+        PersonRecent(
+            stats = listOfNotNull(
+                card?.follower?.takeIf { it > 0 }?.let {
+                    TopPersonStat(formatCount(it.toLong()), "粉丝")
+                },
+                (card?.archive_count?.takeIf { it > 0 } ?: videos.size.takeIf { it > 0 })?.let {
+                    TopPersonStat(formatCount(it.toLong()), "视频")
+                },
+            ),
+            videos = videos.take(3).map { video ->
+                TopPersonVideo(
+                    title = video.title,
+                    coverUrl = video.pic,
+                    meta = video.duration,
+                )
+            },
+            moments = moments.take(2).map { moment ->
+                TopPersonMoment(
+                    text = moment.forward?.text?.takeIf { it.isNotBlank() }
+                        ?: moment.forward?.video?.title?.takeIf { it.isNotBlank() }
+                        ?: moment.text.takeIf { it.isNotBlank() }
+                        ?: moment.video?.title.orEmpty().takeIf { it.isNotBlank() }
+                        ?: "（无文字动态）",
+                    meta = listOf(moment.kindLabel, moment.pubTime)
+                        .filter { it.isNotBlank() }
+                        .joinToString(" · "),
+                    coverUrl = moment.video?.cover ?: moment.images.firstOrNull().orEmpty(),
+                )
+            },
+        )
+    }
+
+    private fun TopPersonUi.withRecent(recent: PersonRecent): TopPersonUi = copy(
+        stats = stats.ifEmpty { recent.stats },
+        recentVideos = recent.videos,
+        recentMoments = recent.moments,
+    )
 
     fun showPanel(panel: TopPanelUi) {
         detailJob?.cancel()
