@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc12-FB7299">
+  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc13-FB7299">
   <img alt="status" src="https://img.shields.io/badge/status-untested%20RC-orange">
   <img alt="Android" src="https://img.shields.io/badge/Android-24%2B-3DDC84?logo=android&logoColor=white">
   <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-1.9.23-7F52FF?logo=kotlin&logoColor=white">
@@ -23,7 +23,7 @@
 上屏只负责视频画面，下屏用一块 `Presentation` 承载完整 UI；手柄和触摸共用同一棵
 Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，也没有上屏 OSD。
 
-> 当前版本：**0.2.0-rc12**（versionCode 13）
+> 当前版本：**0.2.0-rc13**（versionCode 14）
 > 状态：功能完整的 **未测试 RC**，221 个单元测试通过，已在 MuMu 与 Duo 真机做核心
 > 路径验证，尚未完成全流程回归。
 
@@ -151,6 +151,8 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
   - 手柄审查：清晰度/倍速浮层焦点不再漏到背后、设置开关不再抢焦点、
     搜索/合集错误重试可聚焦、清晰度浮层与列表焦点环完整（MuMu 验证）。
   - rc12 修复：UGC 视频按 R1 切到「分P」不再崩溃（Gson 缺失 badge 字段为 null）。
+  - rc13 焦点导航：播放键 Up → 进度条 → 返回键；左侧 chips Down 不再跳右栏；
+    左右栏顶部/底部越界无反应；右栏分P/相关最后一项 Down 停住（Duo 验证）。
   - 登录、个人中心、历史/收藏/关注只读浏览；弹幕发送→撤回闭环。
 
 ### 未实现（代码层面）
@@ -295,7 +297,7 @@ keyPassword=CHANGE_ME
 ### 测试产物
 
 `dist/` 只保留构建说明；APK 通过 GitHub Releases 或本地构建分发，不进入 Git 历史。
-当前 rc12 的哈希与说明见 [`dist/README.md`](dist/README.md)。
+当前 rc13 的哈希与说明见 [`dist/README.md`](dist/README.md)。
 
 ---
 

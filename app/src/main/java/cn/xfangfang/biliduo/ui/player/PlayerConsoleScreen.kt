@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
+
 package cn.xfangfang.biliduo.ui.player
 
 import android.util.Log
@@ -28,6 +30,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -165,6 +168,8 @@ fun PlayerConsoleScreen(
     var selectedTab by remember { mutableIntStateOf(0) }
     var seekDrag by remember { mutableStateOf<Float?>(null) }
     val playFocus = remember { FocusRequester() }
+    val backFocus = remember { FocusRequester() }
+    val sliderFocus = remember { FocusRequester() }
     val tabFocus = remember { List(4) { FocusRequester() } }
     val nextPageFocus = remember { FocusRequester() }
     val qualityFocus = remember { FocusRequester() }
@@ -838,6 +843,11 @@ fun PlayerConsoleScreen(
                     Box(
                         modifier = Modifier
                             .size(24.dp)
+                            .focusRequester(backFocus)
+                            .focusProperties {
+                                up = FocusRequester.Cancel
+                                down = sliderFocus
+                            }
                             .duoFocusRing(CircleShape)
                             .clip(CircleShape)
                             .duoClickable(onClick = ::leave),
@@ -929,6 +939,11 @@ fun PlayerConsoleScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(26.dp)
+                            .focusRequester(sliderFocus)
+                            .focusProperties {
+                                up = backFocus
+                                down = playFocus
+                            }
                             .onFocusChanged { sliderFocused = it.hasFocus }
                             .onPreviewKeyEvent { event ->
                                 if (event.type != KeyEventType.KeyDown) {
@@ -955,6 +970,10 @@ fun PlayerConsoleScreen(
                 }
 
                 Spacer(Modifier.height(4.dp))
+                val transportNav = Modifier.focusProperties {
+                    up = sliderFocus
+                    down = if (!ui.isPgc) danmakuSendFocus else qualityFocus
+                }
                 Row(
                     modifier = Modifier.fillMaxWidth().height(56.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -965,12 +984,14 @@ fun PlayerConsoleScreen(
                         description = "上一P",
                         enabled = hasPrev,
                         onClick = { if (hasPrev) switchPage(ui.pages[currentIndex - 1]) },
+                        modifier = transportNav,
                     )
                     TransportButton(
                         icon = Icons.Filled.Replay10,
                         description = "后退10秒",
                         enabled = playback.isActive,
                         onClick = { controller.seekBy(-10_000L) },
+                        modifier = transportNav,
                     )
                     Box(
                         modifier = Modifier
@@ -978,6 +999,10 @@ fun PlayerConsoleScreen(
                             .clip(CircleShape)
                             .background(if (playback.isActive) DuoPink else DuoSurfaceHigh)
                             .focusRequester(playFocus)
+                            .focusProperties {
+                                up = sliderFocus
+                                down = if (!ui.isPgc) danmakuSendFocus else qualityFocus
+                            }
                             .onFocusChanged {
                                 playFocused = it.isFocused
                                 if (BuildConfig.DEBUG) {
@@ -1022,12 +1047,14 @@ fun PlayerConsoleScreen(
                         description = "前进10秒",
                         enabled = playback.isActive,
                         onClick = { controller.seekBy(10_000L) },
+                        modifier = transportNav,
                     )
                     TransportButton(
                         icon = Icons.Filled.SkipNext,
                         description = "下一P",
                         enabled = hasNext,
                         onClick = { if (hasNext) switchPage(ui.pages[currentIndex + 1]) },
+                        modifier = transportNav,
                     )
                 }
 
@@ -1043,6 +1070,10 @@ fun PlayerConsoleScreen(
                                 .weight(1f)
                                 .height(30.dp)
                                 .focusRequester(danmakuSendFocus)
+                                .focusProperties {
+                                    up = playFocus
+                                    down = qualityFocus
+                                }
                                 .duoFocusRing(RoundedCornerShape(7.dp))
                                 .clip(RoundedCornerShape(7.dp))
                                 .background(DuoSurfaceHigh)
@@ -1100,8 +1131,12 @@ fun PlayerConsoleScreen(
                 }
 
                 Spacer(Modifier.height(10.dp))
+                val chipUp = if (!ui.isPgc) danmakuSendFocus else playFocus
                 val chipDown = Modifier.focusProperties {
-                    down = if (nextPage != null) nextPageFocus else tabFocus[selectedTab]
+                    up = chipUp
+                    // No next-page card means this is the bottom of the left
+                    // pane; Down must not jump into the comment pane.
+                    down = if (nextPage != null) nextPageFocus else FocusRequester.Cancel
                 }
                 Row(
                     modifier = Modifier
@@ -1201,6 +1236,10 @@ fun PlayerConsoleScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .focusRequester(nextPageFocus)
+                            .focusProperties {
+                                up = qualityFocus
+                                down = FocusRequester.Cancel
+                            }
                             .duoFocusRing(RoundedCornerShape(7.dp))
                             .clip(RoundedCornerShape(7.dp))
                             .background(DuoSurface)
@@ -1305,7 +1344,9 @@ fun PlayerConsoleScreen(
                     .background(DuoSurface)
                     .border(1.dp, DuoDivider, RoundedCornerShape(12.dp)),
             ) {
-                val tabUp = Modifier.focusProperties { up = playFocus }
+                // The right pane's top edge: Up stays here instead of jumping
+                // back to the left column.
+                val tabUp = Modifier.focusProperties { up = FocusRequester.Cancel }
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -2066,12 +2107,14 @@ private fun IntroTab(
                     },
                     active = isFavorited == true,
                     onClick = onFavorite,
+                    modifier = Modifier.focusProperties { down = FocusRequester.Cancel },
                 )
                 ActionPill(
                     icon = Icons.Filled.FileDownload,
                     text = "下载",
                     active = false,
                     onClick = onDownload,
+                    modifier = Modifier.focusProperties { down = FocusRequester.Cancel },
                 )
             }
         }
@@ -2250,6 +2293,9 @@ private fun CommentsTab(
                                         .padding(vertical = 4.dp)
                                         .duoFocusRing(RoundedCornerShape(6.dp))
                                         .clip(RoundedCornerShape(6.dp))
+                                        .focusProperties {
+                                            down = FocusRequester.Cancel
+                                        }
                                         .duoClickable(onClick = onLoadMore)
                                         .padding(vertical = 8.dp),
                                     contentAlignment = Alignment.Center,
@@ -2257,12 +2303,25 @@ private fun CommentsTab(
                                     Text("加载更多", color = DuoPink, fontSize = 11.sp)
                                 }
                             } else {
-                                Text(
-                                    text = "没有更多评论了",
-                                    color = DuoTextTertiary,
-                                    fontSize = 9.sp,
-                                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                                )
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp)
+                                        .duoFocusRing(RoundedCornerShape(6.dp))
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .focusProperties {
+                                            down = FocusRequester.Cancel
+                                        }
+                                        .duoClickable(onClick = {})
+                                        .padding(vertical = 8.dp),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Text(
+                                        text = "没有更多评论了",
+                                        color = DuoTextTertiary,
+                                        fontSize = 9.sp,
+                                    )
+                                }
                             }
                         }
                     }
@@ -2639,10 +2698,13 @@ private fun RelatedTab(
                 modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp),
                 contentPadding = PaddingValues(top = 12.dp, bottom = 12.dp),
             ) {
-                items(items, key = { it.bvid }) { item ->
+                itemsIndexed(items, key = { _, item -> item.bvid }) { index, item ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .focusProperties {
+                                if (index == items.lastIndex) down = FocusRequester.Cancel
+                            }
                             .duoFocusRing(RoundedCornerShape(6.dp))
                             .duoClickable { onPlay(item) }
                             .padding(vertical = 5.dp),
@@ -2703,11 +2765,14 @@ private fun PartsTab(
             modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp),
             contentPadding = PaddingValues(top = 12.dp, bottom = 12.dp),
         ) {
-            items(pages, key = { it.cid }) { page ->
+            itemsIndexed(pages, key = { _, page -> page.cid }) { index, page ->
                 val selected = page.cid == currentCid
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .focusProperties {
+                            if (index == pages.lastIndex) down = FocusRequester.Cancel
+                        }
                         .duoFocusRing(RoundedCornerShape(6.dp))
                         .clip(RoundedCornerShape(6.dp))
                         .background(if (selected) DuoPink.copy(alpha = 0.14f) else Color.Transparent)
@@ -3310,9 +3375,10 @@ private fun TransportButton(
     description: String,
     enabled: Boolean,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Box(
-        modifier = Modifier
+        modifier = modifier
             .size(40.dp)
             .duoFocusRing(CircleShape)
             .clip(CircleShape)
@@ -3542,9 +3608,10 @@ private fun ActionPill(
     text: String,
     active: Boolean,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier = Modifier
+        modifier = modifier
             .height(28.dp)
             .duoFocusRing(RoundedCornerShape(50))
             .clip(RoundedCornerShape(50))

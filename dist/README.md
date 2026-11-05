@@ -4,6 +4,23 @@
 `*.apk`），需要时本地 `./gradlew assembleDebug` / `assembleRelease` 生成，或从
 GitHub Releases 下载。
 
+## 0.2.0-rc13（2026-11-05）
+
+- `bili-duo-0.2.0-rc13-release.apk`
+  - R8 minify + resource shrink，正式 release keystore 签名。
+  - APK SHA-256：`bef481a33971d3caec0cae136a88ee765171b4c2f2df7c86f379f946ddee7309`
+- `bili-duo-0.2.0-rc13-debug.apk`
+  - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
+  - SHA-256：`31f61e019eecfebdf365d1cfdf9e90ec7c50052af9116f7e187e3e2c490bc149`
+
+rc13 变更：播放页手柄焦点改为按真实空间位置移动。
+- 播放键 Up → 进度条 → 返回键；返回键再 Up 无反应。
+- 左侧 chips Down 只到「接下来播放」，没有下一P 时停住，不再跳右侧评论栏。
+- 右栏顶部 tab Up 无反应；分P/相关列表最后一项 Down 停住；评论底部
+  「加载更多 / 没有更多评论了」也作为边界停住。
+- 左右栏仍通过 Left/Right 按空间位置切换。
+单测 221；Duo 实测上述焦点链路（Up/Down 截图确认）。
+
 ## 0.2.0-rc12（2026-11-05）
 
 - `bili-duo-0.2.0-rc12-release.apk`
