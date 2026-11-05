@@ -183,6 +183,8 @@ fun PlayerConsoleScreen(
     var danmakuMode by remember { mutableStateOf(1) }
     var danmakuColor by remember { mutableStateOf(0xFFFFFFL) }
     var recallingDanmaku by remember { mutableStateOf(false) }
+    var downloadQuality by remember { mutableStateOf<QualityOption?>(null) }
+    var downloadAllPages by remember { mutableStateOf(false) }
 
     val aid = ui.videoInfo?.aid
     val videoBvid = ui.videoInfo?.bvid
@@ -732,34 +734,64 @@ fun PlayerConsoleScreen(
 
     fun startDownload() {
         val info = ui.videoInfo ?: return
-        val page = ui.currentPage ?: return
-        val quality = ui.currentQuality
-        if (quality == null) {
-            toast("清晰度尚未加载")
+        if (ui.isPgc) {
+            toast("番剧下载暂未开放")
             return
         }
         if (AppSettings.wifiOnlyDownload && !AppSettings.isWifiConnected(context)) {
             toast("已开启仅 Wi-Fi 下载")
             return
         }
-        scope.launch {
-            repository.getPlayUrl(info.bvid, page.cid, quality.quality)
-                .onSuccess { url ->
-                    DownloadManager.getInstance(context).startDownload(
-                        bvid = info.bvid,
-                        cid = page.cid,
-                        title = info.title,
-                        cover = info.pic,
-                        quality = quality.quality,
-                        qualityDesc = quality.description,
-                        url = url,
-                        page = page.page,
-                        part = page.part,
+        downloadQuality = ui.currentQuality ?: ui.availableQualities.firstOrNull()
+        downloadAllPages = false
+        pendingOverlayFocus = null
+        session.openOverlay(DuoOverlay.DOWNLOAD)
+    }
+
+    fun enqueueDownload() {
+        val info = ui.videoInfo ?: return
+        val page = ui.currentPage ?: return
+        val quality = downloadQuality ?: ui.currentQuality ?: return
+        val manager = DownloadManager.getInstance(context)
+        if (downloadAllPages && ui.pages.size > 1) {
+            val queued = manager.startBatchDownload(
+                bvid = info.bvid,
+                videoTitle = info.title,
+                cover = info.pic,
+                pages = ui.pages.map {
+                    DownloadManager.BatchPageInfo(
+                        cid = it.cid,
+                        page = it.page,
+                        part = it.part,
                         aid = info.aid,
                     )
-                    toast("已加入下载")
-                }
-                .onFailure { toast(it.message ?: "获取下载地址失败") }
+                },
+                quality = quality.quality,
+                qualityDesc = quality.description,
+            )
+            toast(if (queued > 0) "已加入 $queued 个分P" else "没有可加入的分P")
+            session.closeOverlay()
+        } else {
+            scope.launch {
+                repository.getPlayUrl(info.bvid, page.cid, quality.quality)
+                    .onSuccess { url ->
+                        manager.startDownload(
+                            bvid = info.bvid,
+                            cid = page.cid,
+                            title = info.title,
+                            cover = info.pic,
+                            quality = quality.quality,
+                            qualityDesc = quality.description,
+                            url = url,
+                            page = page.page,
+                            part = page.part,
+                            aid = info.aid,
+                        )
+                        toast("已加入下载")
+                        session.closeOverlay()
+                    }
+                    .onFailure { toast(it.message ?: "获取下载地址失败") }
+            }
         }
     }
 
@@ -1521,6 +1553,85 @@ fun PlayerConsoleScreen(
                         },
                     )
                 }
+            }
+        }
+    }
+
+    if (overlay == DuoOverlay.DOWNLOAD) {
+        val selectedQuality = downloadQuality ?: ui.currentQuality
+        val qualityFocus = remember { FocusRequester() }
+        val startFocus = remember { FocusRequester() }
+        LaunchedEffect(focusEpoch) {
+            delay(120L)
+            runCatching {
+                if (ui.availableQualities.isEmpty()) {
+                    startFocus.requestFocus()
+                } else {
+                    qualityFocus.requestFocus()
+                }
+            }
+        }
+        OverlayCard(title = "下载视频", onDismiss = { session.closeOverlay() }) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 320.dp)
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                Text("清晰度", color = DuoTextSecondary, fontSize = 10.sp)
+                Spacer(Modifier.height(4.dp))
+                if (ui.availableQualities.isEmpty()) {
+                    Text("清晰度加载中…", color = DuoTextSecondary, fontSize = 12.sp)
+                }
+                var qualityIndex = 0
+                ui.availableQualities.chunked(2).forEach { rowQualities ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        rowQualities.forEach { quality ->
+                            val index = qualityIndex++
+                            DownloadQualityChip(
+                                label = quality.description,
+                                selected = quality.quality == selectedQuality?.quality,
+                                focusRequester = if (index == 0) qualityFocus else null,
+                                onClick = { downloadQuality = quality },
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                        if (rowQualities.size == 1) {
+                            Spacer(Modifier.weight(1f))
+                        }
+                    }
+                    Spacer(Modifier.height(6.dp))
+                }
+                if (ui.pages.size > 1) {
+                    Spacer(Modifier.height(8.dp))
+                    Text("范围", color = DuoTextSecondary, fontSize = 10.sp)
+                    Spacer(Modifier.height(4.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        DownloadQualityChip(
+                            label = "当前分P · P${ui.currentPage?.page ?: 1}",
+                            selected = !downloadAllPages,
+                            focusRequester = null,
+                            onClick = { downloadAllPages = false },
+                            modifier = Modifier.weight(1f),
+                        )
+                        DownloadQualityChip(
+                            label = "全部分P · ${ui.pages.size} 个",
+                            selected = downloadAllPages,
+                            focusRequester = null,
+                            onClick = { downloadAllPages = true },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+                DuoPillButton(
+                    text = "开始下载",
+                    primary = true,
+                    enabled = selectedQuality != null,
+                    focusRequester = startFocus,
+                    onClick = { enqueueDownload() },
+                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                )
             }
         }
     }
@@ -3001,6 +3112,46 @@ private fun OverlayCard(
             }
             Spacer(Modifier.height(4.dp))
             content()
+        }
+    }
+}
+
+@Composable
+private fun DownloadQualityChip(
+    label: String,
+    selected: Boolean,
+    focusRequester: FocusRequester?,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .height(32.dp)
+            .then(
+                if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier
+            )
+            .duoFocusRing(RoundedCornerShape(7.dp))
+            .clip(RoundedCornerShape(7.dp))
+            .background(if (selected) DuoPink.copy(alpha = 0.14f) else DuoSurfaceHigh)
+            .border(
+                width = 1.dp,
+                color = if (selected) DuoPink.copy(alpha = 0.45f) else Color.Transparent,
+                shape = RoundedCornerShape(7.dp),
+            )
+            .duoClickable(onClick = onClick)
+            .padding(horizontal = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            color = if (selected) DuoPink else Color.White,
+            fontSize = 10.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        if (selected) {
+            Text("✓", color = DuoPink, fontSize = 11.sp)
         }
     }
 }

@@ -650,6 +650,9 @@ fun MainScreen(
                     onPlay = { bvid, cid ->
                         navController.navigate(Routes.downloadPlay(bvid, cid))
                     },
+                    onBrowse = {
+                        navController.popBackStack(Screen.Home.route, inclusive = false)
+                    },
                     onVideoFocused = onTopVideoFocused,
                     onFocusCleared = onTopFocusCleared,
                     onTopAmbient = onTopAmbient,

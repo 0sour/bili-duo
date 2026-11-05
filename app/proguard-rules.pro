@@ -16,6 +16,13 @@
     @com.google.gson.annotations.SerializedName <fields>;
 }
 
+# DownloadManager persists List<DownloadInfo> through an anonymous
+# TypeToken<List<DownloadInfo>>. R8 strips the anonymous subclass' generic
+# superclass in release, causing "Missing type parameter" and an empty
+# download list; keep TypeToken and all of its subclasses.
+-keep class com.google.gson.reflect.TypeToken { *; }
+-keep class * extends com.google.gson.reflect.TypeToken { *; }
+
 -keep class cn.xfangfang.biliduo.data.model.** { *; }
 
 -keep class io.noties.markwon.** { *; }

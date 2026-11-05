@@ -68,6 +68,7 @@ import cn.xfangfang.biliduo.ui.common.DuoPillButton
 import cn.xfangfang.biliduo.ui.common.DuoSearchField
 import cn.xfangfang.biliduo.ui.duo.duoClickable
 import cn.xfangfang.biliduo.ui.duo.duoFocusRing
+import cn.xfangfang.biliduo.ui.duo.duoTabCycling
 import cn.xfangfang.biliduo.ui.top.TopAmbientUi
 import cn.xfangfang.biliduo.ui.top.TopGlyph
 import cn.xfangfang.biliduo.ui.top.TopPreviewUi
@@ -80,6 +81,7 @@ import java.util.Locale
 fun DownloadsScreen(
     onBack: () -> Unit,
     onPlay: (bvid: String, cid: Long) -> Unit,
+    onBrowse: () -> Unit = {},
     onVideoFocused: (TopPreviewUi) -> Unit = {},
     onFocusCleared: () -> Unit = {},
     onTopAmbient: (TopAmbientUi) -> Unit = {},
@@ -93,23 +95,70 @@ fun DownloadsScreen(
     val listState = rememberLazyListState()
     val searchFocus = remember { FocusRequester() }
     val firstItemFocus = remember { FocusRequester() }
+    val emptyActionFocus = remember { FocusRequester() }
     var searchMode by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
+    var filter by remember { mutableStateOf(DownloadFilter.ALL) }
     var confirmResume by remember { mutableStateOf<DownloadInfo?>(null) }
+    var confirmResumeAll by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf<DownloadInfo?>(null) }
     var confirmDeleteGroup by remember { mutableStateOf<DownloadGroup?>(null) }
     var confirmClearCompleted by remember { mutableStateOf(false) }
     var pendingActionFocus by remember { mutableStateOf<FocusRequester?>(null) }
     val expandedMap = remember { mutableStateMapOf<String, Boolean>() }
 
-    val displayItems = remember(items, searchQuery) {
-        filterDownloadItems(items, searchQuery)
+    val displayItems = remember(items, searchQuery, filter) {
+        filterDownloadItems(items, searchQuery, filter)
     }
     val completedCount = remember(items) {
         items.sumOf { item ->
             when (item) {
                 is DownloadListItem.Single -> if (item.download.status == DownloadInfo.STATUS_COMPLETED) 1 else 0
                 is DownloadListItem.Group -> item.group.downloads.count { it.status == DownloadInfo.STATUS_COMPLETED }
+            }
+        }
+    }
+    val totalDownloadCount = remember(items) {
+        items.sumOf { item ->
+            when (item) {
+                is DownloadListItem.Single -> 1
+                is DownloadListItem.Group -> item.group.downloads.size
+            }
+        }
+    }
+    val displayTaskCount = remember(displayItems) {
+        displayItems.sumOf { item ->
+            when (item) {
+                is DownloadListItem.Single -> 1
+                is DownloadListItem.Group -> item.group.downloads.size
+            }
+        }
+    }
+    val activeDownloadCount = remember(items) {
+        items.sumOf { item ->
+            when (item) {
+                is DownloadListItem.Single ->
+                    if (item.download.status == DownloadInfo.STATUS_PENDING ||
+                        item.download.status == DownloadInfo.STATUS_DOWNLOADING
+                    ) 1 else 0
+                is DownloadListItem.Group -> item.group.downloads.count {
+                    it.status == DownloadInfo.STATUS_PENDING ||
+                        it.status == DownloadInfo.STATUS_DOWNLOADING
+                }
+            }
+        }
+    }
+    val resumableCount = remember(items) {
+        items.sumOf { item ->
+            when (item) {
+                is DownloadListItem.Single ->
+                    if (item.download.status == DownloadInfo.STATUS_PAUSED ||
+                        item.download.status == DownloadInfo.STATUS_FAILED
+                    ) 1 else 0
+                is DownloadListItem.Group -> item.group.downloads.count {
+                    it.status == DownloadInfo.STATUS_PAUSED ||
+                        it.status == DownloadInfo.STATUS_FAILED
+                }
             }
         }
     }
@@ -137,10 +186,11 @@ fun DownloadsScreen(
             }
         }
     }
-    LaunchedEffect(displayItems.size, searchMode) {
-        if (!searchMode && displayItems.isNotEmpty()) {
+    LaunchedEffect(displayItems.size, searchMode, filter) {
+        if (!searchMode) {
             delay(80)
-            runCatching { firstItemFocus.requestFocus() }
+            val target = if (displayItems.isNotEmpty()) firstItemFocus else emptyActionFocus
+            runCatching { target.requestFocus() }
         }
     }
     LaunchedEffect(searchMode) {
@@ -165,6 +215,12 @@ fun DownloadsScreen(
         restoreFocus(focus)
     }
 
+    fun closeConfirmResumeAll() {
+        val focus = pendingActionFocus
+        confirmResumeAll = false
+        restoreFocus(focus)
+    }
+
     fun closeConfirmDelete() {
         val focus = pendingActionFocus
         confirmDelete = null
@@ -183,9 +239,10 @@ fun DownloadsScreen(
         restoreFocus(focus)
     }
 
-    LaunchedEffect(confirmResume, confirmDelete, confirmDeleteGroup, confirmClearCompleted, searchMode, session) {
+    LaunchedEffect(confirmResume, confirmResumeAll, confirmDelete, confirmDeleteGroup, confirmClearCompleted, searchMode, session) {
         val cancel = when {
             confirmResume != null -> ({ closeConfirmResume() })
+            confirmResumeAll -> ({ closeConfirmResumeAll() })
             confirmDelete != null -> ({ closeConfirmDelete() })
             confirmDeleteGroup != null -> ({ closeConfirmDeleteGroup() })
             confirmClearCompleted -> ({ closeConfirmClearCompleted() })
@@ -226,15 +283,51 @@ fun DownloadsScreen(
         }
     }
 
+    fun requestResumeAll() {
+        if (AppSettings.wifiOnlyDownload && !AppSettings.isWifiConnected(context)) {
+            pendingActionFocus = null
+            confirmResumeAll = true
+        } else {
+            viewModel.resumeAll()
+        }
+    }
+
+    val filters = DownloadFilter.values()
+    fun cycleFilter(step: Int) {
+        val index = filters.indexOf(filter)
+        if (index < 0) return
+        filter = filters[(index + step + filters.size) % filters.size]
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(DuoPalette.Bg),
+            .background(DuoPalette.Bg)
+            .duoTabCycling(
+                onPreviousTab = { cycleFilter(-1) },
+                onNextTab = { cycleFilter(1) },
+            ),
     ) {
         DuoPageHeader(
             title = "我的下载",
             onBack = { if (searchMode) exitSearch() else onBack() },
             actions = {
+                if (activeDownloadCount > 0) {
+                    DuoIconAction(
+                        icon = Icons.Default.Pause,
+                        contentDescription = "全部暂停",
+                        tint = DuoPalette.Secondary,
+                        onClick = { viewModel.pauseAll() },
+                    )
+                }
+                if (resumableCount > 0) {
+                    DuoIconAction(
+                        icon = Icons.Default.PlayArrow,
+                        contentDescription = "全部继续",
+                        tint = DuoPalette.Pink,
+                        onClick = { requestResumeAll() },
+                    )
+                }
                 if (completedCount > 0) {
                     DuoIconAction(
                         icon = Icons.Outlined.DeleteSweep,
@@ -280,16 +373,55 @@ fun DownloadsScreen(
             }
         }
 
+        if (items.isNotEmpty()) {
+            DownloadFilterRow(
+                selected = filter,
+                allCount = totalDownloadCount,
+                activeCount = totalDownloadCount - completedCount,
+                completedCount = completedCount,
+                onSelect = { filter = it },
+            )
+        }
+
         Box(Modifier.weight(1f).fillMaxWidth()) {
             when {
                 items.isEmpty() -> {
                     DuoEmptyState(
                         title = "暂无下载",
                         hint = "在视频简介里点「下载」后会出现在这里",
+                        actionText = "去首页找视频",
+                        onAction = onBrowse,
+                        focusRequester = emptyActionFocus,
                     )
                 }
                 displayItems.isEmpty() -> {
-                    DuoEmptyState(title = "未找到匹配的下载")
+                    DuoEmptyState(
+                        title = when {
+                            searchQuery.isNotBlank() -> "未找到匹配的下载"
+                            filter == DownloadFilter.ACTIVE -> "没有进行中的下载"
+                            filter == DownloadFilter.COMPLETED -> "还没有已完成的下载"
+                            else -> "暂无下载"
+                        },
+                        hint = when {
+                            searchQuery.isNotBlank() -> "换一个关键词，或清除搜索"
+                            filter != DownloadFilter.ALL -> "切换到「全部」查看所有任务"
+                            else -> null
+                        },
+                        actionText = if (searchQuery.isNotBlank() || filter != DownloadFilter.ALL) {
+                            "查看全部"
+                        } else {
+                            "去首页找视频"
+                        },
+                        onAction = {
+                            if (searchQuery.isNotBlank() || filter != DownloadFilter.ALL) {
+                                searchQuery = ""
+                                filter = DownloadFilter.ALL
+                            } else {
+                                onBrowse()
+                            }
+                        },
+                        focusRequester = emptyActionFocus,
+                    )
                 }
                 else -> {
                     LazyColumn(
@@ -361,7 +493,7 @@ fun DownloadsScreen(
                                 contentAlignment = Alignment.Center,
                             ) {
                                 Text(
-                                    text = "共 ${displayItems.size} 项下载 · ${formatFileSize(
+                                    text = "共 $displayTaskCount 项下载 · ${formatFileSize(
                                         items.sumOf { item ->
                                             when (item) {
                                                 is DownloadListItem.Single -> item.download.fileSize
@@ -393,6 +525,22 @@ fun DownloadsScreen(
             },
             onCancel = {
                 closeConfirmResume()
+            },
+            session = null,
+        )
+    }
+    if (confirmResumeAll) {
+        DuoConfirmOverlay(
+            title = "移动网络下载",
+            message = "当前不是 WiFi，继续全部 $resumableCount 个任务会消耗流量。",
+            confirmText = "全部继续",
+            danger = false,
+            onConfirm = {
+                confirmResumeAll = false
+                viewModel.resumeAll()
+            },
+            onCancel = {
+                closeConfirmResumeAll()
             },
             session = null,
         )
@@ -451,6 +599,69 @@ fun DownloadsScreen(
 }
 
 @Composable
+private fun DownloadFilterRow(
+    selected: DownloadFilter,
+    allCount: Int,
+    activeCount: Int,
+    completedCount: Int,
+    onSelect: (DownloadFilter) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(42.dp)
+            .padding(horizontal = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        DownloadFilter.values().forEach { filter ->
+            val count = when (filter) {
+                DownloadFilter.ALL -> allCount
+                DownloadFilter.ACTIVE -> activeCount
+                DownloadFilter.COMPLETED -> completedCount
+            }
+            val isSelected = filter == selected
+            Row(
+                modifier = Modifier
+                    .height(28.dp)
+                    .duoFocusRing(RoundedCornerShape(14.dp))
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(
+                        if (isSelected) DuoPalette.Pink.copy(alpha = 0.16f) else DuoPalette.SurfaceHigh
+                    )
+                    .border(
+                        width = 1.dp,
+                        color = if (isSelected) DuoPalette.Pink.copy(alpha = 0.45f) else Color.Transparent,
+                        shape = RoundedCornerShape(14.dp),
+                    )
+                    .duoClickable { onSelect(filter) }
+                    .padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = filter.label,
+                    color = if (isSelected) DuoPalette.Pink else DuoPalette.Secondary,
+                    fontSize = 11.sp,
+                    fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal,
+                )
+                Spacer(Modifier.width(5.dp))
+                Text(
+                    text = count.toString(),
+                    color = if (isSelected) DuoPalette.Pink.copy(alpha = 0.8f) else DuoPalette.Tertiary,
+                    fontSize = 9.sp,
+                )
+            }
+            Spacer(Modifier.width(7.dp))
+        }
+        Spacer(Modifier.weight(1f))
+        Text(
+            text = "L1/R1 切换",
+            color = DuoPalette.Tertiary,
+            fontSize = 9.sp,
+        )
+    }
+}
+
+@Composable
 private fun DownloadCard(
     download: DownloadInfo,
     firstFocus: FocusRequester?,
@@ -471,7 +682,7 @@ private fun DownloadCard(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(88.dp)
+            .height(96.dp)
             .clip(shape)
             .background(DuoPalette.Surface)
             .border(
@@ -529,10 +740,7 @@ private fun DownloadCard(
                 Text(
                     text = buildString {
                         append(download.qualityDesc)
-                        if (download.page > 0) {
-                            append(" · P${download.page}")
-                            if (download.part.isNotBlank()) append(" ${download.part}")
-                        }
+                        if (download.page > 1) append(" · P${download.page}")
                     },
                     color = DuoPalette.Secondary,
                     fontSize = 10.sp,
@@ -606,7 +814,7 @@ private fun DownloadGroupHeader(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(76.dp)
+            .height(88.dp)
             .clip(shape)
             .background(DuoPalette.Surface)
             .border(
@@ -830,7 +1038,9 @@ private fun DownloadStatusText(download: DownloadInfo) {
 @Composable
 private fun DownloadProgress(download: DownloadInfo, modifier: Modifier = Modifier.fillMaxWidth()) {
     if (download.totalSize <= 0) {
-        Text("等待下载", color = DuoPalette.Tertiary, fontSize = 9.sp)
+        if (download.status == DownloadInfo.STATUS_PENDING) {
+            Text("等待下载", color = DuoPalette.Tertiary, fontSize = 9.sp)
+        }
     } else {
         val fraction = (download.fileSize.toFloat() / download.totalSize).coerceIn(0f, 1f)
         Box(

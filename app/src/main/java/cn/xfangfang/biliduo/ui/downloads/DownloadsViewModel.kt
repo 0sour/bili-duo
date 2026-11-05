@@ -20,10 +20,32 @@ sealed class DownloadListItem {
     data class Single(val download: DownloadInfo) : DownloadListItem()
 }
 
-internal fun filterDownloadItems(items: List<DownloadListItem>, query: String): List<DownloadListItem> {
+enum class DownloadFilter(val label: String) {
+    ALL("全部"),
+    ACTIVE("进行中"),
+    COMPLETED("已完成"),
+}
+
+internal fun DownloadListItem.isCompleted(): Boolean = when (this) {
+    is DownloadListItem.Single -> download.status == DownloadInfo.STATUS_COMPLETED
+    is DownloadListItem.Group ->
+        group.downloads.isNotEmpty() &&
+            group.downloads.all { it.status == DownloadInfo.STATUS_COMPLETED }
+}
+
+internal fun filterDownloadItems(
+    items: List<DownloadListItem>,
+    query: String,
+    filter: DownloadFilter = DownloadFilter.ALL,
+): List<DownloadListItem> {
+    val byStatus = when (filter) {
+        DownloadFilter.ALL -> items
+        DownloadFilter.ACTIVE -> items.filter { !it.isCompleted() }
+        DownloadFilter.COMPLETED -> items.filter { it.isCompleted() }
+    }
     val q = query.trim().lowercase()
-    if (q.isEmpty()) return items
-    return items.filter { item ->
+    if (q.isEmpty()) return byStatus
+    return byStatus.filter { item ->
         when (item) {
             is DownloadListItem.Single -> matchesDownload(item.download, q)
             is DownloadListItem.Group ->
@@ -104,6 +126,21 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun clearCompleted() {
         downloadManager.clearCompleted()
+        load()
+    }
+
+    fun pauseAll() {
+        downloadManager.pauseAll()
+        load()
+    }
+
+    fun resumeAll() {
+        downloadManager.resumeAll()
+        load()
+    }
+
+    fun clearAll() {
+        downloadManager.clearAll()
         load()
     }
 }

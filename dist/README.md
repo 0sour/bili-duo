@@ -4,6 +4,21 @@
 `*.apk`），需要时本地 `./gradlew assembleDebug` / `assembleRelease` 生成，或从
 GitHub Releases 下载。
 
+## 0.2.0-rc9（2026-11-05）
+
+- `bili-duo-0.2.0-rc9-release.apk`
+  - R8 minify + resource shrink，正式 release keystore 签名。
+  - APK SHA-256：`e7a921f04e779d4dd72e8531e21d0c2e9882f2264c75f6a9d979d6bc2c5d1c55`
+- `bili-duo-0.2.0-rc9-debug.apk`
+  - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
+  - SHA-256：`6ae185ee1d41a3270a381f67e6f03b1752c6ba72bfeaff2d8465041867fea730`
+
+rc9 变更：播放器下载层（清晰度、当前/全部分P）、下载页状态筛选与全部暂停/继续、
+下载卡片速度/剩余时间/进度、分P 整组展开；设置新增下载目录/占用空间、清除全部
+下载、清除搜索历史、清除图片缓存。修复 R8 下 `TypeToken<List<DownloadInfo>>`
+泛型被剥离导致下载列表解析失败（`Missing type parameter`）。单测 212，已在 Duo
+验证单条/批量下载、暂停/继续、筛选与存储清理。
+
 ## 0.2.0-rc8（2026-11-05）
 
 - `bili-duo-0.2.0-rc8-release.apk`

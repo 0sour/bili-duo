@@ -10,21 +10,21 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc8-FB7299">
+  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc9-FB7299">
   <img alt="status" src="https://img.shields.io/badge/status-untested%20RC-orange">
   <img alt="Android" src="https://img.shields.io/badge/Android-24%2B-3DDC84?logo=android&logoColor=white">
   <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-1.9.23-7F52FF?logo=kotlin&logoColor=white">
   <img alt="Compose" src="https://img.shields.io/badge/Jetpack%20Compose-2024.04-4285F4?logo=jetpackcompose&logoColor=white">
   <img alt="Media3" src="https://img.shields.io/badge/Media3-1.4.1-FF6D00">
-  <img alt="tests" src="https://img.shields.io/badge/tests-210%20passing-brightgreen">
+  <img alt="tests" src="https://img.shields.io/badge/tests-212%20passing-brightgreen">
   <img alt="license" src="https://img.shields.io/badge/license-MIT-blue">
 </p>
 
 上屏只负责视频画面，下屏用一块 `Presentation` 承载完整 UI；手柄和触摸共用同一棵
 Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，也没有上屏 OSD。
 
-> 当前版本：**0.2.0-rc8**（versionCode 9）
-> 状态：功能完整的 **未测试 RC**，210 个单元测试通过，已在 MuMu 与 Duo 真机做核心
+> 当前版本：**0.2.0-rc9**（versionCode 10）
+> 状态：功能完整的 **未测试 RC**，212 个单元测试通过，已在 MuMu 与 Duo 真机做核心
 > 路径验证，尚未完成全流程回归。
 
 ## 界面预览
@@ -82,6 +82,10 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
   画册/纯文字阅读，上屏同步只读场景。
 - **账号**：扫码 / 短信 / 密码三 tab 登录，二维码倒计时、A 刷新、极验 WebView；
   个人中心、历史、收藏、关注、下载、设置等二级页均为深色手柄 UI。
+- **下载**：播放器内下载层可选清晰度与「当前分P / 全部分P」；下载页支持
+  全部/进行中/已完成筛选（L1/R1）、全部暂停/继续、搜索、分P 分组、进度/速度/
+  剩余时间、单条与整组删除；设置里可查看下载目录与占用空间，清除已完成/全部
+  下载、搜索历史、图片缓存。
 - **UP 主空间**：深色资料卡（头像/签名/粉丝/视频数/关注）、视频/合集 chip 与
   计数、紧凑视频行、搜索、关注/取关确认；资料卡可聚焦，选中后上屏显示 UP 资料、
   最近动态与最近视频；视频行聚焦仍显示单条预览。
@@ -106,7 +110,7 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
 | 图片 | Coil 2.6（含 GIF）、telephoto-zoomable |
 | 登录 | ZXing 二维码、极验 Geetest WebView |
 | 构建 | Gradle 8.7、AGP 8.4.0、JDK 17、R8 |
-| 测试 | JUnit4，210 个单元测试 |
+| 测试 | JUnit4，212 个单元测试 |
 | 架构 | Activity + Presentation、MVVM + StateFlow、单一 `PlayerController` |
 | 界面语言 | 简体中文（当前未做多语言资源） |
 
@@ -116,7 +120,7 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
 
 ### 已验证
 
-- **单元测试**：210 个用例通过（`./gradlew testDebugUnitTest`）。
+- **单元测试**：212 个用例通过（`./gradlew testDebugUnitTest`）。
 - **MuMu（1280×960 / 320dpi）**：双屏壳层、首页、搜索、播放控制台、直播列表与
   HLS 播放、动态空态/登录态、单屏回退提示、签名包安装与冷启动。
 - **Retroid Pocket Duo 真机**：
@@ -132,6 +136,9 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
   - 评论图片全屏、弹幕开关/设置、字幕开关、PGC 切集、UP 主空间。
   - 评论发布/回复/删除：根评论发布后刷新出现、楼中楼回复、删除确认后从列表移除；
     测试评论已全部删除，账号状态还原。
+  - 下载：清晰度 + 当前/全部分P 选择、单条与批量下载、进度/速度/剩余时间、
+    全部/进行中/已完成筛选、全部暂停/继续、整组展开与删除。
+  - 设置存储：下载统计/目录、清除全部下载与已完成、清除搜索历史、清除图片缓存。
   - 登录、个人中心、历史/收藏/关注只读浏览；弹幕发送→撤回闭环。
 
 ### 未实现（代码层面）
@@ -273,7 +280,7 @@ keyPassword=CHANGE_ME
 ### 测试产物
 
 `dist/` 只保留构建说明；APK 通过 GitHub Releases 或本地构建分发，不进入 Git 历史。
-当前 rc8 的哈希与说明见 [`dist/README.md`](dist/README.md)。
+当前 rc9 的哈希与说明见 [`dist/README.md`](dist/README.md)。
 
 ---
 

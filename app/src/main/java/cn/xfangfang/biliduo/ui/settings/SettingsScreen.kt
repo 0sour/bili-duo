@@ -68,6 +68,7 @@ import androidx.compose.ui.unit.sp
 import cn.xfangfang.biliduo.BuildConfig
 import cn.xfangfang.biliduo.data.download.DownloadManager
 import cn.xfangfang.biliduo.data.local.AppSettings
+import cn.xfangfang.biliduo.data.local.SearchHistoryManager
 import cn.xfangfang.biliduo.data.model.DownloadInfo
 import cn.xfangfang.biliduo.duo.DuoSessionViewModel
 import cn.xfangfang.biliduo.ui.common.DuoConfirmOverlay
@@ -79,6 +80,7 @@ import cn.xfangfang.biliduo.ui.top.TopPanelUi
 import cn.xfangfang.biliduo.ui.duo.duoFocusRing
 import cn.xfangfang.biliduo.ui.player.PlayerUiState
 import cn.xfangfang.biliduo.ui.player.PlayerViewModel
+import coil.imageLoader
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -118,8 +120,12 @@ fun SettingsScreen(
     var wifiOnlyPlayback by remember { mutableStateOf(AppSettings.wifiOnlyPlayback) }
     var wifiOnlyDownload by remember { mutableStateOf(AppSettings.wifiOnlyDownload) }
     var confirmClearDownloads by remember { mutableStateOf(false) }
+    var confirmClearAllDownloads by remember { mutableStateOf(false) }
+    var confirmClearSearchHistory by remember { mutableStateOf(false) }
+    var confirmClearImageCache by remember { mutableStateOf(false) }
     var storageTick by remember { mutableIntStateOf(0) }
     val clearRowFocus = remember { FocusRequester() }
+    val clearAllFocus = remember { FocusRequester() }
     val firstRowFocus = remember { FocusRequester() }
 
     val playerUiFlow = playerViewModel?.uiState
@@ -136,6 +142,12 @@ fun SettingsScreen(
     val storageBytes = remember(downloads) {
         downloads.sumOf { if (it.fileSize > 0) it.fileSize else it.totalSize.coerceAtLeast(0) }
     }
+    val searchHistory = remember(storageTick) {
+        SearchHistoryManager(
+            context.getSharedPreferences("bili_prefs", android.content.Context.MODE_PRIVATE)
+        ).load()
+    }
+    val downloadDir = "应用私有目录 / downloads"
 
     LaunchedEffect(
         category,
@@ -193,10 +205,47 @@ fun SettingsScreen(
         }
     }
 
-    LaunchedEffect(confirmClearDownloads, session) {
-        if (confirmClearDownloads) {
+    fun closeClearAllDownloads() {
+        confirmClearAllDownloads = false
+        scope.launch {
+            delay(120)
+            runCatching { clearAllFocus.requestFocus() }
+        }
+    }
+
+    fun closeClearSearchHistory() {
+        confirmClearSearchHistory = false
+        scope.launch {
+            delay(120)
+            runCatching { clearRowFocus.requestFocus() }
+        }
+    }
+
+    fun closeClearImageCache() {
+        confirmClearImageCache = false
+        scope.launch {
+            delay(120)
+            runCatching { clearRowFocus.requestFocus() }
+        }
+    }
+
+    LaunchedEffect(
+        confirmClearDownloads,
+        confirmClearAllDownloads,
+        confirmClearSearchHistory,
+        confirmClearImageCache,
+        session,
+    ) {
+        val close = when {
+            confirmClearDownloads -> ({ closeClearDownloads() })
+            confirmClearAllDownloads -> ({ closeClearAllDownloads() })
+            confirmClearSearchHistory -> ({ closeClearSearchHistory() })
+            confirmClearImageCache -> ({ closeClearImageCache() })
+            else -> null
+        }
+        if (close != null) {
             session?.setBackInterceptor {
-                closeClearDownloads()
+                close()
                 true
             }
         } else {
@@ -286,10 +335,22 @@ fun SettingsScreen(
                         total = downloads.size,
                         completed = completed.size,
                         bytes = storageBytes,
+                        searchHistoryCount = searchHistory.size,
+                        downloadDir = downloadDir,
                         firstFocus = firstRowFocus,
                         clearFocus = clearRowFocus,
+                        clearAllFocus = clearAllFocus,
                         onClearCompleted = {
                             confirmClearDownloads = true
+                        },
+                        onClearAll = {
+                            confirmClearAllDownloads = true
+                        },
+                        onClearSearchHistory = {
+                            confirmClearSearchHistory = true
+                        },
+                        onClearImageCache = {
+                            confirmClearImageCache = true
                         },
                     )
                     else -> AboutSettings(
@@ -319,6 +380,75 @@ fun SettingsScreen(
             },
             onCancel = {
                 closeClearDownloads()
+            },
+            session = null,
+        )
+    }
+    if (confirmClearAllDownloads) {
+        DuoConfirmOverlay(
+            title = "清除全部下载",
+            message = "确定删除全部 ${downloads.size} 个下载任务和本地文件吗？此操作不可恢复。",
+            confirmText = "全部删除",
+            danger = true,
+            onConfirm = {
+                confirmClearAllDownloads = false
+                downloadManager.clearAll()
+                storageTick++
+                scope.launch {
+                    delay(120)
+                    runCatching { firstRowFocus.requestFocus() }
+                }
+            },
+            onCancel = {
+                closeClearAllDownloads()
+            },
+            session = null,
+        )
+    }
+    if (confirmClearSearchHistory) {
+        DuoConfirmOverlay(
+            title = "清除搜索历史",
+            message = "确定删除全部 ${searchHistory.size} 条本地搜索记录吗？",
+            confirmText = "清除",
+            danger = true,
+            onConfirm = {
+                confirmClearSearchHistory = false
+                SearchHistoryManager(
+                    context.getSharedPreferences("bili_prefs", android.content.Context.MODE_PRIVATE)
+                ).clear()
+                storageTick++
+                Toast.makeText(context, "搜索历史已清除", Toast.LENGTH_SHORT).show()
+                scope.launch {
+                    delay(120)
+                    runCatching { clearRowFocus.requestFocus() }
+                }
+            },
+            onCancel = {
+                closeClearSearchHistory()
+            },
+            session = null,
+        )
+    }
+    if (confirmClearImageCache) {
+        DuoConfirmOverlay(
+            title = "清除图片缓存",
+            message = "将清空封面和头像的内存与磁盘缓存，之后浏览时会重新加载。",
+            confirmText = "清除",
+            danger = false,
+            onConfirm = {
+                confirmClearImageCache = false
+                runCatching {
+                    context.imageLoader.memoryCache?.clear()
+                    context.imageLoader.diskCache?.clear()
+                }
+                Toast.makeText(context, "图片缓存已清除", Toast.LENGTH_SHORT).show()
+                scope.launch {
+                    delay(120)
+                    runCatching { clearRowFocus.requestFocus() }
+                }
+            },
+            onCancel = {
+                closeClearImageCache()
             },
             session = null,
         )
@@ -489,13 +619,20 @@ private fun StorageSettings(
     total: Int,
     completed: Int,
     bytes: Long,
+    searchHistoryCount: Int,
+    downloadDir: String,
     firstFocus: FocusRequester,
     clearFocus: FocusRequester,
+    clearAllFocus: FocusRequester,
     onClearCompleted: () -> Unit,
+    onClearAll: () -> Unit,
+    onClearSearchHistory: () -> Unit,
+    onClearImageCache: () -> Unit,
 ) {
     SettingsSection("下载")
     SettingsInfoRow("已下载", "$completed 个已完成 / 共 $total 个", focusRequester = firstFocus)
     SettingsInfoRow("占用空间", formatBytes(bytes))
+    SettingsInfoRow("下载目录", downloadDir)
     Spacer(Modifier.height(10.dp))
     SettingsSection("清理")
     SettingsActionRow(
@@ -505,6 +642,25 @@ private fun StorageSettings(
         enabled = completed > 0,
         focusRequester = clearFocus,
         onClick = onClearCompleted,
+    )
+    SettingsActionRow(
+        title = "清除全部下载",
+        subtitle = if (total > 0) "删除全部 $total 个任务和本地文件" else "暂无下载",
+        danger = true,
+        enabled = total > 0,
+        focusRequester = clearAllFocus,
+        onClick = onClearAll,
+    )
+    SettingsActionRow(
+        title = "清除搜索历史",
+        subtitle = if (searchHistoryCount > 0) "$searchHistoryCount 条本地记录" else "暂无搜索历史",
+        enabled = searchHistoryCount > 0,
+        onClick = onClearSearchHistory,
+    )
+    SettingsActionRow(
+        title = "清除图片缓存",
+        subtitle = "封面和头像的磁盘/内存缓存",
+        onClick = onClearImageCache,
     )
 }
 

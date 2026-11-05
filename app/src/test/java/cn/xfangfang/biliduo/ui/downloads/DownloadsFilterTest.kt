@@ -70,6 +70,56 @@ class DownloadsFilterTest {
         assertTrue(filtered.isEmpty())
     }
 
+    @Test
+    fun statusFilterSplitsCompletedAndActiveItems() {
+        val completed = single(id = 1, title = "已完成")
+        val active = DownloadListItem.Single(
+            download(id = 2, title = "下载中").copy(status = DownloadInfo.STATUS_DOWNLOADING)
+        )
+        val mixedGroup = DownloadListItem.Group(
+            DownloadGroup(
+                bvid = "BV3",
+                title = "混合合集",
+                cover = "",
+                downloads = listOf(
+                    download(id = 3, title = "混合合集").copy(status = DownloadInfo.STATUS_COMPLETED),
+                    download(id = 4, title = "混合合集").copy(status = DownloadInfo.STATUS_PAUSED),
+                ),
+            )
+        )
+        val completedGroup = DownloadListItem.Group(
+            DownloadGroup(
+                bvid = "BV5",
+                title = "完成合集",
+                cover = "",
+                downloads = listOf(download(id = 5, title = "完成合集")),
+            )
+        )
+        val items = listOf(completed, active, mixedGroup, completedGroup)
+
+        val activeOnly = filterDownloadItems(items, "", DownloadFilter.ACTIVE)
+        val completedOnly = filterDownloadItems(items, "", DownloadFilter.COMPLETED)
+
+        assertEquals(listOf(active, mixedGroup), activeOnly)
+        assertEquals(listOf(completed, completedGroup), completedOnly)
+    }
+
+    @Test
+    fun statusFilterStillAppliesSearchQuery() {
+        val items = listOf(
+            single(id = 1, title = "已完成 原神"),
+            DownloadListItem.Single(
+                download(id = 2, title = "下载中 原神")
+                    .copy(status = DownloadInfo.STATUS_DOWNLOADING)
+            ),
+        )
+
+        val filtered = filterDownloadItems(items, "原神", DownloadFilter.ACTIVE)
+
+        assertEquals(1, filtered.size)
+        assertEquals("id_2", (filtered[0] as DownloadListItem.Single).download.id)
+    }
+
     private fun download(id: Int, title: String, part: String = "") = DownloadInfo(
         id = "id_$id",
         bvid = "BV_$id",

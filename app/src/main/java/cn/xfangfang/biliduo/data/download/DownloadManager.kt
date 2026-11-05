@@ -420,26 +420,50 @@ class DownloadManager(private val context: Context) {
         }
     }
 
+    /** Pause every pending/in-flight task; completed and paused rows are untouched. */
+    fun pauseAll() {
+        val active = getDownloads().filter {
+            it.status == DownloadInfo.STATUS_PENDING || it.status == DownloadInfo.STATUS_DOWNLOADING
+        }
+        if (active.isEmpty()) return
+        active.forEach { pauseDownload(it.id) }
+        onDownloadsChanged?.invoke()
+    }
+
+    /** Resume every paused/failed task. The transfer gate keeps 3 running. */
+    fun resumeAll() {
+        val resumable = getDownloads().filter {
+            it.status == DownloadInfo.STATUS_PAUSED || it.status == DownloadInfo.STATUS_FAILED
+        }
+        if (resumable.isEmpty()) return
+        resumable.forEach { resumeDownload(it.id) }
+        onDownloadsChanged?.invoke()
+    }
+
+    fun clearAll() {
+        val all = getDownloads()
+        if (all.isEmpty()) return
+        all.forEach { cancelDownload(it.id) }
+        onDownloadsChanged?.invoke()
+    }
+
     fun resumeDownload(id: String) {
         val download = getDownload(id) ?: return
         if (download.status != DownloadInfo.STATUS_PAUSED && download.status != DownloadInfo.STATUS_FAILED) return
+        if (activeJobs[id]?.isActive == true) return
 
-        val url = getDownloadUrl(download) ?: return
         startForegroundService()
-        val job = scope.launch {
+        activeJobs[id] = scope.launch {
+            val url = resolveDownloadUrl(download)
+            if (url.isNullOrEmpty()) {
+                updateDownload(download.id) {
+                    it.copy(status = DownloadInfo.STATUS_FAILED, speed = 0)
+                }
+                return@launch
+            }
             transferGate.run {
                 downloadFile(download, url)
             }
-        }
-        activeJobs[id] = job
-    }
-
-    private fun getDownloadUrl(download: DownloadInfo): String? {
-        return try {
-            runBlocking { resolveDownloadUrl(download) }
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to get download URL for ${download.bvid}", e)
-            null
         }
     }
 

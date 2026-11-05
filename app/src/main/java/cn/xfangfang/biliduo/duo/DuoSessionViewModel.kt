@@ -27,6 +27,7 @@ enum class DuoOverlay {
     DANMAKU_SEND,
     COMMENT_SEND,
     COMMENT_DELETE,
+    DOWNLOAD,
     IMAGE,
 }
 
