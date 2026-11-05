@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc15-FB7299">
+  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc16-FB7299">
   <img alt="status" src="https://img.shields.io/badge/status-untested%20RC-orange">
   <img alt="Android" src="https://img.shields.io/badge/Android-24%2B-3DDC84?logo=android&logoColor=white">
   <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-1.9.23-7F52FF?logo=kotlin&logoColor=white">
@@ -23,7 +23,7 @@
 上屏只负责视频画面，下屏用一块 `Presentation` 承载完整 UI；手柄和触摸共用同一棵
 Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，也没有上屏 OSD。
 
-> 当前版本：**0.2.0-rc15**（versionCode 16）
+> 当前版本：**0.2.0-rc16**（versionCode 17）
 > 状态：功能完整的 **未测试 RC**，221 个单元测试通过，已在 MuMu 与 Duo 真机做核心
 > 路径验证，尚未完成全流程回归。
 
@@ -162,6 +162,8 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
   - rc15 设置页：卡片间距与焦点留白修复焦点环被相邻卡片/滚动边缘裁切；分类栏
     可聚焦，←/→ 进入/返回内容，L1/R1 切分类；所有行可逐行聚焦，首行/末行显式
     止步，不再跳到全局 rail（MuMu + Duo 验证）。
+  - rc16 清晰度/下载浮层：滚动容器按自身边界裁切，选中行焦点环左侧/右侧被裁；
+    行内容加 8dp 横向内边距，环完整（Duo 验证清晰度 1080P+ 选中态）。
   - 登录、个人中心、历史/收藏/关注只读浏览；弹幕发送→撤回闭环。
 
 ### 未实现（代码层面）
@@ -306,7 +308,7 @@ keyPassword=CHANGE_ME
 ### 测试产物
 
 `dist/` 只保留构建说明；APK 通过 GitHub Releases 或本地构建分发，不进入 Git 历史。
-当前 rc15 的哈希与说明见 [`dist/README.md`](dist/README.md)。
+当前 rc16 的哈希与说明见 [`dist/README.md`](dist/README.md)。
 
 ---
 

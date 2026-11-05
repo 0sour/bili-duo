@@ -4,6 +4,22 @@
 `*.apk`），需要时本地 `./gradlew assembleDebug` / `assembleRelease` 生成，或从
 GitHub Releases 下载。
 
+## 0.2.0-rc16（2026-11-05）
+
+- `bili-duo-0.2.0-rc16-release.apk`
+  - R8 minify + resource shrink，正式 release keystore 签名。
+  - APK SHA-256：`0daf66678a1868860a46af281f5f35218e708165a85841a70dfa1781ff17d83f`
+- `bili-duo-0.2.0-rc16-debug.apk`
+  - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
+  - SHA-256：`9a8f0cdf061fe119e15bdf426ca89f96f759dc4713796d6ec5fe92a7d016a8a6`
+
+rc16 变更：清晰度/下载浮层的选中焦点环被滚动容器左右裁切。
+- `verticalScroll` 按自身矩形裁切四个方向；行 `fillMaxWidth()` 顶满 viewport 时，
+  `duoFocusRing` 外伸的左侧/右侧被裁。
+- 清晰度滚动内容加 `padding(horizontal = 8.dp, vertical = 7.dp)`；
+  下载浮层滚动内容加横向 8dp。速度浮层不滚动，不受影响。
+Duo 真机验证清晰度 1080P+ 选中态四边环完整；下载浮层在 MuMu 验证。
+
 ## 0.2.0-rc15（2026-11-05）
 
 - `bili-duo-0.2.0-rc15-release.apk`

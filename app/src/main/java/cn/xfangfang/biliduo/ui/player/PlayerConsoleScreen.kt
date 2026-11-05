@@ -1573,7 +1573,9 @@ fun PlayerConsoleScreen(
                     Modifier
                         .fillMaxWidth()
                         .verticalScroll(rememberScrollState())
-                        .padding(vertical = 7.dp),
+                        // The scroll container clips to its own bounds. Inset
+                        // rows so their focus rings are not cut on the sides.
+                        .padding(horizontal = 8.dp, vertical = 7.dp),
                 ) {
                     ui.availableQualities.forEachIndexed { index, quality ->
                         OverlayRow(
@@ -1663,7 +1665,9 @@ fun PlayerConsoleScreen(
                 Modifier
                     .fillMaxWidth()
                     .heightIn(max = 320.dp)
-                    .verticalScroll(rememberScrollState()),
+                    .verticalScroll(rememberScrollState())
+                    // Keep chip focus rings clear of the scroll viewport.
+                    .padding(horizontal = 8.dp, vertical = 2.dp),
             ) {
                 Text("清晰度", color = DuoTextSecondary, fontSize = 10.sp)
                 Spacer(Modifier.height(4.dp))
