@@ -4,6 +4,23 @@
 `*.apk`），需要时本地 `./gradlew assembleDebug` / `assembleRelease` 生成，或从
 GitHub Releases 下载。
 
+## 0.2.0-rc21（2026-11-05）
+
+- `bili-duo-0.2.0-rc21-release.apk`
+  - R8 minify + resource shrink，正式 release keystore 签名。
+  - APK SHA-256：`ef0cb5b1b4c4d93db5337a8a6ebbb506097f95a4b6090cbf826b4c8b1db24734`
+- `bili-duo-0.2.0-rc21-debug.apk`
+  - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
+  - SHA-256：`b96966bf3171eedb8c0543ea2b8e357d94854ed2a9c27b07f9df98be859ece6c`
+
+rc21 变更：回退 rc20 的右摇杆切 tab。
+- rc20 在 `MainActivity.dispatchGenericMotionEvent` 拦截手柄 MotionEvent，真机上
+  导致 Duo 左侧方向键失灵（D-pad HAT 事件被吞）。
+- 功能整体移除：`RightStickTabStepper`/单测、`InputRouter.dispatchMotion`、
+  `DuoSessionViewModel.tabScroll`、`PlayerConsoleScreen` 的收集逻辑全部删除；
+  右栏 tab 仍用 LB/RB 切换。单测回到 221。
+Duo 验证：安装 rc21 后 adb 注入方向键右/下/左/上均能正常移动焦点；物理 D-pad 待用户确认。
+
 ## 0.2.0-rc19（2026-11-05）
 
 - `bili-duo-0.2.0-rc19-release.apk`
