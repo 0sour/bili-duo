@@ -10,21 +10,21 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc19-FB7299">
+  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc20-FB7299">
   <img alt="status" src="https://img.shields.io/badge/status-untested%20RC-orange">
   <img alt="Android" src="https://img.shields.io/badge/Android-24%2B-3DDC84?logo=android&logoColor=white">
   <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-1.9.23-7F52FF?logo=kotlin&logoColor=white">
   <img alt="Compose" src="https://img.shields.io/badge/Jetpack%20Compose-2024.04-4285F4?logo=jetpackcompose&logoColor=white">
   <img alt="Media3" src="https://img.shields.io/badge/Media3-1.4.1-FF6D00">
-  <img alt="tests" src="https://img.shields.io/badge/tests-221%20passing-brightgreen">
+  <img alt="tests" src="https://img.shields.io/badge/tests-228%20passing-brightgreen">
   <img alt="license" src="https://img.shields.io/badge/license-MIT-blue">
 </p>
 
 上屏只负责视频画面，下屏用一块 `Presentation` 承载完整 UI；手柄和触摸共用同一棵
 Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，也没有上屏 OSD。
 
-> 当前版本：**0.2.0-rc19**（versionCode 20）
-> 状态：功能完整的 **未测试 RC**，221 个单元测试通过，已在 MuMu 与 Duo 真机做核心
+> 当前版本：**0.2.0-rc20**（versionCode 21）
+> 状态：功能完整的 **未测试 RC**，228 个单元测试通过，已在 MuMu 与 Duo 真机做核心
 > 路径验证，尚未完成全流程回归。
 
 ## 界面预览
@@ -120,7 +120,7 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
 | 图片 | Coil 2.6（含 GIF）、telephoto-zoomable |
 | 登录 | ZXing 二维码、极验 Geetest WebView |
 | 构建 | Gradle 8.7、AGP 8.4.0、JDK 17、R8 |
-| 测试 | JUnit4，221 个单元测试 |
+| 测试 | JUnit4，228 个单元测试 |
 | 架构 | Activity + Presentation、MVVM + StateFlow、单一 `PlayerController` |
 | 界面语言 | 简体中文（当前未做多语言资源） |
 
@@ -130,7 +130,7 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
 
 ### 已验证
 
-- **单元测试**：221 个用例通过（`./gradlew testDebugUnitTest`）。
+- **单元测试**：228 个用例通过（`./gradlew testDebugUnitTest`）。
 - **MuMu（1280×960 / 320dpi）**：双屏壳层、首页、搜索、播放控制台、直播列表与
   HLS 播放、动态空态/登录态、单屏回退提示、签名包安装与冷启动。
 - **Retroid Pocket Duo 真机**：
@@ -170,6 +170,8 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
     4dp 圆角焦点环（Duo 验证评论截图选中态）。
   - rc19 进度条焦点环：环底部与暂停/播放按钮顶部重叠约 1.75dp；进度条上下各留
     4dp/10dp 间距，环与按钮完全分开（Duo 验证）。
+  - rc20 右摇杆切 tab：播放页右摇杆 ↑/↓ 直接切换右栏 tab（评论/推荐/简介/分P），
+    阈值/连发由 `RightStickTabStepper` 处理，7 个单测覆盖；焦点环随新 tab 移动。
   - 登录、个人中心、历史/收藏/关注只读浏览；弹幕发送→撤回闭环。
 
 ### 未实现（代码层面）
@@ -232,6 +234,7 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
 | X | 弹幕开/关（直播不绑定） |
 | START / MENU | 打开清晰度菜单 |
 | LB / RB | 切换右栏 tab（评论/推荐/简介/分P；直播评论/信息） |
+| 右摇杆 ↑ / ↓ | 播放页快速切换右栏 tab，焦点环随新 tab 移动 |
 | Y | 不绑定 |
 | 触摸 | 一次点击直接操作 |
 
@@ -314,7 +317,7 @@ keyPassword=CHANGE_ME
 ### 测试产物
 
 `dist/` 只保留构建说明；APK 通过 GitHub Releases 或本地构建分发，不进入 Git 历史。
-当前 rc19 的哈希与说明见 [`dist/README.md`](dist/README.md)。
+当前 rc20 的哈希与说明见 [`dist/README.md`](dist/README.md)。
 
 ---
 

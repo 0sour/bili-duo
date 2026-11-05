@@ -4,6 +4,24 @@
 `*.apk`），需要时本地 `./gradlew assembleDebug` / `assembleRelease` 生成，或从
 GitHub Releases 下载。
 
+## 0.2.0-rc20（2026-11-05）
+
+- `bili-duo-0.2.0-rc20-release.apk`
+  - R8 minify + resource shrink，正式 release keystore 签名。
+  - APK SHA-256：`b411f44d3534695a8d678685ba7fb6e820d6274741218d28452ca7a270298278`
+- `bili-duo-0.2.0-rc20-debug.apk`
+  - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
+  - SHA-256：`125a8c332c5d2770e19cedce5d983ea97050a6dcf6fb470ce67374d0f81eba8e`
+
+rc20 变更：播放页右摇杆上下切换右栏 tab。
+- `MainActivity.dispatchGenericMotionEvent` 在视图树前转发；`InputRouter`
+  读 `AXIS_RZ`（回退 `AXIS_RY`），仅 PLAYER 且无 overlay 时生效。
+- `RightStickTabStepper`：0.65 触发 / 0.40 释放阈值、200ms 连发，纯 Kotlin
+  7 个单测（总数 228）。
+- 事件经 `DuoSessionViewModel.tabScroll` → `cycleTab`，tab 下划线与右栏焦点环
+  一起移动；提示文案改为「LB/RB / 右摇杆 切换 tab」。
+本机 sendevent 注入 `ABS_RZ` 被驱动忽略，物理右摇杆手感待 Duo 实测。
+
 ## 0.2.0-rc19（2026-11-05）
 
 - `bili-duo-0.2.0-rc19-release.apk`

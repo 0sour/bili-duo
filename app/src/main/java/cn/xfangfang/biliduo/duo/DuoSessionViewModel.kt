@@ -51,6 +51,15 @@ class DuoSessionViewModel : ViewModel() {
     private val _backRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val backRequests: SharedFlow<Unit> = _backRequests.asSharedFlow()
 
+    /** Right stick vertical steps: -1 = previous tab, +1 = next tab. */
+    private val _tabScroll = MutableSharedFlow<Int>(extraBufferCapacity = 4)
+    val tabScroll: SharedFlow<Int> = _tabScroll.asSharedFlow()
+
+    fun emitTabScroll(direction: Int) {
+        if (direction == 0) return
+        _tabScroll.tryEmit(direction)
+    }
+
     private val _focusEpoch = MutableStateFlow(0)
     val focusEpoch: StateFlow<Int> = _focusEpoch.asStateFlow()
 
