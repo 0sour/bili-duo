@@ -17,15 +17,22 @@ import cn.xfangfang.biliduo.data.local.SubtitlePreferenceManager
 import cn.xfangfang.biliduo.data.model.*
 import cn.xfangfang.biliduo.data.download.DownloadManager
 import cn.xfangfang.biliduo.data.repository.BilibiliRepository
+import cn.xfangfang.biliduo.data.repository.PlaybackMeta
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 enum class PlaybackSource { ONLINE, LOCAL }
+
+/** Cap the wait for player/v2 so a slow metadata call never blocks playback. */
+private const val META_WAIT_MS = 1_600L
 
 data class PlayerUiState(
     val isLoading: Boolean = true,
@@ -90,6 +97,8 @@ class PlayerViewModel(
     private var playUrlJob: Job? = null
     private var danmakuJob: Job? = null
     private var liveJob: Job? = null
+    /** player/wbi/v2 result shared by subtitles and cloud resume. */
+    private var metaJob: Deferred<Result<PlaybackMeta>>? = null
     private val pgcEpisodeByCid = mutableMapOf<Long, PgcEpisode>()
 
     init {
@@ -110,6 +119,8 @@ class PlayerViewModel(
         Log.d(BilibiliApp.TAG, "PlayerVM: load bvid=$bvid cid=$cid source=$source")
         loadJob?.cancel()
         playUrlJob?.cancel()
+        metaJob?.cancel()
+        metaJob = null
         liveJob?.cancel()
         cachedDashData = null
         loadJob = viewModelScope.launch {
@@ -230,8 +241,8 @@ class PlayerViewModel(
                     localFiles = emptyMap()
                 )
                 Log.d(BilibiliApp.TAG, "PlayerVM: resume aid=${info.aid} -> pageCid=${startPage.cid} resumeMs=${resumeMs}")
+                loadPlaybackMeta(info.aid, startPage.cid)
                 loadPlayUrlDash(bvid, startPage.cid)
-                loadSubtitles(info.aid, startPage.cid)
                 loadDanmaku(startPage.cid)
             }
             .onFailure { e ->
@@ -253,6 +264,8 @@ class PlayerViewModel(
         Log.d(BilibiliApp.TAG, "PlayerVM: loadLive roomId=$roomId qn=$qn refreshDetail=$refreshDetail")
         loadJob?.cancel()
         playUrlJob?.cancel()
+        metaJob?.cancel()
+        metaJob = null
         danmakuJob?.cancel()
         liveJob?.cancel()
         cachedDashData = null
@@ -366,6 +379,8 @@ class PlayerViewModel(
         Log.d(BilibiliApp.TAG, "PlayerVM: loadPgc seasonId=$seasonId startEp=$startEpId")
         loadJob?.cancel()
         playUrlJob?.cancel()
+        metaJob?.cancel()
+        metaJob = null
         danmakuJob?.cancel()
         liveJob?.cancel()
         cachedDashData = null
@@ -396,6 +411,7 @@ class PlayerViewModel(
                     val episode = startEpId?.let { id -> episodes.find { it.epId == id } }
                         ?: episodes.first()
                     val page = pages.find { it.cid == episode.cid } ?: pages.first()
+                    val resumeMs = (playbackProgressManager.load(episode.aid, episode.cid) ?: 0L) * 1000L
                     _uiState.value = withCurrentDanmakuSettings(
                         PlayerUiState(
                             isLoading = true,
@@ -404,8 +420,10 @@ class PlayerViewModel(
                             pages = pages,
                             currentPage = page,
                             title = detail.title.ifBlank { episode.longTitle },
+                            resumePositionMs = resumeMs,
                         )
                     )
+                    loadPlaybackMeta(episode.aid, episode.cid, applySubtitles = false)
                     loadPgcPlayUrl(episode)
                     loadDanmaku(episode.cid)
                 }
@@ -448,9 +466,13 @@ class PlayerViewModel(
     private fun loadPgcPlayUrl(episode: PgcEpisode) {
         playUrlJob?.cancel()
         playUrlJob = viewModelScope.launch {
-            repository.getPgcPlayUrl(episode.epId, episode.cid)
+            val pendingMeta = metaJob
+            val playUrlDeferred = async { repository.getPgcPlayUrl(episode.epId, episode.cid) }
+            val meta = pendingMeta?.let { withTimeoutOrNull(META_WAIT_MS) { it.await() } }?.getOrNull()
+            playUrlDeferred.await()
                 .onSuccess { playUrlInfo ->
                     if (_uiState.value.currentPage?.cid != episode.cid) return@onSuccess
+                    applyCloudResume(meta?.lastPlayTimeMs ?: 0L, episode.cid, episode.duration)
                     applyPlayUrlData(playUrlInfo)
                 }
                 .onFailure { e ->
@@ -467,8 +489,7 @@ class PlayerViewModel(
         if (_uiState.value.isPgc) {
             val episode = pgcEpisodeByCid[page.cid] ?: return
             val info = _uiState.value.videoInfo
-            val resumeMs = info?.aid?.let { playbackProgressManager.load(it, page.cid) }
-                ?.times(1000L) ?: 0L
+            val resumeMs = (playbackProgressManager.load(episode.aid, page.cid) ?: 0L) * 1000L
             _uiState.value = _uiState.value.copy(
                 currentPage = page,
                 resumePositionMs = resumeMs,
@@ -481,6 +502,7 @@ class PlayerViewModel(
                 ),
             )
             playUrlJob?.cancel()
+            loadPlaybackMeta(episode.aid, page.cid, applySubtitles = false)
             loadPgcPlayUrl(episode)
             loadDanmaku(page.cid)
             return
@@ -575,6 +597,7 @@ class PlayerViewModel(
             videoUrl = null
         )
         playUrlJob?.cancel()
+        loadPlaybackMeta(info.aid, page.cid)
         loadPlayUrlDash(bvid, page.cid)
         loadDanmaku(page.cid)
     }
@@ -583,6 +606,8 @@ class PlayerViewModel(
     fun reset() {
         loadJob?.cancel()
         playUrlJob?.cancel()
+        metaJob?.cancel()
+        metaJob = null
         danmakuJob?.cancel()
         liveJob?.cancel()
         cachedDashData = null
@@ -734,9 +759,16 @@ class PlayerViewModel(
 
     private fun loadPlayUrlDash(bvid: String, cid: Long) {
         playUrlJob = viewModelScope.launch {
-            repository.getPlayUrlDash(bvid, cid)
+            // Metadata and play URL run in parallel; metadata only delays the
+            // start when it answers within META_WAIT_MS.
+            val pendingMeta = metaJob
+            val playUrlDeferred = async { repository.getPlayUrlDash(bvid, cid) }
+            val meta = pendingMeta?.let { withTimeoutOrNull(META_WAIT_MS) { it.await() } }?.getOrNull()
+            playUrlDeferred.await()
                 .onSuccess { playUrlInfo ->
                     Log.d(BilibiliApp.TAG, "PlayerVM: dash loaded, accept=${playUrlInfo.accept_quality}")
+                    val durationMs = (_uiState.value.currentPage?.duration ?: 0L) * 1000L
+                    applyCloudResume(meta?.lastPlayTimeMs ?: 0L, cid, durationMs)
                     applyPlayUrlData(playUrlInfo)
                 }
                 .onFailure { e ->
@@ -820,34 +852,58 @@ class PlayerViewModel(
         return videos.minByOrNull { it.id }
     }
 
-    private fun loadSubtitles(aid: Long, cid: Long) {
+    /**
+     * Fetches player/v2 once for both subtitles and cloud resume. The play URL
+     * job awaits the same deferred (bounded by [META_WAIT_MS]), so a cloud
+     * position is known before the media source is prepared.
+     */
+    private fun loadPlaybackMeta(aid: Long, cid: Long, applySubtitles: Boolean = true) {
+        metaJob?.cancel()
+        metaJob = null
+        if (aid <= 0L) return
+        // PGC only needs cloud progress; guests have nothing to resume.
+        if (!applySubtitles && BilibiliApi.loginCookies.isBlank()) return
+        val job = viewModelScope.async { repository.getPlaybackMeta(aid, cid) }
+        metaJob = job
+        if (!applySubtitles) return
         viewModelScope.launch {
-            repository.getSubtitleTracks(aid, cid)
-                .onSuccess { tracks ->
-                    Log.d(BilibiliApp.TAG, "loadSubtitles: aid=$aid cid=$cid ${tracks.size} tracks")
-                    val sortedTracks = tracks.sortedWith(
-                        compareBy<SubtitleTrack> { it.type }.thenBy { it.lan }
-                    )
-                    _uiState.value = _uiState.value.copy(availableSubtitles = sortedTracks)
+            val meta = job.await()
+                .onFailure { e -> Log.e(BilibiliApp.TAG, "loadPlaybackMeta failed", e) }
+                .getOrNull() ?: return@launch
+            if (_uiState.value.currentPage?.cid != cid) return@launch
+            applySubtitleTracks(aid, cid, meta.subtitleTracks)
+        }
+    }
 
-                    val saved = subtitlePreferenceManager.load(aid, cid)
-                    Log.d(BilibiliApp.TAG, "loadSubtitles saved pref: aid=$aid cid=$cid saved=${saved?.let { "lan=${it.lan} en=${it.enabled} offX=${it.offsetX} offY=${it.offsetY}" } ?: "null"}")
-                    if (saved != null) {
-                        _uiState.value = _uiState.value.copy(
-                            subtitleOffsetX = saved.offsetX,
-                            subtitleOffsetY = saved.offsetY
-                        )
-                        if (saved.enabled && saved.lan.isNotBlank()) {
-                            val matched = sortedTracks.find { it.lan == saved.lan }
-                            if (matched != null) {
-                                selectSubtitle(matched)
-                            }
-                        }
-                    }
+    private fun applyCloudResume(cloudMs: Long, cid: Long, durationMs: Long) {
+        val state = _uiState.value
+        if (state.currentPage?.cid != cid) return
+        val position = pickResumePosition(state.resumePositionMs, cloudMs, durationMs)
+        if (position == state.resumePositionMs) return
+        Log.d(BilibiliApp.TAG, "PlayerVM: cloud resume cid=$cid position=$position")
+        _uiState.value = state.copy(resumePositionMs = position)
+    }
+
+    private fun applySubtitleTracks(aid: Long, cid: Long, tracks: List<SubtitleTrack>) {
+        Log.d(BilibiliApp.TAG, "loadSubtitles: aid=$aid cid=$cid ${tracks.size} tracks")
+        val sortedTracks = tracks.sortedWith(
+            compareBy<SubtitleTrack> { it.type }.thenBy { it.lan }
+        )
+        _uiState.value = _uiState.value.copy(availableSubtitles = sortedTracks)
+
+        val saved = subtitlePreferenceManager.load(aid, cid)
+        Log.d(BilibiliApp.TAG, "loadSubtitles saved pref: aid=$aid cid=$cid saved=${saved?.let { "lan=${it.lan} en=${it.enabled} offX=${it.offsetX} offY=${it.offsetY}" } ?: "null"}")
+        if (saved != null) {
+            _uiState.value = _uiState.value.copy(
+                subtitleOffsetX = saved.offsetX,
+                subtitleOffsetY = saved.offsetY
+            )
+            if (saved.enabled && saved.lan.isNotBlank()) {
+                val matched = sortedTracks.find { it.lan == saved.lan }
+                if (matched != null) {
+                    selectSubtitle(matched)
                 }
-                .onFailure { e ->
-                    Log.e(BilibiliApp.TAG, "loadSubtitles failed", e)
-                }
+            }
         }
     }
 

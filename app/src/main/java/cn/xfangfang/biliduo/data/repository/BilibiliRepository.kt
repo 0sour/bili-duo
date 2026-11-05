@@ -24,6 +24,14 @@ import java.util.zip.GZIPInputStream
 import java.util.zip.Inflater
 import org.xmlpull.v1.XmlPullParser
 
+/** Player metadata shared by subtitles and cross-device resume. */
+data class PlaybackMeta(
+    val subtitleTracks: List<SubtitleTrack> = emptyList(),
+    /** Cloud playback position in milliseconds; 0 when the account has none. */
+    val lastPlayTimeMs: Long = 0L,
+    val lastPlayCid: Long = 0L,
+)
+
 class BilibiliRepository(
     private val api: BilibiliApi = BilibiliApi.create(),
     private val passportApi: PassportApi = PassportApi.create()
@@ -1371,30 +1379,38 @@ class BilibiliRepository(
         }
     }
 
-    suspend fun getSubtitleTracks(aid: Long, cid: Long): Result<List<SubtitleTrack>> {
-        if (BuildConfig.DEBUG) Log.d(BilibiliApp.TAG, "getSubtitleTracks: aid=$aid cid=$cid")
+    suspend fun getPlaybackMeta(aid: Long, cid: Long): Result<PlaybackMeta> {
+        if (BuildConfig.DEBUG) Log.d(BilibiliApp.TAG, "getPlaybackMeta: aid=$aid cid=$cid")
         return runCatching {
             val response = api.getPlayerInfo(aid = aid, cid = cid)
-            if (BuildConfig.DEBUG) Log.d(BilibiliApp.TAG, "getSubtitleTracks response: code=${response.code}")
+            if (BuildConfig.DEBUG) Log.d(BilibiliApp.TAG, "getPlaybackMeta response: code=${response.code}")
             if (response.code == 0) {
-                val subtitles = response.data?.subtitle?.subtitles ?: emptyList()
-                subtitles.map { track ->
-                    SubtitleTrack(
-                        id = track.id,
-                        lan = track.lan,
-                        lanDoc = track.lan_doc,
-                        subtitleUrl = track.subtitleUrl.let { url ->
-                            if (url.startsWith("//")) "https:$url" else url
-                        },
-                        type = track.type,
-                        aiStatus = track.aiStatus
-                    )
-                }.filter { it.subtitleUrl.isNotBlank() }
+                val data = response.data
+                val subtitles = data?.subtitle?.subtitles ?: emptyList()
+                PlaybackMeta(
+                    subtitleTracks = subtitles.map { track ->
+                        SubtitleTrack(
+                            id = track.id,
+                            lan = track.lan,
+                            lanDoc = track.lan_doc,
+                            subtitleUrl = track.subtitleUrl.let { url ->
+                                if (url.startsWith("//")) "https:$url" else url
+                            },
+                            type = track.type,
+                            aiStatus = track.aiStatus
+                        )
+                    }.filter { it.subtitleUrl.isNotBlank() },
+                    lastPlayTimeMs = data?.lastPlayTime?.coerceAtLeast(0L) ?: 0L,
+                    lastPlayCid = data?.lastPlayCid ?: 0L,
+                )
             } else {
                 throw Exception(response.message)
             }
-        }.onFailure { Log.e(BilibiliApp.TAG, "getSubtitleTracks failed", it) }
+        }.onFailure { Log.e(BilibiliApp.TAG, "getPlaybackMeta failed", it) }
     }
+
+    suspend fun getSubtitleTracks(aid: Long, cid: Long): Result<List<SubtitleTrack>> =
+        getPlaybackMeta(aid, cid).map { it.subtitleTracks }
 
     suspend fun getSubtitleContent(url: String): Result<SubtitleBody> {
         if (BuildConfig.DEBUG) Log.d(BilibiliApp.TAG, "getSubtitleContent: url=${url.take(80)}")

@@ -4,6 +4,21 @@
 `*.apk`），需要时本地 `./gradlew assembleDebug` / `assembleRelease` 生成，或从
 GitHub Releases 下载。
 
+## 0.2.0-rc10（2026-11-05）
+
+- `bili-duo-0.2.0-rc10-release.apk`
+  - R8 minify + resource shrink，正式 release keystore 签名。
+  - APK SHA-256：`a359ca3a51d89c606e2bfd409e34991d8ec0417a1dc60dc7467420b677083603`
+- `bili-duo-0.2.0-rc10-debug.apk`
+  - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
+  - SHA-256：`1e0daf219b77fd994316841d22f51e684cbfc038a9b7ce9ca210b74986b8fb56`
+
+rc10 变更：新增云端进度续播。打开视频时优先使用本机分P进度；本机没有记录时从
+`x/player/wbi/v2` 读取账号的 `last_play_time`（与字幕共用一次请求，播放地址与
+metadata 并行，最多等 1600ms），历史/收藏点击可直接续播。不足 5 秒或已到 95%
+时长的进度会从头播放。单测 218，已在 Duo 用历史条目验证从 01:45/04:45 续播；
+PGC 云端续播已接代码但未在真实剧集验证。
+
 ## 0.2.0-rc9（2026-11-05）
 
 - `bili-duo-0.2.0-rc9-release.apk`

@@ -692,7 +692,10 @@ data class UserCardInfo(
 )
 
 data class PlayerInfo(
-    val subtitle: SubtitleData? = null
+    val subtitle: SubtitleData? = null,
+    /** Milliseconds; the last reported playback position for this page. */
+    @SerializedName("last_play_time") val lastPlayTime: Long = 0,
+    @SerializedName("last_play_cid") val lastPlayCid: Long = 0
 )
 
 data class SubtitleData(

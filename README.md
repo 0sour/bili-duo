@@ -10,21 +10,21 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc9-FB7299">
+  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc10-FB7299">
   <img alt="status" src="https://img.shields.io/badge/status-untested%20RC-orange">
   <img alt="Android" src="https://img.shields.io/badge/Android-24%2B-3DDC84?logo=android&logoColor=white">
   <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-1.9.23-7F52FF?logo=kotlin&logoColor=white">
   <img alt="Compose" src="https://img.shields.io/badge/Jetpack%20Compose-2024.04-4285F4?logo=jetpackcompose&logoColor=white">
   <img alt="Media3" src="https://img.shields.io/badge/Media3-1.4.1-FF6D00">
-  <img alt="tests" src="https://img.shields.io/badge/tests-212%20passing-brightgreen">
+  <img alt="tests" src="https://img.shields.io/badge/tests-218%20passing-brightgreen">
   <img alt="license" src="https://img.shields.io/badge/license-MIT-blue">
 </p>
 
 上屏只负责视频画面，下屏用一块 `Presentation` 承载完整 UI；手柄和触摸共用同一棵
 Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，也没有上屏 OSD。
 
-> 当前版本：**0.2.0-rc9**（versionCode 10）
-> 状态：功能完整的 **未测试 RC**，212 个单元测试通过，已在 MuMu 与 Duo 真机做核心
+> 当前版本：**0.2.0-rc10**（versionCode 11）
+> 状态：功能完整的 **未测试 RC**，218 个单元测试通过，已在 MuMu 与 Duo 真机做核心
 > 路径验证，尚未完成全流程回归。
 
 ## 界面预览
@@ -69,7 +69,9 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
   上屏显示人物卡；聚焦用户行时还显示粉丝/视频数与最近动态、最近视频
   （220ms 防抖 + 按 mid 缓存）。搜索框支持下屏系统 IME。
 - **播放**：DASH 多清晰度、倍速、音量、进度 seek、分P/选集、相关推荐、UP 主空间
-  入口；PGC 番剧/影视复用同一控制台。
+  入口；PGC 番剧/影视复用同一控制台。打开视频时优先恢复本机分P进度，本机没有记录
+  则读取账号云端进度（`x/player/wbi/v2` 的 `last_play_time`），历史/收藏点击可直接
+  续播；接近结尾或不足 5 秒的进度会从头播放。
 - **评论**：分页、热门/最新排序、楼中楼回复分页、评论/回复点赞与点踩、长评论
   展开、评论图片缩略图与全屏查看器；登录后可发布评论/回复，并可删除自己的评论。
 - **弹幕**：按 cid 拉取 XML（手动解 raw deflate）、上屏 Canvas 渲染、滚动/顶部/
@@ -110,7 +112,7 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
 | 图片 | Coil 2.6（含 GIF）、telephoto-zoomable |
 | 登录 | ZXing 二维码、极验 Geetest WebView |
 | 构建 | Gradle 8.7、AGP 8.4.0、JDK 17、R8 |
-| 测试 | JUnit4，212 个单元测试 |
+| 测试 | JUnit4，218 个单元测试 |
 | 架构 | Activity + Presentation、MVVM + StateFlow、单一 `PlayerController` |
 | 界面语言 | 简体中文（当前未做多语言资源） |
 
@@ -120,7 +122,7 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
 
 ### 已验证
 
-- **单元测试**：212 个用例通过（`./gradlew testDebugUnitTest`）。
+- **单元测试**：218 个用例通过（`./gradlew testDebugUnitTest`）。
 - **MuMu（1280×960 / 320dpi）**：双屏壳层、首页、搜索、播放控制台、直播列表与
   HLS 播放、动态空态/登录态、单屏回退提示、签名包安装与冷启动。
 - **Retroid Pocket Duo 真机**：
@@ -139,6 +141,7 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
   - 下载：清晰度 + 当前/全部分P 选择、单条与批量下载、进度/速度/剩余时间、
     全部/进行中/已完成筛选、全部暂停/继续、整组展开与删除。
   - 设置存储：下载统计/目录、清除全部下载与已完成、清除搜索历史、清除图片缓存。
+  - 云端续播：本机无记录时从历史条目 1:45 的位置续播（日志与本机进度条一致）。
   - 登录、个人中心、历史/收藏/关注只读浏览；弹幕发送→撤回闭环。
 
 ### 未实现（代码层面）
@@ -146,13 +149,13 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
 - **动态写操作**：点赞、转发、发布未实现，动态流当前只读。
 - **PGC 大会员 / 付费集**：只在无剧集时提示「可能需要大会员」，没有 VIP 标识、
   权限判断或购买引导。
-- **云端观看进度续播**：播放器不读取云端历史进度；只有本地进度上报与历史列表。
 - **取消非视频收藏**：收藏夹中的专栏/动态等条目提示「暂不支持取消该类型收藏」。
 - **单屏直播 / PGC**：目标设备始终双屏；无下屏时 VOD 走旧 `PlayerScreen`，
   直播/PGC 显示「此内容需要下屏控制台」提示，不进入播放。**非本 RC 目标**。
 
 ### 待验证（已实现，缺真机/账号验证）
 
+- **PGC 云端续播**：PGC 复用同一套 `last_play_time` 读取，尚未在真实剧集上验证。
 - **直播真实发送与关注**：UI、校验和 API 已接，但未在公开直播间留下测试消息；
   需要明确授权后在无人直播间补测。
 - **PGC VIP 集**：未登录/无权限时整季显示「该番剧暂无可播放剧集，可能需要大会员」
@@ -280,7 +283,7 @@ keyPassword=CHANGE_ME
 ### 测试产物
 
 `dist/` 只保留构建说明；APK 通过 GitHub Releases 或本地构建分发，不进入 Git 历史。
-当前 rc9 的哈希与说明见 [`dist/README.md`](dist/README.md)。
+当前 rc10 的哈希与说明见 [`dist/README.md`](dist/README.md)。
 
 ---
 
