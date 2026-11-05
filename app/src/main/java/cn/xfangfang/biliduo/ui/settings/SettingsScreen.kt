@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
+
 package cn.xfangfang.biliduo.ui.settings
 
 import android.content.ActivityNotFoundException
@@ -6,7 +8,7 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -51,6 +53,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
@@ -75,6 +78,7 @@ import cn.xfangfang.biliduo.ui.common.DuoConfirmOverlay
 import cn.xfangfang.biliduo.ui.common.DuoPageHeader
 import cn.xfangfang.biliduo.ui.common.DuoPalette
 import cn.xfangfang.biliduo.ui.duo.duoClickable
+import cn.xfangfang.biliduo.ui.duo.duoTabCycling
 import cn.xfangfang.biliduo.ui.top.TopGlyph
 import cn.xfangfang.biliduo.ui.top.TopPanelUi
 import cn.xfangfang.biliduo.ui.duo.duoFocusRing
@@ -97,6 +101,13 @@ private val settingsCategories = listOf(
     SettingsCategory("存储", Icons.Outlined.Storage),
     SettingsCategory("关于", Icons.Outlined.Info),
 )
+
+/**
+ * The settings content is a closed focus loop: Left goes back to the
+ * category rail and Up/Down stop at the list edges. Without this, focus
+ * can fall through to the global app rail (e.g. Down from the last row).
+ */
+private val SettingsTopEdge = Modifier.focusProperties { up = FocusRequester.Cancel }
 
 private const val REPOSITORY_URL = "https://github.com/0sour/bili-duo"
 private const val ISSUES_URL = "https://github.com/0sour/bili-duo/issues"
@@ -127,6 +138,8 @@ fun SettingsScreen(
     val clearRowFocus = remember { FocusRequester() }
     val clearAllFocus = remember { FocusRequester() }
     val firstRowFocus = remember { FocusRequester() }
+    val categoryFocus = remember { List(settingsCategories.size) { FocusRequester() } }
+    val scrollState = rememberScrollState()
 
     val playerUiFlow = playerViewModel?.uiState
     val playerUi: PlayerUiState? = if (playerUiFlow != null) {
@@ -195,12 +208,39 @@ fun SettingsScreen(
             )
         )
     }
-    // Changing a switch/danmaku value must not yank focus back to the first
-    // row; only entering a new category does.
-    LaunchedEffect(category) {
+    // Entering the page lands on the first row. Category changes caused by
+    // moving focus in the category rail must not steal focus back to content.
+    LaunchedEffect(Unit) {
         delay(120)
         runCatching { firstRowFocus.requestFocus() }
     }
+    LaunchedEffect(category) {
+        // A long category can leave the next one scrolled halfway down.
+        scrollState.scrollTo(0)
+    }
+    fun selectCategory(index: Int, focusContent: Boolean) {
+        category = index
+        if (focusContent) {
+            scope.launch {
+                delay(120)
+                runCatching { firstRowFocus.requestFocus() }
+            }
+        }
+    }
+    // The bottom row also scrolls to the end so its focus ring is not clipped
+    // by the scroll viewport (bring-into-view only guarantees the row bounds).
+    val bottomEdgeModifier = Modifier
+        .focusProperties { down = FocusRequester.Cancel }
+        .onFocusChanged {
+            if (it.isFocused) {
+                scope.launch {
+                    // Bring-into-view runs after the focus event and would
+                    // cancel an immediate scroll; let it settle first.
+                    delay(80L)
+                    scrollState.animateScrollTo(scrollState.maxValue)
+                }
+            }
+        }
     fun closeClearDownloads() {
         confirmClearDownloads = false
         scope.launch {
@@ -275,7 +315,21 @@ fun SettingsScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(DuoPalette.Bg),
+            .background(DuoPalette.Bg)
+            .duoTabCycling(
+                onPreviousTab = {
+                    selectCategory(
+                        (category - 1 + settingsCategories.size) % settingsCategories.size,
+                        focusContent = true,
+                    )
+                },
+                onNextTab = {
+                    selectCategory(
+                        (category + 1) % settingsCategories.size,
+                        focusContent = true,
+                    )
+                },
+            ),
     ) {
         DuoPageHeader(title = "设置", onBack = onBack)
 
@@ -283,6 +337,8 @@ fun SettingsScreen(
             CategoryRail(
                 selected = category,
                 onSelect = { category = it },
+                onEnter = { selectCategory(it, focusContent = true) },
+                focusRequesters = categoryFocus,
             )
             Column(
                 modifier = Modifier
@@ -293,19 +349,23 @@ fun SettingsScreen(
                             return@onPreviewKeyEvent false
                         }
                         when (event.key) {
+                            // Left returns to the settings category rail.
+                            // Right has nowhere to go; swallow it so focus
+                            // cannot leak into the global app rail.
                             Key.DirectionLeft -> {
-                                category = (category - 1 + settingsCategories.size) % settingsCategories.size
+                                scope.launch {
+                                    delay(40)
+                                    runCatching { categoryFocus[category].requestFocus() }
+                                }
                                 true
                             }
-                            Key.DirectionRight -> {
-                                category = (category + 1) % settingsCategories.size
-                                true
-                            }
+                            Key.DirectionRight -> true
                             else -> false
                         }
                     }
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                    .verticalScroll(scrollState)
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 when (category) {
                     0 -> PlaySettings(
@@ -315,6 +375,7 @@ fun SettingsScreen(
                             AppSettings.wifiOnlyPlayback = it
                         },
                         firstFocus = firstRowFocus,
+                        bottomModifier = bottomEdgeModifier,
                     )
                     1 -> NetworkSettings(
                         wifiOnlyDownload = wifiOnlyDownload,
@@ -323,11 +384,16 @@ fun SettingsScreen(
                             AppSettings.wifiOnlyDownload = it
                         },
                         firstFocus = firstRowFocus,
+                        bottomModifier = bottomEdgeModifier,
                     )
-                    2 -> AppearanceSettings(firstFocus = firstRowFocus)
+                    2 -> AppearanceSettings(
+                        firstFocus = firstRowFocus,
+                        bottomModifier = bottomEdgeModifier,
+                    )
                     3 -> DanmakuSettings(
                         ui = playerUi,
                         firstFocus = firstRowFocus,
+                        bottomModifier = bottomEdgeModifier,
                         onEnabled = { playerViewModel?.setDanmakuEnabled(it) },
                         onOpacity = { playerViewModel?.setDanmakuOpacity(it) },
                         onSpeed = { playerViewModel?.setDanmakuSpeed(it) },
@@ -342,6 +408,7 @@ fun SettingsScreen(
                         searchHistoryCount = searchHistory.size,
                         downloadDir = downloadDir,
                         firstFocus = firstRowFocus,
+                        bottomModifier = bottomEdgeModifier,
                         clearFocus = clearRowFocus,
                         clearAllFocus = clearAllFocus,
                         onClearCompleted = {
@@ -359,10 +426,14 @@ fun SettingsScreen(
                     )
                     else -> AboutSettings(
                         firstFocus = firstRowFocus,
+                        bottomModifier = bottomEdgeModifier,
                         onOpenRepository = { openRepository() },
                         onOpenIssues = { openRepository(ISSUES_URL) },
                     )
                 }
+                // Extra tail lets the last row scroll clear of the viewport
+                // edge so its focus ring is never clipped.
+                Spacer(Modifier.height(12.dp))
             }
         }
     }
@@ -464,6 +535,8 @@ fun SettingsScreen(
 private fun CategoryRail(
     selected: Int,
     onSelect: (Int) -> Unit,
+    onEnter: (Int) -> Unit,
+    focusRequesters: List<FocusRequester>,
 ) {
     Column(
         modifier = Modifier
@@ -474,26 +547,51 @@ private fun CategoryRail(
     ) {
         settingsCategories.forEachIndexed { index, item ->
             val active = index == selected
+            var focused by remember { mutableStateOf(false) }
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 2.dp)
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                    .focusRequester(focusRequesters[index])
+                    .focusProperties {
+                        left = FocusRequester.Cancel
+                        right = FocusRequester.Cancel
+                        if (index == 0) up = FocusRequester.Cancel
+                        if (index == settingsCategories.lastIndex) down = FocusRequester.Cancel
+                    }
+                    .duoFocusRing(RoundedCornerShape(8.dp))
                     .clip(RoundedCornerShape(8.dp))
                     .background(if (active) DuoPalette.Pink.copy(alpha = 0.12f) else Color.Transparent)
-                    .clickable { onSelect(index) }
+                    .onFocusChanged {
+                        focused = it.isFocused
+                        // Moving through the rail previews each category
+                        // without stealing focus away from the rail.
+                        if (it.isFocused) onSelect(index)
+                    }
+                    .onPreviewKeyEvent { event ->
+                        if (event.type == KeyEventType.KeyDown &&
+                            event.key == Key.DirectionRight
+                        ) {
+                            onEnter(index)
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                    .duoClickable { onEnter(index) }
                     .padding(horizontal = 10.dp, vertical = 9.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
                     imageVector = item.icon,
                     contentDescription = null,
-                    tint = if (active) DuoPalette.Pink else DuoPalette.Secondary,
+                    tint = if (active || focused) DuoPalette.Pink else DuoPalette.Secondary,
                     modifier = Modifier.size(18.dp),
                 )
                 Spacer(Modifier.width(10.dp))
                 Text(
                     text = item.label,
-                    color = if (active) DuoPalette.Pink else DuoPalette.Text,
+                    color = if (active || focused) DuoPalette.Pink else DuoPalette.Text,
                     fontSize = 12.sp,
                     fontWeight = if (active) FontWeight.Medium else FontWeight.Normal,
                 )
@@ -501,7 +599,7 @@ private fun CategoryRail(
         }
         Spacer(Modifier.weight(1f))
         Text(
-            text = "← / → 切换分类",
+            text = "↑ / ↓ 选择分类 · → 进入",
             color = DuoPalette.Tertiary,
             fontSize = 9.sp,
             modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp),
@@ -514,6 +612,7 @@ private fun PlaySettings(
     wifiOnlyPlayback: Boolean,
     onWifiOnlyPlayback: (Boolean) -> Unit,
     firstFocus: FocusRequester,
+    bottomModifier: Modifier,
 ) {
     SettingsSection("播放")
     SettingsSwitchRow(
@@ -521,13 +620,18 @@ private fun PlaySettings(
         subtitle = "移动网络下不开始播放，避免消耗流量",
         checked = wifiOnlyPlayback,
         focusRequester = firstFocus,
+        modifier = SettingsTopEdge,
         onToggle = { onWifiOnlyPlayback(!wifiOnlyPlayback) },
     )
     Spacer(Modifier.height(10.dp))
     SettingsSection("播放器")
     SettingsInfoRow("清晰度 / 倍速", "在播放控制台内调整")
     SettingsInfoRow("弹幕外观", "在「弹幕」分类调整默认值")
-    SettingsInfoRow("后台行为", "离开 App 会暂停并保留进度")
+    SettingsInfoRow(
+        title = "后台行为",
+        value = "离开 App 会暂停并保留进度",
+        modifier = bottomModifier,
+    )
 }
 
 @Composable
@@ -535,6 +639,7 @@ private fun NetworkSettings(
     wifiOnlyDownload: Boolean,
     onWifiOnlyDownload: (Boolean) -> Unit,
     firstFocus: FocusRequester,
+    bottomModifier: Modifier,
 ) {
     val context = LocalContext.current
     val onWifi = remember { AppSettings.isWifiConnected(context) }
@@ -544,19 +649,36 @@ private fun NetworkSettings(
         subtitle = "移动网络下暂停下载任务",
         checked = wifiOnlyDownload,
         focusRequester = firstFocus,
+        modifier = SettingsTopEdge,
         onToggle = { onWifiOnlyDownload(!wifiOnlyDownload) },
     )
     Spacer(Modifier.height(10.dp))
     SettingsSection("当前状态")
-    SettingsInfoRow("网络类型", if (onWifi) "WiFi" else "移动网络 / 离线")
+    SettingsInfoRow(
+        title = "网络类型",
+        value = if (onWifi) "WiFi" else "移动网络 / 离线",
+        modifier = bottomModifier,
+    )
 }
 
 @Composable
-private fun AppearanceSettings(firstFocus: FocusRequester) {
+private fun AppearanceSettings(
+    firstFocus: FocusRequester,
+    bottomModifier: Modifier,
+) {
     SettingsSection("外观")
-    SettingsInfoRow("主题", "深色（固定）", focusRequester = firstFocus)
+    SettingsInfoRow(
+        title = "主题",
+        value = "深色（固定）",
+        focusRequester = firstFocus,
+        modifier = SettingsTopEdge,
+    )
     SettingsInfoRow("模式条", "底部常驻，显示当前手柄所有权")
-    SettingsInfoRow("焦点样式", "白色焦点环 + 粉色选中态")
+    SettingsInfoRow(
+        title = "焦点样式",
+        value = "白色焦点环 + 粉色选中态",
+        modifier = bottomModifier,
+    )
     Spacer(Modifier.height(10.dp))
     Text(
         text = "Bili-Duo 只提供深色主题：上屏视频场景和下屏 OLED 需要稳定的对比度。",
@@ -571,6 +693,7 @@ private fun AppearanceSettings(firstFocus: FocusRequester) {
 private fun DanmakuSettings(
     ui: PlayerUiState?,
     firstFocus: FocusRequester,
+    bottomModifier: Modifier,
     onEnabled: (Boolean) -> Unit,
     onOpacity: (Float) -> Unit,
     onSpeed: (Float) -> Unit,
@@ -591,6 +714,7 @@ private fun DanmakuSettings(
         subtitle = "进入播放时沿用上次开关",
         checked = enabled,
         focusRequester = firstFocus,
+        modifier = SettingsTopEdge,
         onToggle = { onEnabled(!enabled) },
     )
     SettingsValueRow(
@@ -622,7 +746,11 @@ private fun DanmakuSettings(
         },
     )
     Spacer(Modifier.height(10.dp))
-    SettingsInfoRow("屏蔽词", "在播放控制台「弹幕设置」内编辑")
+    SettingsInfoRow(
+        title = "屏蔽词",
+        value = "在播放控制台「播放设置」内编辑",
+        modifier = bottomModifier,
+    )
 }
 
 @Composable
@@ -633,6 +761,7 @@ private fun StorageSettings(
     searchHistoryCount: Int,
     downloadDir: String,
     firstFocus: FocusRequester,
+    bottomModifier: Modifier,
     clearFocus: FocusRequester,
     clearAllFocus: FocusRequester,
     onClearCompleted: () -> Unit,
@@ -641,7 +770,12 @@ private fun StorageSettings(
     onClearImageCache: () -> Unit,
 ) {
     SettingsSection("下载")
-    SettingsInfoRow("已下载", "$completed 个已完成 / 共 $total 个", focusRequester = firstFocus)
+    SettingsInfoRow(
+        title = "已下载",
+        value = "$completed 个已完成 / 共 $total 个",
+        focusRequester = firstFocus,
+        modifier = SettingsTopEdge,
+    )
     SettingsInfoRow("占用空间", formatBytes(bytes))
     SettingsInfoRow("下载目录", downloadDir)
     Spacer(Modifier.height(10.dp))
@@ -671,6 +805,7 @@ private fun StorageSettings(
     SettingsActionRow(
         title = "清除图片缓存",
         subtitle = "封面和头像的磁盘/内存缓存",
+        modifier = bottomModifier,
         onClick = onClearImageCache,
     )
 }
@@ -678,11 +813,17 @@ private fun StorageSettings(
 @Composable
 private fun AboutSettings(
     firstFocus: FocusRequester,
+    bottomModifier: Modifier,
     onOpenRepository: () -> Unit,
     onOpenIssues: () -> Unit,
 ) {
     SettingsSection("关于 Bili-Duo")
-    SettingsInfoRow("版本", "v${BuildConfig.VERSION_NAME}", focusRequester = firstFocus)
+    SettingsInfoRow(
+        title = "版本",
+        value = "v${BuildConfig.VERSION_NAME}",
+        focusRequester = firstFocus,
+        modifier = SettingsTopEdge,
+    )
     SettingsInfoRow("状态", "未测试 RC")
     SettingsActionRow(
         title = "开源仓库",
@@ -698,6 +839,7 @@ private fun AboutSettings(
         title = "GitHub Issues",
         subtitle = "问题反馈与功能建议",
         icon = Icons.Outlined.Language,
+        modifier = bottomModifier,
         onClick = onOpenIssues,
     )
     Spacer(Modifier.height(10.dp))
@@ -726,11 +868,12 @@ private fun SettingsSwitchRow(
     subtitle: String,
     checked: Boolean,
     focusRequester: FocusRequester,
+    modifier: Modifier = Modifier,
     onToggle: () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .height(52.dp)
             .focusRequester(focusRequester)
@@ -760,11 +903,12 @@ private fun SettingsSwitchRow(
 private fun SettingsValueRow(
     title: String,
     value: String,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .height(46.dp)
             .duoFocusRing(RoundedCornerShape(8.dp))
@@ -792,18 +936,19 @@ private fun SettingsInfoRow(
     title: String,
     value: String,
     focusRequester: FocusRequester? = null,
+    modifier: Modifier = Modifier,
 ) {
     var focused by remember { mutableStateOf(false) }
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .height(46.dp)
             .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
-            .then(if (focusRequester != null) Modifier.duoFocusRing(RoundedCornerShape(8.dp)) else Modifier)
+            .duoFocusRing(RoundedCornerShape(8.dp))
             .clip(RoundedCornerShape(8.dp))
             .background(if (focused) DuoPalette.SurfaceHigh else DuoPalette.Surface)
             .onFocusChanged { focused = it.isFocused }
-            .then(if (focusRequester != null) Modifier.duoClickable(onClick = {}) else Modifier)
+            .focusable()
             .padding(horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -826,11 +971,12 @@ private fun SettingsActionRow(
     enabled: Boolean = true,
     icon: ImageVector? = null,
     focusRequester: FocusRequester? = null,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .height(52.dp)
             .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)

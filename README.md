@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc14-FB7299">
+  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc15-FB7299">
   <img alt="status" src="https://img.shields.io/badge/status-untested%20RC-orange">
   <img alt="Android" src="https://img.shields.io/badge/Android-24%2B-3DDC84?logo=android&logoColor=white">
   <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-1.9.23-7F52FF?logo=kotlin&logoColor=white">
@@ -23,7 +23,7 @@
 上屏只负责视频画面，下屏用一块 `Presentation` 承载完整 UI；手柄和触摸共用同一棵
 Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，也没有上屏 OSD。
 
-> 当前版本：**0.2.0-rc14**（versionCode 15）
+> 当前版本：**0.2.0-rc15**（versionCode 16）
 > 状态：功能完整的 **未测试 RC**，221 个单元测试通过，已在 MuMu 与 Duo 真机做核心
 > 路径验证，尚未完成全流程回归。
 
@@ -85,7 +85,9 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
   画册/纯文字阅读，上屏同步只读场景；卡片头部显示点赞状态与数量，A/触摸可点赞，
   手柄 X 直接点赞/取消（优化请求、失败回滚）；转发/发布仍只读。
 - **账号**：扫码 / 短信 / 密码三 tab 登录，二维码倒计时、A 刷新、极验 WebView；
-  个人中心、历史、收藏、关注、下载、设置等二级页均为深色手柄 UI。
+  个人中心、历史、收藏、关注、下载、设置等二级页均为深色手柄 UI。设置页为
+  双栏焦点闭环：分类栏可聚焦，←/→ 在分类与内容之间切换，L1/R1 切分类，
+  内容行逐行聚焦、首尾止步，卡片间距保证焦点环完整。
 - **收藏**：收藏夹增删改、取消收藏；视频/音频/合集等非视频收藏也按资源类型提交
   取消请求，不再固定提示「暂不支持」。
 - **下载**：播放器内下载层可选清晰度与「当前分P / 全部分P」；下载页支持
@@ -157,6 +159,9 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
   - rc14 字幕设置：字幕开关移入齿轮「播放设置」菜单（弹幕/字幕分栏），新增字幕
     轨道、字号、背景、位置；去掉 chips 行字幕按钮后清晰度/倍速/弹幕/音量/齿轮
     不再被裁切（Duo 验证）。
+  - rc15 设置页：卡片间距与焦点留白修复焦点环被相邻卡片/滚动边缘裁切；分类栏
+    可聚焦，←/→ 进入/返回内容，L1/R1 切分类；所有行可逐行聚焦，首行/末行显式
+    止步，不再跳到全局 rail（MuMu 验证，Duo 待回归）。
   - 登录、个人中心、历史/收藏/关注只读浏览；弹幕发送→撤回闭环。
 
 ### 未实现（代码层面）
@@ -301,7 +306,7 @@ keyPassword=CHANGE_ME
 ### 测试产物
 
 `dist/` 只保留构建说明；APK 通过 GitHub Releases 或本地构建分发，不进入 Git 历史。
-当前 rc14 的哈希与说明见 [`dist/README.md`](dist/README.md)。
+当前 rc15 的哈希与说明见 [`dist/README.md`](dist/README.md)。
 
 ---
 

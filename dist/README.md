@@ -4,6 +4,23 @@
 `*.apk`），需要时本地 `./gradlew assembleDebug` / `assembleRelease` 生成，或从
 GitHub Releases 下载。
 
+## 0.2.0-rc15（2026-11-05）
+
+- `bili-duo-0.2.0-rc15-release.apk`
+  - R8 minify + resource shrink，正式 release keystore 签名。
+  - APK SHA-256：`4cce9674b15f419928df62e296211691f90d8521eabd3f4c879453735a984c80`
+- `bili-duo-0.2.0-rc15-debug.apk`
+  - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
+  - SHA-256：`7393948a8794a970334ef33523ee813cf7b9f7ee6a3cb13b6a8772e68767d179`
+
+rc15 变更：设置页布局与手柄焦点重做。
+- 内容行改为 6dp 间距 + 上下 10dp 内边距，卡片不再贴在一起，焦点环不会被
+  相邻卡片或滚动视口底边裁切。
+- 左侧分类栏可聚焦：↑/↓ 选择分类，→ 或 A 进入内容首行；内容内 ← 回分类栏。
+- 首行 Up / 末行 Down 显式停住，不再跳到全局 app rail；所有信息行均可聚焦。
+- L1/R1 切分类并聚焦首行；分类切换时滚动回顶部。
+MuMu 验证布局、分类栏/内容焦点、外观页底部止步与关于页末项滚动；Duo 待回归。
+
 ## 0.2.0-rc14（2026-11-05）
 
 - `bili-duo-0.2.0-rc14-release.apk`
