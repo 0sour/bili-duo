@@ -25,6 +25,8 @@ enum class DuoOverlay {
     SPEED,
     DANMAKU,
     DANMAKU_SEND,
+    COMMENT_SEND,
+    COMMENT_DELETE,
     IMAGE,
 }
 

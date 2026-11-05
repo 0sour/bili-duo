@@ -298,6 +298,12 @@ data class CommentCursor(
     @SerializedName("is_end") val isEnd: Boolean = true
 )
 
+data class CommentAddData(
+    val rpid: Long = 0,
+    @SerializedName("rpid_str") val rpidStr: String = "",
+    @SerializedName("success_toast") val successToast: String = ""
+)
+
 data class PlayUrlInfo(
     val quality: Int,
     val format: String,

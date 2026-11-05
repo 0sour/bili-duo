@@ -247,6 +247,27 @@ interface BilibiliApi {
     ): ApiResponse<Any>
 
     @FormUrlEncoded
+    @POST("x/v2/reply/add")
+    suspend fun addComment(
+        @Field("type") type: Int = 1,
+        @Field("oid") oid: Long,
+        @Field("message") message: String,
+        @Field("plat") plat: Int = 1,
+        @Field("root") root: Long?,
+        @Field("parent") parent: Long?,
+        @Field("csrf") csrf: String
+    ): ApiResponse<CommentAddData>
+
+    @FormUrlEncoded
+    @POST("x/v2/reply/del")
+    suspend fun deleteComment(
+        @Field("type") type: Int = 1,
+        @Field("oid") oid: Long,
+        @Field("rpid") rpid: Long,
+        @Field("csrf") csrf: String
+    ): ApiResponse<Any>
+
+    @FormUrlEncoded
     @POST("x/v2/history/report")
     suspend fun reportProgress(
         @Field("aid") aid: Long,

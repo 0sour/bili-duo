@@ -196,6 +196,16 @@ fun PlayerConsoleScreen(
     var commentsLoading by remember(aid) { mutableStateOf(false) }
     var commentsEnded by remember(aid) { mutableStateOf(false) }
     var commentsError by remember(aid) { mutableStateOf<String?>(null) }
+    val selfMid = remember { BilibiliApi.parseSelfMid() }
+    val commentComposeFocus = remember { FocusRequester() }
+    var commentDraft by remember { mutableStateOf("") }
+    var commentReplyTarget by remember { mutableStateOf<CommentItem?>(null) }
+    var commentReplyRoot by remember { mutableStateOf<CommentItem?>(null) }
+    var commentSending by remember { mutableStateOf(false) }
+    var commentSendError by remember { mutableStateOf<String?>(null) }
+    var commentDeleteTarget by remember { mutableStateOf<CommentItem?>(null) }
+    var commentDeleting by remember { mutableStateOf(false) }
+    var commentDeleteError by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(overlay) {
         val previous = observedOverlay
@@ -258,7 +268,9 @@ fun PlayerConsoleScreen(
     }
 
     LaunchedEffect(overlay) {
-        if (overlay != DuoOverlay.DANMAKU_SEND) keyboard?.hide()
+        if (overlay != DuoOverlay.DANMAKU_SEND && overlay != DuoOverlay.COMMENT_SEND) {
+            keyboard?.hide()
+        }
     }
 
     fun submitDanmaku() {
@@ -482,6 +494,119 @@ fun PlayerConsoleScreen(
                     commentLikeState = commentLikeState + (comment.rpid to previousLiked)
                     commentLikeDelta = commentLikeDelta + (comment.rpid to previousDelta)
                     toast(it.message ?: "点踩失败")
+                }
+        }
+    }
+
+    fun openCommentComposer(target: CommentItem? = null, root: CommentItem? = null) {
+        if (BilibiliApi.loginCookies.isBlank() || BilibiliApi.biliJct.isBlank()) {
+            toast("请先登录")
+            return
+        }
+        commentDraft = ""
+        commentReplyTarget = target
+        commentReplyRoot = root ?: target
+        commentSendError = null
+        pendingOverlayFocus = tabFocus[0]
+        session.openOverlay(DuoOverlay.COMMENT_SEND)
+    }
+
+    fun submitComment() {
+        if (commentSending) return
+        val videoAid = ui.videoInfo?.aid ?: return
+        if (BilibiliApi.loginCookies.isBlank() || BilibiliApi.biliJct.isBlank()) {
+            commentSendError = "请先登录"
+            return
+        }
+        val validation = validateComment(commentDraft)
+        if (validation != null) {
+            commentSendError = validation
+            return
+        }
+        val text = commentDraft.trim()
+        val target = commentReplyTarget
+        val root = commentReplyRoot
+        commentSending = true
+        commentSendError = null
+        scope.launch {
+            repository.addComment(
+                aid = videoAid,
+                message = text,
+                root = root?.rpid,
+                parent = target?.rpid,
+            ).onSuccess {
+                commentSending = false
+                session.closeOverlay()
+                toast(if (root != null) "回复已发布" else "评论已发布")
+                if (root == null) {
+                    commentSort = 2
+                    comments = emptyList()
+                    commentsLoaded = false
+                    nextCursor = 0
+                    commentsEnded = false
+                    expandedReplies = emptySet()
+                    repliesByRoot = emptyMap()
+                    repliesPage = emptyMap()
+                    expandedComments = emptySet()
+                } else {
+                    repliesByRoot = repliesByRoot - root.rpid
+                    repliesPage = repliesPage - root.rpid
+                    expandedReplies = expandedReplies + root.rpid
+                    repliesLoading = repliesLoading + root.rpid
+                    repliesError = repliesError - root.rpid
+                    val refreshed = repository.getReplies(videoAid, root.rpid, 1)
+                    refreshed.onSuccess { list ->
+                        repliesByRoot = repliesByRoot + (
+                            root.rpid to list.replies.orEmpty().filter { it.rpid != root.rpid }
+                        )
+                        repliesPage = repliesPage + (root.rpid to 1)
+                    }.onFailure { error ->
+                        repliesError = repliesError + (root.rpid to (error.message ?: "回复加载失败"))
+                    }
+                    repliesLoading = repliesLoading - root.rpid
+                }
+            }.onFailure { error ->
+                commentSending = false
+                commentSendError = error.message ?: "发送失败"
+            }
+        }
+    }
+
+    fun requestDeleteComment(comment: CommentItem) {
+        if (selfMid == null) {
+            toast("请先登录")
+            return
+        }
+        if (comment.member.mid != selfMid) {
+            toast("只能删除自己的评论")
+            return
+        }
+        commentDeleteTarget = comment
+        commentDeleteError = null
+        pendingOverlayFocus = tabFocus[0]
+        session.openOverlay(DuoOverlay.COMMENT_DELETE)
+    }
+
+    fun confirmDeleteComment() {
+        val target = commentDeleteTarget ?: return
+        val videoAid = ui.videoInfo?.aid ?: return
+        if (commentDeleting) return
+        commentDeleting = true
+        commentDeleteError = null
+        scope.launch {
+            repository.deleteComment(videoAid, target.rpid)
+                .onSuccess {
+                    commentDeleting = false
+                    comments = comments.filterNot { it.rpid == target.rpid }
+                    repliesByRoot = repliesByRoot.mapValues { (_, list) ->
+                        list.filterNot { it.rpid == target.rpid }
+                    }
+                    session.closeOverlay()
+                    toast("评论已删除")
+                }
+                .onFailure { error ->
+                    commentDeleting = false
+                    commentDeleteError = error.message ?: "删除失败"
                 }
         }
     }
@@ -1226,6 +1351,14 @@ fun PlayerConsoleScreen(
                                 }
                             },
                             onOpenImages = ::openImages,
+                            selfMid = selfMid,
+                            composeFocus = commentComposeFocus,
+                            onCompose = { openCommentComposer() },
+                            onReply = { comment -> openCommentComposer(target = comment) },
+                            onReplyToReply = { root, reply ->
+                                openCommentComposer(target = reply, root = root)
+                            },
+                            onDelete = ::requestDeleteComment,
                         )
                         1 -> RelatedTab(
                             items = related,
@@ -1573,6 +1706,32 @@ fun PlayerConsoleScreen(
         )
     }
 
+    if (overlay == DuoOverlay.COMMENT_SEND) {
+        CommentSendOverlay(
+            title = commentReplyTarget?.let { "回复 @${it.member.uname}" } ?: "写评论",
+            text = commentDraft,
+            sending = commentSending,
+            error = commentSendError,
+            loggedIn = BilibiliApi.loginCookies.isNotBlank(),
+            onText = { commentDraft = it },
+            onSend = { submitComment() },
+            onCancel = {
+                session.closeOverlay()
+                keyboard?.hide()
+            },
+        )
+    }
+
+    if (overlay == DuoOverlay.COMMENT_DELETE) {
+        CommentDeleteOverlay(
+            userName = commentDeleteTarget?.member?.uname.orEmpty(),
+            deleting = commentDeleting,
+            error = commentDeleteError,
+            onConfirm = { confirmDeleteComment() },
+            onCancel = { session.closeOverlay() },
+        )
+    }
+
     if (overlay == DuoOverlay.IMAGE && viewerPictures.isNotEmpty()) {
         CommentImageViewerOverlay(
             pictures = viewerPictures,
@@ -1780,8 +1939,29 @@ private fun CommentsTab(
     expandedComments: Set<Long>,
     onToggleCommentBody: (CommentItem) -> Unit,
     onOpenImages: (List<CommentPicture>, Int) -> Unit,
+    selfMid: Long?,
+    composeFocus: FocusRequester,
+    onCompose: () -> Unit,
+    onReply: (CommentItem) -> Unit,
+    onReplyToReply: (CommentItem, CommentItem) -> Unit,
+    onDelete: (CommentItem) -> Unit,
 ) {
     Column(Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 5.dp)
+                .height(30.dp)
+                .focusRequester(composeFocus)
+                .duoFocusRing(RoundedCornerShape(7.dp))
+                .clip(RoundedCornerShape(7.dp))
+                .background(DuoSurfaceHigh)
+                .duoClickable(onClick = onCompose)
+                .padding(horizontal = 10.dp),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            Text("写评论…", color = DuoTextTertiary, fontSize = 10.sp)
+        }
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1856,6 +2036,12 @@ private fun CommentsTab(
                                 onLikeReply = onLike,
                                 onDislikeReply = onDislike,
                                 onOpenImages = onOpenImages,
+                                selfMid = selfMid,
+                                onReply = { onReply(comment) },
+                                canDelete = selfMid != null && comment.member.mid == selfMid,
+                                onDelete = { onDelete(comment) },
+                                onReplyReply = { reply -> onReplyToReply(comment, reply) },
+                                onDeleteReply = { reply -> onDelete(reply) },
                             )
                         }
                         item {
@@ -1942,6 +2128,12 @@ private fun CommentRow(
     onLikeReply: (CommentItem) -> Unit,
     onDislikeReply: (CommentItem) -> Unit,
     onOpenImages: (List<CommentPicture>, Int) -> Unit,
+    selfMid: Long?,
+    onReply: () -> Unit,
+    canDelete: Boolean,
+    onDelete: () -> Unit,
+    onReplyReply: (CommentItem) -> Unit,
+    onDeleteReply: (CommentItem) -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.fillMaxWidth().padding(vertical = 9.dp)) {
@@ -2011,6 +2203,10 @@ private fun CommentRow(
                         active = disliked,
                         onClick = onDislike,
                     )
+                    CommentAction(text = "回复", onClick = onReply)
+                    if (canDelete) {
+                        CommentAction(text = "删除", onClick = onDelete)
+                    }
                     if (comment.rcount > 0) {
                         CommentAction(
                             text = if (expanded) {
@@ -2072,6 +2268,9 @@ private fun CommentRow(
                                 onLike = { onLikeReply(reply) },
                                 onDislike = { onDislikeReply(reply) },
                                 onOpenImages = onOpenImages,
+                                onReply = { onReplyReply(reply) },
+                                canDelete = selfMid != null && reply.member.mid == selfMid,
+                                onDelete = { onDeleteReply(reply) },
                             )
                         }
                         if (comment.rcount > replies.size) {
@@ -2127,6 +2326,9 @@ private fun ReplyRow(
     onLike: () -> Unit,
     onDislike: () -> Unit,
     onOpenImages: (List<CommentPicture>, Int) -> Unit,
+    onReply: () -> Unit,
+    canDelete: Boolean,
+    onDelete: () -> Unit,
 ) {
     Row(modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp)) {
         AsyncImage(
@@ -2180,6 +2382,10 @@ private fun ReplyRow(
                     active = disliked,
                     onClick = onDislike,
                 )
+                CommentAction(text = "回复", onClick = onReply)
+                if (canDelete) {
+                    CommentAction(text = "删除", onClick = onDelete)
+                }
             }
         }
     }
@@ -2538,6 +2744,143 @@ private fun DanmakuInputField(
             }
         },
     )
+}
+
+@Composable
+private fun CommentSendOverlay(
+    title: String,
+    text: String,
+    sending: Boolean,
+    error: String?,
+    loggedIn: Boolean,
+    onText: (String) -> Unit,
+    onSend: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    val fieldFocus = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+    LaunchedEffect(Unit) {
+        runCatching { fieldFocus.requestFocus() }
+        keyboard?.show()
+    }
+    val length = text.trim().length
+    val valid = validateComment(text) == null
+    OverlayCard(title = title, onDismiss = onCancel) {
+        Column(Modifier.fillMaxWidth()) {
+            Text(
+                text = "评论会公开显示在当前视频下",
+                color = DuoTextTertiary,
+                fontSize = 9.sp,
+            )
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = text,
+                onValueChange = onText,
+                textStyle = TextStyle(color = Color.White, fontSize = 12.sp),
+                minLines = 3,
+                maxLines = 5,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = DuoSurfaceHigh,
+                    unfocusedContainerColor = DuoSurfaceHigh,
+                    focusedBorderColor = DuoPink,
+                    unfocusedBorderColor = DuoDivider,
+                    cursorColor = DuoPink,
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White,
+                ),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 92.dp)
+                    .focusRequester(fieldFocus)
+                    .duoTextFieldNavigation(),
+            )
+            Spacer(Modifier.height(4.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "$length/$COMMENT_MAX_LENGTH",
+                    color = if (length > COMMENT_MAX_LENGTH) DuoPink else DuoTextTertiary,
+                    fontSize = 9.sp,
+                )
+                Spacer(Modifier.weight(1f))
+                if (sending) Text("发布中…", color = DuoPink, fontSize = 9.sp)
+            }
+            if (!loggedIn) {
+                Spacer(Modifier.height(6.dp))
+                Text("请先登录后再发表评论", color = DuoPink, fontSize = 10.sp)
+            }
+            if (error != null) {
+                Spacer(Modifier.height(6.dp))
+                Text(error, color = DuoPink, fontSize = 10.sp)
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                DuoPillButton(
+                    text = "取消",
+                    onClick = onCancel,
+                    modifier = Modifier.weight(1f),
+                )
+                DuoPillButton(
+                    text = if (sending) "发布中…" else "发布",
+                    onClick = onSend,
+                    modifier = Modifier.weight(1f),
+                    primary = loggedIn && valid && !sending,
+                    enabled = loggedIn && valid && !sending,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CommentDeleteOverlay(
+    userName: String,
+    deleting: Boolean,
+    error: String?,
+    onConfirm: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    val cancelFocus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { cancelFocus.requestFocus() } }
+    OverlayCard(title = "删除评论", onDismiss = onCancel) {
+        Column(Modifier.fillMaxWidth()) {
+            Text(
+                text = if (userName.isBlank()) {
+                    "确定删除这条评论？删除后无法恢复。"
+                } else {
+                    "确定删除 @$userName 的这条评论？删除后无法恢复。"
+                },
+                color = DuoTextSecondary,
+                fontSize = 11.sp,
+                lineHeight = 16.sp,
+            )
+            if (error != null) {
+                Spacer(Modifier.height(6.dp))
+                Text(error, color = DuoPink, fontSize = 10.sp)
+            }
+            Spacer(Modifier.height(10.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                DuoPillButton(
+                    text = "取消",
+                    onClick = onCancel,
+                    modifier = Modifier.weight(1f).focusRequester(cancelFocus),
+                )
+                DuoPillButton(
+                    text = if (deleting) "删除中…" else "删除",
+                    onClick = onConfirm,
+                    modifier = Modifier.weight(1f),
+                    primary = !deleting,
+                    enabled = !deleting,
+                )
+            }
+        }
+    }
 }
 
 @Composable

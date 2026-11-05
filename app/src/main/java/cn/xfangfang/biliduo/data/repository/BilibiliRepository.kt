@@ -846,6 +846,52 @@ class BilibiliRepository(
         }.onFailure { Log.e(BilibiliApp.TAG, "likeComment failed", it) }
     }
 
+    suspend fun addComment(
+        aid: Long,
+        message: String,
+        root: Long? = null,
+        parent: Long? = null
+    ): Result<CommentAddData> {
+        if (BuildConfig.DEBUG) {
+            Log.d(BilibiliApp.TAG, "addComment: aid=$aid root=$root parent=$parent")
+        }
+        return runCatching {
+            if (BilibiliApi.biliJct.isEmpty()) {
+                throw Exception("请先登录")
+            }
+            val response = api.addComment(
+                oid = aid,
+                message = message,
+                root = root,
+                parent = parent,
+                csrf = BilibiliApi.biliJct
+            )
+            if (BuildConfig.DEBUG) {
+                Log.d(BilibiliApp.TAG, "addComment response: code=${response.code} msg=${response.message}")
+            }
+            if (response.code == 0) {
+                response.data ?: CommentAddData()
+            } else {
+                throw Exception(response.message)
+            }
+        }.onFailure { Log.e(BilibiliApp.TAG, "addComment failed", it) }
+    }
+
+    suspend fun deleteComment(aid: Long, rpid: Long): Result<Unit> {
+        if (BuildConfig.DEBUG) Log.d(BilibiliApp.TAG, "deleteComment: aid=$aid rpid=$rpid")
+        return runCatching {
+            if (BilibiliApi.biliJct.isEmpty()) {
+                throw Exception("请先登录")
+            }
+            val response = api.deleteComment(
+                oid = aid,
+                rpid = rpid,
+                csrf = BilibiliApi.biliJct
+            )
+            if (response.code == 0) Unit else throw Exception(response.message)
+        }.onFailure { Log.e(BilibiliApp.TAG, "deleteComment failed", it) }
+    }
+
     suspend fun suggestSearch(term: String): Result<List<String>> {
         if (term.isBlank()) return Result.success(emptyList())
         return runCatching {

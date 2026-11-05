@@ -10,21 +10,21 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc5-FB7299">
+  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc6-FB7299">
   <img alt="status" src="https://img.shields.io/badge/status-untested%20RC-orange">
   <img alt="Android" src="https://img.shields.io/badge/Android-24%2B-3DDC84?logo=android&logoColor=white">
   <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-1.9.23-7F52FF?logo=kotlin&logoColor=white">
   <img alt="Compose" src="https://img.shields.io/badge/Jetpack%20Compose-2024.04-4285F4?logo=jetpackcompose&logoColor=white">
   <img alt="Media3" src="https://img.shields.io/badge/Media3-1.4.1-FF6D00">
-  <img alt="tests" src="https://img.shields.io/badge/tests-202%20passing-brightgreen">
+  <img alt="tests" src="https://img.shields.io/badge/tests-205%20passing-brightgreen">
   <img alt="license" src="https://img.shields.io/badge/license-MIT-blue">
 </p>
 
 上屏只负责视频画面，下屏用一块 `Presentation` 承载完整 UI；手柄和触摸共用同一棵
 Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，也没有上屏 OSD。
 
-> 当前版本：**0.2.0-rc5**（versionCode 6）  
-> 状态：功能完整的 **未测试 RC**，202 个单元测试通过，已在 MuMu 与 Duo 真机做核心
+> 当前版本：**0.2.0-rc6**（versionCode 7）  
+> 状态：功能完整的 **未测试 RC**，205 个单元测试通过，已在 MuMu 与 Duo 真机做核心
 > 路径验证，尚未完成全流程回归。
 
 ## 界面预览
@@ -68,7 +68,7 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
 - **播放**：DASH 多清晰度、倍速、音量、进度 seek、分P/选集、相关推荐、UP 主空间
   入口；PGC 番剧/影视复用同一控制台。
 - **评论**：分页、热门/最新排序、楼中楼回复分页、评论/回复点赞与点踩、长评论
-  展开、评论图片缩略图与全屏查看器。
+  展开、评论图片缩略图与全屏查看器；登录后可发布评论/回复，并可删除自己的评论。
 - **弹幕**：按 cid 拉取 XML（手动解 raw deflate）、上屏 Canvas 渲染、滚动/顶部/
   底部泳道、暂停冻结、seek 重建；下屏开关、透明度/速度/字号/显示区域、屏蔽词、
   同屏上限；普通视频支持发送与撤回。
@@ -101,7 +101,7 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
 | 图片 | Coil 2.6（含 GIF）、telephoto-zoomable |
 | 登录 | ZXing 二维码、极验 Geetest WebView |
 | 构建 | Gradle 8.7、AGP 8.4.0、JDK 17、R8 |
-| 测试 | JUnit4，202 个单元测试 |
+| 测试 | JUnit4，205 个单元测试 |
 | 架构 | Activity + Presentation、MVVM + StateFlow、单一 `PlayerController` |
 | 界面语言 | 简体中文（当前未做多语言资源） |
 
@@ -111,9 +111,9 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
 
 ### 已验证
 
-- **单元测试**：202 个用例通过（`./gradlew testDebugUnitTest`）。
+- **单元测试**：205 个用例通过（`./gradlew testDebugUnitTest`）。
 - **MuMu（1280×960 / 320dpi）**：双屏壳层、首页、搜索、播放控制台、直播列表与
-  HLS 播放、动态空态/登录态、单屏回退提示、rc5 签名包安装与冷启动。
+  HLS 播放、动态空态/登录态、单屏回退提示、rc6 签名包安装与冷启动。
 - **Retroid Pocket Duo 真机**：
   - 双屏冷启动、上屏视频、下屏触摸与系统 IME、后台恢复。
   - 视频：初始聚焦播放键、A 暂停、进度 ±10s/seek、X 弹幕、START 清晰度、
@@ -126,8 +126,6 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
 
 ### 未实现（代码层面）
 
-- **评论发布 / 回复 / 删除**：评论 tab 目前只读，支持分页、楼中楼、点赞/点踩、
-  图片查看；没有 `reply/add` 输入入口。
 - **动态写操作**：点赞、转发、发布未实现，动态流当前只读。
 - **PGC 大会员 / 付费集**：只在无剧集时提示「可能需要大会员」，没有 VIP 标识、
   权限判断或购买引导。
@@ -141,12 +139,14 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
 
 - **直播真实发送与关注**：UI、校验和 API 已接，但未在公开直播间留下测试消息；
   需要明确授权后在无人直播间补测。
+- **评论发布 / 回复 / 删除**：代码已接，需要登录账号实测；会公开发布评论，
+  测试需明确授权（实现包含立即删除自己评论的入口）。
 - **PGC VIP 集**：需要大会员账号验证播放/提示路径。
 - **短信 / 密码 / 极验登录**：代码已接，目前只实际验证过扫码登录。
 - **完整真机回归**：真实手柄长按 repeat、断连/热插拔、锁屏/休眠唤醒、
   120Hz/HDR、弱网/断网矩阵尚未系统覆盖。
 - **UP 主空间 / 搜索肩键**：代码已接同一套 `duoTabCycling`，尚未单独做真机点验。
-- **部分登录态路径**：收藏/关注真实卡片预览、云端进度同步待补测。
+- **部分登录态路径**：收藏/关注真实卡片预览待补测。
 
 ### 已知限制
 
@@ -265,7 +265,7 @@ keyPassword=CHANGE_ME
 ### 测试产物
 
 `dist/` 只保留构建说明；APK 通过 GitHub Releases 或本地构建分发，不进入 Git 历史。
-当前 rc5 的哈希与说明见 [`dist/README.md`](dist/README.md)。
+当前 rc6 的哈希与说明见 [`dist/README.md`](dist/README.md)。
 
 ---
 
