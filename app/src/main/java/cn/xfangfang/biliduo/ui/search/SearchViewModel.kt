@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import cn.xfangfang.biliduo.BilibiliApp
 import cn.xfangfang.biliduo.data.local.SearchHistoryManager
+import cn.xfangfang.biliduo.data.model.SearchUserItem
 import cn.xfangfang.biliduo.data.model.SearchVideoItem
 import cn.xfangfang.biliduo.data.repository.BilibiliRepository
 import cn.xfangfang.biliduo.util.cleanHtmlText
@@ -31,9 +32,16 @@ object SearchSort {
     )
 }
 
+enum class SearchType(val value: String, val label: String) {
+    VIDEO("video", "视频"),
+    USER("bili_user", "用户"),
+}
+
 data class SearchUiState(
     val query: String = "",
+    val searchType: SearchType = SearchType.VIDEO,
     val results: List<SearchVideoItem> = emptyList(),
+    val users: List<SearchUserItem> = emptyList(),
     val isLoading: Boolean = false,
     val isLoadingMore: Boolean = false,
     val error: String? = null,
@@ -87,6 +95,7 @@ class SearchViewModel(
             _uiState.value = _uiState.value.copy(
                 query = "",
                 results = emptyList(),
+                users = emptyList(),
                 isLoading = false,
                 isLoadingMore = false,
                 error = null,
@@ -115,10 +124,33 @@ class SearchViewModel(
     }
 
     fun setSortBy(sort: SearchSortOption) {
+        if (_uiState.value.searchType != SearchType.VIDEO) return
         if (sort.value == _uiState.value.sortBy.value) return
         _uiState.value = _uiState.value.copy(sortBy = sort)
         searchJob?.cancel()
         search()
+    }
+
+    fun setSearchType(type: SearchType) {
+        val state = _uiState.value
+        if (type == state.searchType) return
+        val shouldSearch = state.hasSearched &&
+            state.query.trim().isNotEmpty() &&
+            state.query.trim() == state.submittedQuery
+        searchJob?.cancel()
+        _uiState.value = state.copy(
+            searchType = type,
+            results = emptyList(),
+            users = emptyList(),
+            isLoading = shouldSearch,
+            isLoadingMore = false,
+            error = null,
+            moreError = null,
+            hasSearched = shouldSearch,
+            currentPage = 1,
+            hasMore = false,
+        )
+        if (shouldSearch) search()
     }
 
     fun search() {
@@ -129,7 +161,8 @@ class SearchViewModel(
         }
 
         val order = _uiState.value.sortBy.value
-        Log.d(BilibiliApp.TAG, "search: query=$query sort=$order")
+        val type = _uiState.value.searchType
+        Log.d(BilibiliApp.TAG, "search: query=$query sort=$order type=${type.value}")
         suggestJob?.cancel()
         _uiState.value = _uiState.value.copy(
             submittedQuery = query,
@@ -138,7 +171,10 @@ class SearchViewModel(
         searchJob?.cancel()
         searchJob = viewModelScope.launch {
             delay(500)
-            if (query != _uiState.value.query.trim() || order != _uiState.value.sortBy.value) return@launch
+            if (query != _uiState.value.query.trim() ||
+                order != _uiState.value.sortBy.value ||
+                type != _uiState.value.searchType
+            ) return@launch
 
             val newHistory = historyManager.add(query)
             _uiState.value = _uiState.value.copy(searchHistory = newHistory)
@@ -149,31 +185,53 @@ class SearchViewModel(
                 moreError = null,
                 hasSearched = true,
                 results = emptyList(),
+                users = emptyList(),
                 currentPage = 1
             )
-            repository.search(query, page = 1, order = order)
-                .onSuccess { (results, totalPages) ->
-                    Log.d(BilibiliApp.TAG, "search success: ${results.size} results, pages=$totalPages")
-                    _uiState.value = _uiState.value.copy(
-                        results = results.distinctBy { it.bvid }.filter { it.bvid.isNotBlank() }
-                            .map { it.copy(
-                                title = cleanHtmlText(it.title),
-                                author = cleanHtmlText(it.author),
-                                description = cleanHtmlText(it.description),
-                                duration = formatDuration(it.duration)
-                            ) },
-                        isLoading = false,
-                        currentPage = 1,
-                        hasMore = totalPages > 1
-                    )
-                }
-                .onFailure { e ->
-                    Log.e(BilibiliApp.TAG, "search error: ${e.message}")
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        error = e.message ?: "未知错误"
-                    )
-                }
+            if (type == SearchType.USER) {
+                repository.searchUsers(query, page = 1)
+                    .onSuccess { (users, totalPages) ->
+                        Log.d(BilibiliApp.TAG, "searchUsers success: ${users.size} users, pages=$totalPages")
+                        _uiState.value = _uiState.value.copy(
+                            users = users.filter { it.mid > 0 }.distinctBy { it.mid }
+                                .map { it.cleanForDisplay() },
+                            isLoading = false,
+                            currentPage = 1,
+                            hasMore = totalPages > 1
+                        )
+                    }
+                    .onFailure { e ->
+                        Log.e(BilibiliApp.TAG, "searchUsers error: ${e.message}")
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            error = e.message ?: "未知错误"
+                        )
+                    }
+            } else {
+                repository.search(query, page = 1, order = order)
+                    .onSuccess { (results, totalPages) ->
+                        Log.d(BilibiliApp.TAG, "search success: ${results.size} results, pages=$totalPages")
+                        _uiState.value = _uiState.value.copy(
+                            results = results.distinctBy { it.bvid }.filter { it.bvid.isNotBlank() }
+                                .map { it.copy(
+                                    title = cleanHtmlText(it.title),
+                                    author = cleanHtmlText(it.author),
+                                    description = cleanHtmlText(it.description),
+                                    duration = formatDuration(it.duration)
+                                ) },
+                            isLoading = false,
+                            currentPage = 1,
+                            hasMore = totalPages > 1
+                        )
+                    }
+                    .onFailure { e ->
+                        Log.e(BilibiliApp.TAG, "search error: ${e.message}")
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            error = e.message ?: "未知错误"
+                        )
+                    }
+            }
         }
     }
 
@@ -199,34 +257,61 @@ class SearchViewModel(
         if (state.isLoadingMore || !state.hasMore) return
 
         val nextPage = state.currentPage + 1
-        Log.d(BilibiliApp.TAG, "loadMore: page=$nextPage query=${state.query}")
+        Log.d(BilibiliApp.TAG, "loadMore: page=$nextPage query=${state.query} type=${state.searchType.value}")
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoadingMore = true)
-            repository.search(state.query, page = nextPage, order = state.sortBy.value)
-                .onSuccess { (results, totalPages) ->
-                    val existingBvids = _uiState.value.results.map { it.bvid }.toSet()
-                    val deduped = results.filter { it.bvid !in existingBvids && it.bvid.isNotBlank() }
-                        .map { it.copy(
-                            title = cleanHtmlText(it.title),
-                            author = cleanHtmlText(it.author),
-                            description = cleanHtmlText(it.description),
-                            duration = formatDuration(it.duration)
-                        ) }
-                    _uiState.value = _uiState.value.copy(
-                        results = _uiState.value.results + deduped,
-                        isLoadingMore = false,
-                        moreError = null,
-                        currentPage = nextPage,
-                        hasMore = nextPage < totalPages
-                    )
-                }
-                .onFailure { e ->
-                    Log.e(BilibiliApp.TAG, "loadMore error: ${e.message}")
-                    _uiState.value = _uiState.value.copy(
-                        isLoadingMore = false,
-                        moreError = e.message ?: "加载失败"
-                    )
-                }
+            if (state.searchType == SearchType.USER) {
+                repository.searchUsers(state.query, page = nextPage)
+                    .onSuccess { (users, totalPages) ->
+                        if (_uiState.value.searchType != state.searchType) return@onSuccess
+                        val existingMids = _uiState.value.users.map { it.mid }.toSet()
+                        val deduped = users.filter { it.mid > 0 && it.mid !in existingMids }
+                            .map { it.cleanForDisplay() }
+                        _uiState.value = _uiState.value.copy(
+                            users = _uiState.value.users + deduped,
+                            isLoadingMore = false,
+                            moreError = null,
+                            currentPage = nextPage,
+                            hasMore = nextPage < totalPages
+                        )
+                    }
+                    .onFailure { e ->
+                        if (_uiState.value.searchType != state.searchType) return@onFailure
+                        Log.e(BilibiliApp.TAG, "loadMore users error: ${e.message}")
+                        _uiState.value = _uiState.value.copy(
+                            isLoadingMore = false,
+                            moreError = e.message ?: "加载失败"
+                        )
+                    }
+            } else {
+                repository.search(state.query, page = nextPage, order = state.sortBy.value)
+                    .onSuccess { (results, totalPages) ->
+                        if (_uiState.value.searchType != state.searchType) return@onSuccess
+                        val existingBvids = _uiState.value.results.map { it.bvid }.toSet()
+                        val deduped = results.filter { it.bvid !in existingBvids && it.bvid.isNotBlank() }
+                            .map { it.copy(
+                                title = cleanHtmlText(it.title),
+                                author = cleanHtmlText(it.author),
+                                description = cleanHtmlText(it.description),
+                                duration = formatDuration(it.duration)
+                            ) }
+                        _uiState.value = _uiState.value.copy(
+                            results = _uiState.value.results + deduped,
+                            isLoadingMore = false,
+                            moreError = null,
+                            currentPage = nextPage,
+                            hasMore = nextPage < totalPages
+                        )
+                    }
+                    .onFailure { e ->
+                        if (_uiState.value.searchType != state.searchType) return@onFailure
+                        Log.e(BilibiliApp.TAG, "loadMore error: ${e.message}")
+                        _uiState.value = _uiState.value.copy(
+                            isLoadingMore = false,
+                            moreError = e.message ?: "加载失败"
+                        )
+                    }
+            }
         }
     }
 
@@ -266,6 +351,7 @@ class SearchViewModel(
             suggestions = emptyList(),
             submittedQuery = "",
             results = emptyList(),
+            users = emptyList(),
             hasMore = false,
             hasSearched = false,
             currentPage = 1,

@@ -38,6 +38,13 @@ interface BilibiliApi {
         @Query("order") order: String? = null
     ): ApiResponse<SearchResult>
 
+    @GET("x/web-interface/search/type")
+    suspend fun searchUsers(
+        @Query("search_type") searchType: String = "bili_user",
+        @Query("keyword") keyword: String,
+        @Query("page") page: Int = 1
+    ): ApiResponse<SearchUserResult>
+
     @GET("https://s.search.bilibili.com/main/suggest")
     suspend fun suggestSearch(
         @Query("term") term: String,

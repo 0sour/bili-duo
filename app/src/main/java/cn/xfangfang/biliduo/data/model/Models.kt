@@ -21,6 +21,31 @@ data class SearchResult(
     @SerializedName("numPages") val totalPages: Int = 0
 )
 
+data class SearchUserResult(
+    val result: List<SearchUserItem>?,
+    val page: Int = 1,
+    val pagesize: Int = 20,
+    @SerializedName("numResults") val totalResults: Int = 0,
+    @SerializedName("numPages") val totalPages: Int = 0
+)
+
+data class SearchUserItem(
+    val mid: Long = 0,
+    val uname: String = "",
+    @SerializedName("usign") val sign: String = "",
+    @SerializedName("upic") val avatar: String = "",
+    val fans: Long = 0,
+    val videos: Long = 0,
+    val level: Int = 0,
+    @SerializedName("is_upuser") val isUpUser: Int = 0,
+    @SerializedName("official_verify") val officialVerify: SearchUserVerify? = null,
+)
+
+data class SearchUserVerify(
+    val type: Int = 0,
+    val desc: String = "",
+)
+
 data class SearchSuggestResponse(
     val code: Int = 0,
     val result: SearchSuggestResult? = null,

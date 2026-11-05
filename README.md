@@ -10,21 +10,21 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc6-FB7299">
+  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc7-FB7299">
   <img alt="status" src="https://img.shields.io/badge/status-untested%20RC-orange">
   <img alt="Android" src="https://img.shields.io/badge/Android-24%2B-3DDC84?logo=android&logoColor=white">
   <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-1.9.23-7F52FF?logo=kotlin&logoColor=white">
   <img alt="Compose" src="https://img.shields.io/badge/Jetpack%20Compose-2024.04-4285F4?logo=jetpackcompose&logoColor=white">
   <img alt="Media3" src="https://img.shields.io/badge/Media3-1.4.1-FF6D00">
-  <img alt="tests" src="https://img.shields.io/badge/tests-205%20passing-brightgreen">
+  <img alt="tests" src="https://img.shields.io/badge/tests-208%20passing-brightgreen">
   <img alt="license" src="https://img.shields.io/badge/license-MIT-blue">
 </p>
 
 上屏只负责视频画面，下屏用一块 `Presentation` 承载完整 UI；手柄和触摸共用同一棵
 Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，也没有上屏 OSD。
 
-> 当前版本：**0.2.0-rc6**（versionCode 7）  
-> 状态：功能完整的 **未测试 RC**，205 个单元测试通过，已在 MuMu 与 Duo 真机做核心
+> 当前版本：**0.2.0-rc7**（versionCode 8）
+> 状态：功能完整的 **未测试 RC**，208 个单元测试通过，已在 MuMu 与 Duo 真机做核心
 > 路径验证，尚未完成全流程回归。
 
 ## 界面预览
@@ -55,7 +55,8 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
   `TOP_PLAYER ↔ BOTTOM_UI` 双模式和 Y 键切换。
 - **键位**：D-pad 移动焦点，A 确认，B 逐级返回，X 弹幕开关，START 清晰度菜单，
   LB/RB 切换右栏 tab；Y 不绑定。进度条可聚焦，左右键 ±10s。
-- **肩键快捷键**：L1/R1 切一级 tab，L2/R2 切二级筛选行；长按只走一格。
+- **肩键快捷键**：L1/R1 切一级 tab（搜索页切视频/用户），L2/R2 切二级筛选行；
+  长按只走一格。
 - **overlay 独占**：清晰度、倍速、弹幕设置、发送、图片查看等打开时独占输入，
   B 只关闭 overlay，不退出播放。
 
@@ -64,7 +65,8 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
 - **首页**：直播 / 推荐 / 热门 / 排行 / 番剧 / 影视六个 tab；推荐、热门、排行、
   PGC 列表，热门支持分页。
 - **搜索**：搜索建议（250ms 防抖）、历史记录、热门搜索、五种排序、分页与重试；
-  搜索框支持下屏系统 IME。
+  支持视频/用户两种结果（chip 或 L1/R1 切换），用户结果可进入 UP 主空间，
+  上屏显示人物卡；搜索框支持下屏系统 IME。
 - **播放**：DASH 多清晰度、倍速、音量、进度 seek、分P/选集、相关推荐、UP 主空间
   入口；PGC 番剧/影视复用同一控制台。
 - **评论**：分页、热门/最新排序、楼中楼回复分页、评论/回复点赞与点踩、长评论
@@ -101,7 +103,7 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
 | 图片 | Coil 2.6（含 GIF）、telephoto-zoomable |
 | 登录 | ZXing 二维码、极验 Geetest WebView |
 | 构建 | Gradle 8.7、AGP 8.4.0、JDK 17、R8 |
-| 测试 | JUnit4，205 个单元测试 |
+| 测试 | JUnit4，208 个单元测试 |
 | 架构 | Activity + Presentation、MVVM + StateFlow、单一 `PlayerController` |
 | 界面语言 | 简体中文（当前未做多语言资源） |
 
@@ -111,7 +113,7 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
 
 ### 已验证
 
-- **单元测试**：205 个用例通过（`./gradlew testDebugUnitTest`）。
+- **单元测试**：208 个用例通过（`./gradlew testDebugUnitTest`）。
 - **MuMu（1280×960 / 320dpi）**：双屏壳层、首页、搜索、播放控制台、直播列表与
   HLS 播放、动态空态/登录态、单屏回退提示、签名包安装与冷启动。
 - **Retroid Pocket Duo 真机**：
@@ -121,6 +123,7 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
   - 直播：初始聚焦、LB/RB 切 tab、输入框 B 收键盘、B 层级退出、触摸直点。
   - 首页 L1/R1 切 tab、直播 L2/R2 切分区、动态 L1/R1 切筛选、L2/R2 切 UP 主。
   - 直播子分区 + 关注主播行下滚自动收起、回到顶部展开。
+  - 搜索视频/用户切换、用户行上屏人物卡、A 进入 UP 主空间。
   - 评论图片全屏、弹幕开关/设置、字幕开关、PGC 切集、UP 主空间。
   - 评论发布/回复/删除：根评论发布后刷新出现、楼中楼回复、删除确认后从列表移除；
     测试评论已全部删除，账号状态还原。
@@ -133,7 +136,6 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
   权限判断或购买引导。
 - **云端观看进度续播**：播放器不读取云端历史进度；只有本地进度上报与历史列表。
 - **取消非视频收藏**：收藏夹中的专栏/动态等条目提示「暂不支持取消该类型收藏」。
-- **搜索用户 / UP 主**：搜索接口目前固定 `search_type=video`，只有视频结果。
 - **单屏直播 / PGC**：目标设备始终双屏；无下屏时 VOD 走旧 `PlayerScreen`，
   直播/PGC 显示「此内容需要下屏控制台」提示，不进入播放。**非本 RC 目标**。
 
@@ -141,7 +143,8 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
 
 - **直播真实发送与关注**：UI、校验和 API 已接，但未在公开直播间留下测试消息；
   需要明确授权后在无人直播间补测。
-- **PGC VIP 集**：需要大会员账号验证播放/提示路径。
+- **PGC VIP 集**：未登录/无权限时整季显示「该番剧暂无可播放剧集，可能需要大会员」
+  （Duo 实测）；大会员账号的实际播放路径仍需补测。
 - **短信 / 密码 / 极验登录**：代码已接，目前只实际验证过扫码登录。
 - **完整真机回归**：真实手柄长按 repeat、断连/热插拔、锁屏/休眠唤醒、
   120Hz/HDR、弱网/断网矩阵尚未系统覆盖。
@@ -169,7 +172,7 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
 | B | 关闭页内确认层 → 返回上一页 |
 | X | 页面上下文操作 |
 | Y | 搜索页切排序；其他页面无绑定 |
-| L1 / R1 | 切一级 tab（首页、动态、UP 主空间） |
+| L1 / R1 | 切一级 tab（首页、动态、UP 主空间）；搜索页切视频/用户 |
 | L2 / R2 | 切二级筛选（直播分区、动态 UP 主、搜索排序） |
 | START | 页面菜单（如有） |
 
@@ -265,7 +268,7 @@ keyPassword=CHANGE_ME
 ### 测试产物
 
 `dist/` 只保留构建说明；APK 通过 GitHub Releases 或本地构建分发，不进入 Git 历史。
-当前 rc6 的哈希与说明见 [`dist/README.md`](dist/README.md)。
+当前 rc7 的哈希与说明见 [`dist/README.md`](dist/README.md)。
 
 ---
 

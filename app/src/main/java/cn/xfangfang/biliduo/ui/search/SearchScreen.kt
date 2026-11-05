@@ -65,12 +65,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import cn.xfangfang.biliduo.data.model.SearchUserItem
 import cn.xfangfang.biliduo.data.model.SearchVideoItem
 import cn.xfangfang.biliduo.ui.duo.duoClickable
 import cn.xfangfang.biliduo.ui.duo.duoTextFieldNavigation
 import cn.xfangfang.biliduo.ui.duo.duoFocusRing
 import cn.xfangfang.biliduo.ui.top.TopAmbientUi
 import cn.xfangfang.biliduo.ui.top.TopGlyph
+import cn.xfangfang.biliduo.ui.top.TopPersonUi
 import cn.xfangfang.biliduo.ui.top.TopPreviewUi
 import cn.xfangfang.biliduo.util.fixPic
 import cn.xfangfang.biliduo.util.formatCount
@@ -86,8 +88,10 @@ private val SearchPink = Color(0xFFFB7299)
 @Composable
 fun SearchScreen(
     onVideoClick: (String) -> Unit,
+    onUserClick: (Long) -> Unit = {},
     onBack: () -> Unit = {},
     onVideoFocused: (TopPreviewUi) -> Unit = {},
+    onUserFocused: (TopPersonUi) -> Unit = {},
     onFocusCleared: () -> Unit = {},
     onTopAmbient: (TopAmbientUi) -> Unit = {},
     viewModel: SearchViewModel = viewModel(),
@@ -118,14 +122,21 @@ fun SearchScreen(
 
     LaunchedEffect(
         state.hasSearched,
+        state.searchType,
         state.query,
         state.results.size,
+        state.users.size,
         state.isLoading,
         state.error,
         searchFocused,
         editingQuery,
         state.suggestions.size,
     ) {
+        val hasItems = if (state.searchType == SearchType.USER) {
+            state.users.isNotEmpty()
+        } else {
+            state.results.isNotEmpty()
+        }
         when {
             editingQuery -> onTopAmbient(
                 TopAmbientUi(
@@ -135,14 +146,24 @@ fun SearchScreen(
                     glyph = TopGlyph.SEARCH,
                 )
             )
-            !state.hasSearched || state.results.isEmpty() || state.isLoading || searchFocused ->
+            !state.hasSearched || !hasItems || state.isLoading || searchFocused ->
                 onTopAmbient(searchAmbient(state, searchFocused))
         }
     }
 
-    LaunchedEffect(state.hasSearched, state.results.firstOrNull()?.bvid) {
+    LaunchedEffect(
+        state.hasSearched,
+        state.searchType,
+        state.results.firstOrNull()?.bvid,
+        state.users.firstOrNull()?.mid,
+    ) {
         delay(120L)
-        val target = if (state.hasSearched && state.results.isNotEmpty()) {
+        val hasItems = if (state.searchType == SearchType.USER) {
+            state.users.isNotEmpty()
+        } else {
+            state.results.isNotEmpty()
+        }
+        val target = if (state.hasSearched && hasItems) {
             firstResultFocus
         } else {
             searchFocus
@@ -157,19 +178,35 @@ fun SearchScreen(
         Unit
     }
 
-    val sortKeyModifier = if (
-        !searchFocused && state.hasSearched && state.results.isNotEmpty()
-    ) {
+    val sortKeyModifier = if (!searchFocused && state.hasSearched) {
         Modifier.onPreviewKeyEvent { event ->
             if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+            val types = SearchType.values()
+            val typeIndex = types.indexOf(state.searchType)
             when (event.key) {
-                Key.Y, Key.ButtonR2 -> {
-                    viewModel.nextSort()
+                Key.ButtonR1 -> {
+                    viewModel.setSearchType(types[(typeIndex + 1) % types.size])
                     true
                 }
-                Key.ButtonL2 -> {
-                    viewModel.prevSort()
+                Key.ButtonL1 -> {
+                    viewModel.setSearchType(types[(typeIndex - 1 + types.size) % types.size])
                     true
+                }
+                Key.Y, Key.ButtonR2 -> {
+                    if (state.searchType == SearchType.VIDEO) {
+                        viewModel.nextSort()
+                        true
+                    } else {
+                        false
+                    }
+                }
+                Key.ButtonL2 -> {
+                    if (state.searchType == SearchType.VIDEO) {
+                        viewModel.prevSort()
+                        true
+                    } else {
+                        false
+                    }
                 }
                 else -> false
             }
@@ -229,14 +266,23 @@ fun SearchScreen(
                 },
             )
         } else {
+            SearchTypeRow(
+                selected = state.searchType,
+                onSelect = viewModel::setSearchType,
+            )
+            val hasItems = if (state.searchType == SearchType.USER) {
+                state.users.isNotEmpty()
+            } else {
+                state.results.isNotEmpty()
+            }
             when {
-                state.isLoading && state.results.isEmpty() -> {
+                state.isLoading && !hasItems -> {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(color = SearchPink)
                     }
                 }
 
-                state.error != null && state.results.isEmpty() -> {
+                state.error != null && !hasItems -> {
                     SearchMessage(
                         text = "加载失败：${state.error}",
                         action = "重试",
@@ -244,8 +290,49 @@ fun SearchScreen(
                     )
                 }
 
-                state.results.isEmpty() -> {
-                    SearchMessage(text = "没有找到相关视频")
+                !hasItems -> {
+                    SearchMessage(
+                        text = if (state.searchType == SearchType.USER) {
+                            "没有找到相关用户"
+                        } else {
+                            "没有找到相关视频"
+                        }
+                    )
+                }
+
+                state.searchType == SearchType.USER -> {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        itemsIndexed(
+                            items = state.users,
+                            key = { _, item -> item.mid },
+                        ) { index, item ->
+                            SearchUserRow(
+                                item = item,
+                                onClick = { onUserClick(item.mid) },
+                                focusRequester = if (index == 0) firstResultFocus else null,
+                                onFocusChanged = { focused ->
+                                    if (focused) {
+                                        onUserFocused(item.toTopPerson())
+                                    } else {
+                                        onFocusCleared()
+                                    }
+                                },
+                            )
+                        }
+                        item {
+                            SearchListFooter(
+                                isLoadingMore = state.isLoadingMore,
+                                hasMore = state.hasMore,
+                                moreError = state.moreError,
+                                onRetry = viewModel::retryLoadMore,
+                            )
+                        }
+                    }
                 }
 
                 else -> {
@@ -621,6 +708,55 @@ private fun HotChip(
 }
 
 @Composable
+private fun SearchTypeRow(
+    selected: SearchType,
+    onSelect: (SearchType) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(40.dp)
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        SearchType.values().forEach { type ->
+            val isSelected = type == selected
+            Box(
+                modifier = Modifier
+                    .height(28.dp)
+                    .duoFocusRing(RoundedCornerShape(14.dp))
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(
+                        if (isSelected) SearchPink.copy(alpha = 0.16f) else SearchFieldBg
+                    )
+                    .border(
+                        width = 1.dp,
+                        color = if (isSelected) SearchPink.copy(alpha = 0.45f) else Color.Transparent,
+                        shape = RoundedCornerShape(14.dp),
+                    )
+                    .duoClickable { onSelect(type) }
+                    .padding(horizontal = 14.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = type.label,
+                    color = if (isSelected) SearchPink else SearchSecondary,
+                    fontSize = 12.sp,
+                    fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal,
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+        }
+        Spacer(Modifier.weight(1f))
+        Text(
+            text = "L1/R1 切类型",
+            color = SearchSecondary.copy(alpha = 0.7f),
+            fontSize = 9.sp,
+        )
+    }
+}
+
+@Composable
 private fun SortRow(
     selected: SearchSortOption,
     onSelect: (SearchSortOption) -> Unit,
@@ -761,6 +897,94 @@ private fun SearchResultRow(
 }
 
 @Composable
+private fun SearchUserRow(
+    item: SearchUserItem,
+    onClick: () -> Unit,
+    focusRequester: FocusRequester?,
+    onFocusChanged: (Boolean) -> Unit = {},
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(88.dp)
+            .duoFocusRing(RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(8.dp))
+            .background(SearchCardBg)
+            .then(
+                if (focusRequester != null) {
+                    Modifier.focusRequester(focusRequester)
+                } else {
+                    Modifier
+                }
+            )
+            .onFocusChanged { onFocusChanged(it.isFocused) }
+            .duoClickable(onClick = onClick)
+            .padding(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(64.dp)
+                .clip(CircleShape)
+                .background(SearchFieldBg),
+        ) {
+            AsyncImage(
+                model = fixPic(item.avatar),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = item.uname,
+                    color = SearchText,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = item.badgeLabel(),
+                    color = SearchPink,
+                    fontSize = 9.sp,
+                    maxLines = 1,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(SearchPink.copy(alpha = 0.12f))
+                        .padding(horizontal = 5.dp, vertical = 2.dp),
+                )
+            }
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = item.sign.ifBlank { "这个 UP 主还没有填写签名。" },
+                color = SearchSecondary,
+                fontSize = 11.sp,
+                lineHeight = 15.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.height(5.dp))
+            Text(
+                text = buildString {
+                    append("UID ${item.mid}")
+                    item.metaLine().takeIf { it.isNotEmpty() }?.let { append(" · ").append(it) }
+                    if (item.level > 0) append(" · Lv${item.level}")
+                },
+                color = SearchSecondary.copy(alpha = 0.8f),
+                fontSize = 9.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
 private fun SearchListFooter(
     isLoadingMore: Boolean,
     hasMore: Boolean,
@@ -851,6 +1075,9 @@ private fun SearchMessage(
 }
 
 private fun searchAmbient(state: SearchUiState, searchFocused: Boolean): TopAmbientUi {
+    val isUser = state.searchType == SearchType.USER
+    val itemCount = if (isUser) state.users.size else state.results.size
+    val unit = if (isUser) "位用户" else "条结果"
     val title: String
     val subtitle: String
     when {
@@ -860,23 +1087,27 @@ private fun searchAmbient(state: SearchUiState, searchFocused: Boolean): TopAmbi
         }
         state.isLoading -> {
             title = "正在搜索「${state.query}」。"
-            subtitle = "结果返回后，聚焦任意条目即可在上屏查看封面与简介。"
+            subtitle = "结果返回后，聚焦任意条目即可在上屏查看预览。"
         }
-        state.error != null && state.results.isEmpty() -> {
+        state.error != null && itemCount == 0 -> {
             title = "搜索没有完成。"
             subtitle = "请在下屏重试，或换一个关键词。"
         }
-        state.results.isEmpty() -> {
+        itemCount == 0 -> {
             title = "没有找到「${state.query}」。"
             subtitle = "换一个关键词，或回到下屏看看热门搜索。"
         }
         searchFocused -> {
             title = "搜索「${state.query}」。"
-            subtitle = "共 ${state.results.size} 条结果；方向键回到结果列表，A 直接播放。"
+            subtitle = if (isUser) {
+                "共 $itemCount 位用户；方向键回到结果列表，A 进入 UP 主空间。"
+            } else {
+                "共 $itemCount 条结果；方向键回到结果列表，A 直接播放。"
+            }
         }
         else -> {
             title = "搜索「${state.query}」。"
-            subtitle = "共 ${state.results.size} 条结果。"
+            subtitle = "共 $itemCount $unit。"
         }
     }
     return TopAmbientUi(
@@ -898,4 +1129,17 @@ private fun SearchVideoItem.toTopPreview(): TopPreviewUi = TopPreviewUi(
     pubdate = pubdate,
     duration = duration,
     description = description,
+)
+
+private fun SearchUserItem.toTopPerson(): TopPersonUi = TopPersonUi(
+    eyebrow = "SEARCH / 用户",
+    name = uname,
+    subtitle = buildString {
+        append("UID $mid")
+        if (level > 0) append(" · Lv$level")
+    },
+    description = sign.ifBlank { "这个 UP 主还没有填写签名。" },
+    badge = badgeLabel(),
+    avatarUrl = avatar,
+    glyph = TopGlyph.PERSON,
 )

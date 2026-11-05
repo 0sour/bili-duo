@@ -4,6 +4,19 @@
 `*.apk`），需要时本地 `./gradlew assembleDebug` / `assembleRelease` 生成，或从
 GitHub Releases 下载。
 
+## 0.2.0-rc7（2026-11-05）
+
+- `bili-duo-0.2.0-rc7-release.apk`
+  - R8 minify + resource shrink，正式 release keystore 签名。
+  - APK SHA-256：`3d47ec437a7372a6a1c9ecb3bd4cab179a563f6d47c1f8df35833c1ebd879eab`
+- `bili-duo-0.2.0-rc7-debug.apk`
+  - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
+  - SHA-256：`b06ce424aec39b2de1a9ebaa1e42cd000b7de0822cd0d066f52f826612dd8566`
+
+rc7 变更：搜索页新增「视频 / 用户」类型切换（chip / L1R1），用户结果支持进入
+UP 主空间、上屏人物卡；修复 `is_upuser` 返回数字导致的解析失败。单测 208。
+已在 Duo 验证用户搜索、类型切换、上屏人物卡和进入 UP 主空间。
+
 ## 0.2.0-rc6（2026-11-05）
 
 - `bili-duo-0.2.0-rc6-release.apk`

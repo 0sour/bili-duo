@@ -42,6 +42,20 @@ class BilibiliRepository(
         }.onFailure { Log.e(BilibiliApp.TAG, "search failed", it) }
     }
 
+    suspend fun searchUsers(keyword: String, page: Int = 1): Result<Pair<List<SearchUserItem>, Int>> {
+        if (BuildConfig.DEBUG) Log.d(BilibiliApp.TAG, "searchUsers: keyword=$keyword page=$page")
+        return runCatching<Pair<List<SearchUserItem>, Int>> {
+            val response = api.searchUsers(keyword = keyword, page = page)
+            if (BuildConfig.DEBUG) Log.d(BilibiliApp.TAG, "searchUsers response: code=${response.code} msg=${response.message}")
+            if (response.code == 0) {
+                val data = response.data
+                Pair(data?.result ?: emptyList(), data?.totalPages ?: 1)
+            } else {
+                throw Exception(response.message)
+            }
+        }.onFailure { Log.e(BilibiliApp.TAG, "searchUsers failed", it) }
+    }
+
     suspend fun getHotSearches(limit: Int = 20): Result<List<String>> {
         return runCatching {
             val response = api.getSearchSquare(limit = limit)

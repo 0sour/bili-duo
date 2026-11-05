@@ -407,8 +407,12 @@ fun MainScreen(
                         onVideoClick = { bvid ->
                             navController.navigate(Routes.player(bvid))
                         },
+                        onUserClick = { mid ->
+                            navController.navigate(Routes.channel(mid))
+                        },
                         onBack = { navController.popBackStack() },
                         onVideoFocused = onTopVideoFocused,
+                        onUserFocused = onTopPerson,
                         onFocusCleared = onTopFocusCleared,
                         onTopAmbient = onTopAmbient,
                     )
