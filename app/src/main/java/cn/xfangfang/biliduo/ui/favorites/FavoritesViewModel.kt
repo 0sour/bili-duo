@@ -426,13 +426,19 @@ class FavoritesViewModel(application: Application) : AndroidViewModel(applicatio
     /** Remove one video from the currently open folder. */
     fun removeFavResource(item: FavResourceItem) {
         val folderId = _uiState.value.selectedFolderId ?: return
-        if (item.type != 2 || item.aid <= 0L) {
-            _uiState.value = _uiState.value.copy(actionError = "暂不支持取消该类型收藏")
+        val rid = if (item.type == 2) {
+            item.aid.takeIf { it > 0L } ?: item.id
+        } else {
+            item.id
+        }
+        if (rid <= 0L) {
+            _uiState.value = _uiState.value.copy(actionError = "无法识别该收藏内容")
             return
         }
         viewModelScope.launch {
             repository.dealFavResource(
-                rid = item.aid,
+                rid = rid,
+                type = item.type,
                 addMediaIds = "",
                 delMediaIds = folderId.toString(),
             ).onSuccess {

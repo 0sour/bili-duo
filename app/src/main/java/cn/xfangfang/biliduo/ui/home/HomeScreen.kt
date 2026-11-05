@@ -135,9 +135,12 @@ fun HomeScreen(
     }
 
     // Choosing a live area reloads the grid; return focus to the first room.
-    // The sub-area row stays reachable with Up from the first card.
-    LaunchedEffect(state.liveAreaId, state.liveSubAreaId, state.liveItems.size) {
-        if (isLive && state.liveItems.isNotEmpty() && focusedTab == HomeTab.LIVE) {
+    // The sub-area row stays reachable with Up from the first card. Keying on
+    // isLoading (not list size) avoids stealing focus when a page is appended.
+    LaunchedEffect(state.liveAreaId, state.liveSubAreaId, state.isLoading, isLive) {
+        if (isLive && !state.isLoading && state.liveItems.isNotEmpty() &&
+            focusedTab == HomeTab.LIVE
+        ) {
             delay(120L)
             runCatching { firstFocus.requestFocus() }
         }
@@ -204,9 +207,17 @@ fun HomeScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Text(state.error ?: "加载失败", color = Color(0xFFFF9AA9), fontSize = 12.sp)
-                    TextButton(onClick = viewModel::refresh) {
-                        Text("重试", color = HomePink)
-                    }
+                    Text(
+                        text = "重试",
+                        color = HomePink,
+                        fontSize = 12.sp,
+                        modifier = Modifier
+                            .padding(top = 4.dp)
+                            .duoFocusRing(RoundedCornerShape(6.dp))
+                            .clip(RoundedCornerShape(6.dp))
+                            .duoClickable(onClick = viewModel::refresh)
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                    )
                 }
             }
             itemsEmpty -> {

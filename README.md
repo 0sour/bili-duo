@@ -10,21 +10,21 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc10-FB7299">
+  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc11-FB7299">
   <img alt="status" src="https://img.shields.io/badge/status-untested%20RC-orange">
   <img alt="Android" src="https://img.shields.io/badge/Android-24%2B-3DDC84?logo=android&logoColor=white">
   <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-1.9.23-7F52FF?logo=kotlin&logoColor=white">
   <img alt="Compose" src="https://img.shields.io/badge/Jetpack%20Compose-2024.04-4285F4?logo=jetpackcompose&logoColor=white">
   <img alt="Media3" src="https://img.shields.io/badge/Media3-1.4.1-FF6D00">
-  <img alt="tests" src="https://img.shields.io/badge/tests-218%20passing-brightgreen">
+  <img alt="tests" src="https://img.shields.io/badge/tests-219%20passing-brightgreen">
   <img alt="license" src="https://img.shields.io/badge/license-MIT-blue">
 </p>
 
 上屏只负责视频画面，下屏用一块 `Presentation` 承载完整 UI；手柄和触摸共用同一棵
 Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，也没有上屏 OSD。
 
-> 当前版本：**0.2.0-rc10**（versionCode 11）
-> 状态：功能完整的 **未测试 RC**，218 个单元测试通过，已在 MuMu 与 Duo 真机做核心
+> 当前版本：**0.2.0-rc11**（versionCode 12）
+> 状态：功能完整的 **未测试 RC**，219 个单元测试通过，已在 MuMu 与 Duo 真机做核心
 > 路径验证，尚未完成全流程回归。
 
 ## 界面预览
@@ -81,13 +81,18 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
 - **直播**：分区 chips（一级 + 子分区）、关注主播行、双列房间、HLS 播放、
   双栏控制台、实时弹幕/SC、清晰度/音量、直播信息；网格下滚时收起二级筛选行。
 - **动态**：关注动态流、全部/视频/图文筛选、UP 主筛选、视频直达播放、图文详情/
-  画册/纯文字阅读，上屏同步只读场景。
+  画册/纯文字阅读，上屏同步只读场景；卡片头部显示点赞状态与数量，A/触摸可点赞，
+  手柄 X 直接点赞/取消（优化请求、失败回滚）；转发/发布仍只读。
 - **账号**：扫码 / 短信 / 密码三 tab 登录，二维码倒计时、A 刷新、极验 WebView；
   个人中心、历史、收藏、关注、下载、设置等二级页均为深色手柄 UI。
+- **收藏**：收藏夹增删改、取消收藏；视频/音频/合集等非视频收藏也按资源类型提交
+  取消请求，不再固定提示「暂不支持」。
 - **下载**：播放器内下载层可选清晰度与「当前分P / 全部分P」；下载页支持
   全部/进行中/已完成筛选（L1/R1）、全部暂停/继续、搜索、分P 分组、进度/速度/
   剩余时间、单条与整组删除；设置里可查看下载目录与占用空间，清除已完成/全部
   下载、搜索历史、图片缓存。
+- **PGC 会员标识**：选集列表显示每集的 `badge`（会员/抢先等）；播放失败且当前集为
+  会员专享时，错误提示会补充「请确认大会员状态」。
 - **UP 主空间**：深色资料卡（头像/签名/粉丝/视频数/关注）、视频/合集 chip 与
   计数、紧凑视频行、搜索、关注/取关确认；资料卡可聚焦，选中后上屏显示 UP 资料、
   最近动态与最近视频；视频行聚焦仍显示单条预览。
@@ -112,7 +117,7 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
 | 图片 | Coil 2.6（含 GIF）、telephoto-zoomable |
 | 登录 | ZXing 二维码、极验 Geetest WebView |
 | 构建 | Gradle 8.7、AGP 8.4.0、JDK 17、R8 |
-| 测试 | JUnit4，218 个单元测试 |
+| 测试 | JUnit4，219 个单元测试 |
 | 架构 | Activity + Presentation、MVVM + StateFlow、单一 `PlayerController` |
 | 界面语言 | 简体中文（当前未做多语言资源） |
 
@@ -122,7 +127,7 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
 
 ### 已验证
 
-- **单元测试**：218 个用例通过（`./gradlew testDebugUnitTest`）。
+- **单元测试**：219 个用例通过（`./gradlew testDebugUnitTest`）。
 - **MuMu（1280×960 / 320dpi）**：双屏壳层、首页、搜索、播放控制台、直播列表与
   HLS 播放、动态空态/登录态、单屏回退提示、签名包安装与冷启动。
 - **Retroid Pocket Duo 真机**：
@@ -142,20 +147,26 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
     全部/进行中/已完成筛选、全部暂停/继续、整组展开与删除。
   - 设置存储：下载统计/目录、清除全部下载与已完成、清除搜索历史、清除图片缓存。
   - 云端续播：本机无记录时从历史条目 1:45 的位置续播（日志与本机进度条一致）。
+  - 动态点赞/取消：X 点赞 2675→2676→2675，卡片头部状态与计数同步，账号已还原。
+  - 手柄审查：清晰度/倍速浮层焦点不再漏到背后、设置开关不再抢焦点、
+    搜索/合集错误重试可聚焦、清晰度浮层与列表焦点环完整（MuMu 验证）。
   - 登录、个人中心、历史/收藏/关注只读浏览；弹幕发送→撤回闭环。
 
 ### 未实现（代码层面）
 
-- **动态写操作**：点赞、转发、发布未实现，动态流当前只读。
-- **PGC 大会员 / 付费集**：只在无剧集时提示「可能需要大会员」，没有 VIP 标识、
-  权限判断或购买引导。
-- **取消非视频收藏**：收藏夹中的专栏/动态等条目提示「暂不支持取消该类型收藏」。
+- **动态转发 / 发布**：点赞已实现；转发和图文/纯文本发布仍只读（需要创作者向
+  payload、图片上传与更完整的发布 UI，暂不纳入本 RC）。
+- **PGC 大会员 / 付费集**：选集已显示 badge，播放失败会提示确认大会员状态；
+  没有内嵌购买/开通引导，VIP 专享集仍需大会员账号验证。
 - **单屏直播 / PGC**：目标设备始终双屏；无下屏时 VOD 走旧 `PlayerScreen`，
   直播/PGC 显示「此内容需要下屏控制台」提示，不进入播放。**非本 RC 目标**。
 
 ### 待验证（已实现，缺真机/账号验证）
 
 - **PGC 云端续播**：PGC 复用同一套 `last_play_time` 读取，尚未在真实剧集上验证。
+- **PGC 选集 badge**：代码已渲染 `PgcEpisode.badge`；当前账号无大会员，
+  VIP 季在无权限时返回 0 集，无法看到带 badge 的选集。
+- **非视频收藏取消**：已按 `type` 提交音频/合集取消请求，未在真实非视频条目验证。
 - **直播真实发送与关注**：UI、校验和 API 已接，但未在公开直播间留下测试消息；
   需要明确授权后在无人直播间补测。
 - **PGC VIP 集**：未登录/无权限时整季显示「该番剧暂无可播放剧集，可能需要大会员」
@@ -283,7 +294,7 @@ keyPassword=CHANGE_ME
 ### 测试产物
 
 `dist/` 只保留构建说明；APK 通过 GitHub Releases 或本地构建分发，不进入 Git 历史。
-当前 rc10 的哈希与说明见 [`dist/README.md`](dist/README.md)。
+当前 rc11 的哈希与说明见 [`dist/README.md`](dist/README.md)。
 
 ---
 

@@ -406,6 +406,7 @@ class PlayerViewModel(
                             page = index + 1,
                             part = ep.longTitle.ifBlank { ep.title },
                             duration = ep.duration / 1000L,
+                            badge = ep.badge,
                         )
                     }
                     val episode = startEpId?.let { id -> episodes.find { it.epId == id } }
@@ -477,9 +478,17 @@ class PlayerViewModel(
                 }
                 .onFailure { e ->
                     Log.e(BilibiliApp.TAG, "PlayerVM: loadPgcPlayUrl failed", e)
+                    val message = e.message ?: "番剧播放链接加载失败"
+                    val badgeHint = if (
+                        episode.badge.contains("会员") && !message.contains("大会员")
+                    ) {
+                        "；该集为${episode.badge}专享，请确认大会员状态"
+                    } else {
+                        ""
+                    }
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        error = e.message ?: "番剧播放链接加载失败",
+                        error = message + badgeHint,
                     )
                 }
         }

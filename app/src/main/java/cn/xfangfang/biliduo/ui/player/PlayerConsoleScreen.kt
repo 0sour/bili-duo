@@ -8,6 +8,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.RowScope
@@ -165,6 +166,7 @@ fun PlayerConsoleScreen(
     var seekDrag by remember { mutableStateOf<Float?>(null) }
     val playFocus = remember { FocusRequester() }
     val tabFocus = remember { List(4) { FocusRequester() } }
+    val nextPageFocus = remember { FocusRequester() }
     val qualityFocus = remember { FocusRequester() }
     val speedFocus = remember { FocusRequester() }
     val settingsFocus = remember { FocusRequester() }
@@ -1098,7 +1100,9 @@ fun PlayerConsoleScreen(
                 }
 
                 Spacer(Modifier.height(10.dp))
-                val chipDown = Modifier.focusProperties { down = tabFocus[selectedTab] }
+                val chipDown = Modifier.focusProperties {
+                    down = if (nextPage != null) nextPageFocus else tabFocus[selectedTab]
+                }
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1196,6 +1200,7 @@ fun PlayerConsoleScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .focusRequester(nextPageFocus)
                             .duoFocusRing(RoundedCornerShape(7.dp))
                             .clip(RoundedCornerShape(7.dp))
                             .background(DuoSurface)
@@ -1304,8 +1309,8 @@ fun PlayerConsoleScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(36.dp)
-                        .padding(horizontal = 12.dp),
+                        .height(40.dp)
+                        .padding(start = 12.dp, end = 12.dp, top = 6.dp),
                     verticalAlignment = Alignment.Bottom,
                     horizontalArrangement = Arrangement.spacedBy(18.dp),
                 ) {
@@ -1479,9 +1484,16 @@ fun PlayerConsoleScreen(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
-                TextButton(onClick = { controller.retry() }) {
-                    Text("重试", color = Color.White, fontSize = 11.sp)
-                }
+                Text(
+                    text = "重试",
+                    color = Color.White,
+                    fontSize = 11.sp,
+                    modifier = Modifier
+                        .duoFocusRing(RoundedCornerShape(5.dp))
+                        .clip(RoundedCornerShape(5.dp))
+                        .duoClickable { controller.retry() }
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                )
             }
         }
 
@@ -1502,21 +1514,50 @@ fun PlayerConsoleScreen(
         val selectedIndex = ui.availableQualities
             .indexOfFirst { it.quality == ui.currentQuality?.quality }
             .coerceAtLeast(0)
-        OverlayCard(title = "清晰度", onDismiss = { session.closeOverlay() }) {
+        val qualityRowFocus = remember { FocusRequester() }
+        val qualityCloseFocus = remember { FocusRequester() }
+        var qualityFocusedRow by remember { mutableStateOf(selectedIndex) }
+        val focusTrap = Modifier.onPreviewKeyEvent { event ->
+            if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+            when (event.key) {
+                // Only one column: horizontal moves have nowhere to go, and
+                // Down on the last row must not reach the console behind.
+                Key.DirectionLeft, Key.DirectionRight -> true
+                Key.DirectionDown -> qualityFocusedRow >= ui.availableQualities.lastIndex
+                else -> false
+            }
+        }
+        LaunchedEffect(focusEpoch, ui.availableQualities.size) {
+            delay(120L)
+            runCatching {
+                if (ui.availableQualities.isEmpty()) {
+                    qualityCloseFocus.requestFocus()
+                } else {
+                    qualityRowFocus.requestFocus()
+                }
+            }
+        }
+        OverlayCard(
+            title = "清晰度",
+            onDismiss = { session.closeOverlay() },
+            closeFocus = qualityCloseFocus,
+            modifier = focusTrap,
+        ) {
             if (ui.availableQualities.isEmpty()) {
                 Text("清晰度加载中…", color = DuoTextSecondary, fontSize = 12.sp)
             } else {
-                val qualityRowFocus = remember { FocusRequester() }
-                LaunchedEffect(focusEpoch) {
-                    delay(120L)
-                    runCatching { qualityRowFocus.requestFocus() }
-                }
-                Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(vertical = 7.dp),
+                ) {
                     ui.availableQualities.forEachIndexed { index, quality ->
                         OverlayRow(
                             label = quality.description,
                             selected = quality.quality == ui.currentQuality?.quality,
                             focusRequester = if (index == selectedIndex) qualityRowFocus else null,
+                            onFocus = { qualityFocusedRow = index },
                             onClick = {
                                 session.closeOverlay()
                                 if (quality.quality != ui.currentQuality?.quality) {
@@ -1535,18 +1576,31 @@ fun PlayerConsoleScreen(
         val speedIndex = speedOptions
             .indexOfFirst { kotlin.math.abs(playback.speed - it) < 0.01f }
             .coerceAtLeast(0)
-        OverlayCard(title = "倍速", onDismiss = { session.closeOverlay() }) {
-            val speedRowFocus = remember { FocusRequester() }
-            LaunchedEffect(focusEpoch) {
-                delay(120L)
-                runCatching { speedRowFocus.requestFocus() }
-            }
+        val speedRowFocus = remember { FocusRequester() }
+        var speedFocusedRow by remember { mutableStateOf(speedIndex) }
+        LaunchedEffect(focusEpoch) {
+            delay(120L)
+            runCatching { speedRowFocus.requestFocus() }
+        }
+        OverlayCard(
+            title = "倍速",
+            onDismiss = { session.closeOverlay() },
+            modifier = Modifier.onPreviewKeyEvent { event ->
+                if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                when (event.key) {
+                    Key.DirectionLeft, Key.DirectionRight -> true
+                    Key.DirectionDown -> speedFocusedRow >= speedOptions.lastIndex
+                    else -> false
+                }
+            },
+        ) {
             Column(Modifier.fillMaxWidth()) {
                 speedOptions.forEachIndexed { index, speed ->
                     OverlayRow(
                         label = formatSpeed(speed),
                         selected = kotlin.math.abs(playback.speed - speed) < 0.01f,
                         focusRequester = if (index == speedIndex) speedRowFocus else null,
+                        onFocus = { speedFocusedRow = index },
                         onClick = {
                             session.closeOverlay()
                             controller.setSpeed(speed)
@@ -1561,6 +1615,7 @@ fun PlayerConsoleScreen(
         val selectedQuality = downloadQuality ?: ui.currentQuality
         val qualityFocus = remember { FocusRequester() }
         val startFocus = remember { FocusRequester() }
+        var downloadStartFocused by remember { mutableStateOf(false) }
         LaunchedEffect(focusEpoch) {
             delay(120L)
             runCatching {
@@ -1571,7 +1626,16 @@ fun PlayerConsoleScreen(
                 }
             }
         }
-        OverlayCard(title = "下载视频", onDismiss = { session.closeOverlay() }) {
+        OverlayCard(
+            title = "下载视频",
+            onDismiss = { session.closeOverlay() },
+            modifier = Modifier.onPreviewKeyEvent { event ->
+                // The start button is the last focus stop; Down must not reach
+                // the console behind the scrim.
+                event.type == KeyEventType.KeyDown &&
+                    event.key == Key.DirectionDown && downloadStartFocused
+            },
+        ) {
             Column(
                 Modifier
                     .fillMaxWidth()
@@ -1630,7 +1694,9 @@ fun PlayerConsoleScreen(
                     enabled = selectedQuality != null,
                     focusRequester = startFocus,
                     onClick = { enqueueDownload() },
-                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                    modifier = Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .onFocusChanged { downloadStartFocused = it.isFocused },
                 )
             }
         }
@@ -2108,7 +2174,17 @@ private fun CommentsTab(
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         Text(error, color = Color(0xFFFF9AA9), fontSize = 11.sp)
-                        TextButton(onClick = onRetry) { Text("重试", color = DuoPink) }
+                        Text(
+                            text = "重试",
+                            color = DuoPink,
+                            fontSize = 11.sp,
+                            modifier = Modifier
+                                .padding(top = 4.dp)
+                                .duoFocusRing(RoundedCornerShape(6.dp))
+                                .clip(RoundedCornerShape(6.dp))
+                                .duoClickable(onClick = onRetry)
+                                .padding(horizontal = 12.dp, vertical = 6.dp),
+                        )
                     }
                 }
                 comments.isEmpty() && loading -> {
@@ -2168,9 +2244,15 @@ private fun CommentsTab(
                                     )
                                 }
                             } else if (!ended) {
-                                TextButton(
-                                    onClick = onLoadMore,
-                                    modifier = Modifier.fillMaxWidth(),
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp)
+                                        .duoFocusRing(RoundedCornerShape(6.dp))
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .duoClickable(onClick = onLoadMore)
+                                        .padding(vertical = 8.dp),
+                                    contentAlignment = Alignment.Center,
                                 ) {
                                     Text("加载更多", color = DuoPink, fontSize = 11.sp)
                                 }
@@ -2647,11 +2729,25 @@ private fun PartsTab(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f),
                     )
+                    if (page.badge.isNotBlank()) {
+                        Text(
+                            text = page.badge,
+                            color = DuoPink,
+                            fontSize = 8.sp,
+                            maxLines = 1,
+                            modifier = Modifier
+                                .padding(start = 6.dp)
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(DuoPink.copy(alpha = 0.14f))
+                                .padding(horizontal = 5.dp, vertical = 1.dp),
+                        )
+                    }
                     if (page.duration > 0) {
                         Text(
                             text = formatTime(page.duration * 1000L),
                             color = DuoTextSecondary,
                             fontSize = 9.sp,
+                            modifier = Modifier.padding(start = 6.dp),
                         )
                     }
                 }
@@ -2729,6 +2825,9 @@ private fun CommentImageViewerOverlay(
                             step(1)
                             true
                         }
+                        // The viewer is modal: keep D-pad focus from leaking
+                        // onto the console controls behind it.
+                        Key.DirectionUp, Key.DirectionDown, Key.DirectionCenter -> true
                         else -> false
                     }
                 }
@@ -3087,6 +3186,8 @@ private fun DanmakuSendOverlay(
 private fun OverlayCard(
     title: String,
     onDismiss: () -> Unit,
+    closeFocus: FocusRequester? = null,
+    modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
     Box(
@@ -3103,12 +3204,26 @@ private fun OverlayCard(
                 .clip(RoundedCornerShape(10.dp))
                 .background(DuoSurface)
                 .clickable { /* consume */ }
+                .focusGroup()
+                .then(modifier)
                 .padding(12.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(title, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
                 Spacer(Modifier.weight(1f))
-                TextButton(onClick = onDismiss) { Text("关闭", color = DuoTextSecondary, fontSize = 11.sp) }
+                Text(
+                    text = "关闭",
+                    color = DuoTextSecondary,
+                    fontSize = 11.sp,
+                    modifier = Modifier
+                        .then(
+                            if (closeFocus != null) Modifier.focusRequester(closeFocus) else Modifier
+                        )
+                        .duoFocusRing(RoundedCornerShape(6.dp))
+                        .clip(RoundedCornerShape(6.dp))
+                        .duoClickable(onClick = onDismiss)
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                )
             }
             Spacer(Modifier.height(4.dp))
             content()
@@ -3161,6 +3276,7 @@ private fun OverlayRow(
     label: String,
     selected: Boolean,
     focusRequester: FocusRequester? = null,
+    onFocus: (() -> Unit)? = null,
     onClick: () -> Unit,
 ) {
     Row(
@@ -3170,6 +3286,7 @@ private fun OverlayRow(
             .clip(RoundedCornerShape(6.dp))
             .background(if (selected) DuoPink.copy(alpha = 0.14f) else Color.Transparent)
             .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
+            .onFocusChanged { if (it.isFocused) onFocus?.invoke() }
             .duoClickable(onClick = onClick)
             .padding(horizontal = 10.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,

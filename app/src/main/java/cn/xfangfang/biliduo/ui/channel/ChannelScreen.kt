@@ -93,6 +93,8 @@ fun ChannelScreen(
     val firstVideoFocus = remember { FocusRequester() }
     val scope = rememberCoroutineScope()
     val keyboardController = LocalSoftwareKeyboardController.current
+    val inSeason = uiState.viewMode == ChannelViewMode.SEASON_DETAIL
+    val inSearch = isSearching || uiState.viewMode == ChannelViewMode.SEARCH
 
     fun channelPerson(): TopPersonUi = buildChannelPersonUi(
         mid = mid,
@@ -121,14 +123,23 @@ fun ChannelScreen(
         }
     }
 
-    LaunchedEffect(showUnfollowConfirm) {
-        if (showUnfollowConfirm) {
-            session?.setBackInterceptor {
+    LaunchedEffect(showUnfollowConfirm, inSeason, inSearch) {
+        when {
+            showUnfollowConfirm -> session?.setBackInterceptor {
                 closeUnfollowConfirm()
                 true
             }
-        } else {
-            session?.setBackInterceptor(null)
+            inSearch -> session?.setBackInterceptor {
+                keyboardController?.hide()
+                isSearching = false
+                viewModel.clearSearch()
+                true
+            }
+            inSeason -> session?.setBackInterceptor {
+                viewModel.backFromSeason()
+                true
+            }
+            else -> session?.setBackInterceptor(null)
         }
     }
     DisposableEffect(session) {
@@ -148,15 +159,16 @@ fun ChannelScreen(
         }
     }
 
-    val inSeason = uiState.viewMode == ChannelViewMode.SEASON_DETAIL
-    val inSearch = isSearching || uiState.viewMode == ChannelViewMode.SEARCH
-
     DisposableEffect(Unit) {
         onDispose { onFocusCleared() }
     }
 
-    LaunchedEffect(uiState.videos.size, uiState.viewMode) {
-        if (uiState.viewMode == ChannelViewMode.VIDEOS && uiState.videos.isNotEmpty()) {
+    // Focus the first video after an initial load (or when returning to the
+    // VIDEOS tab), but not when loadMore appends a page.
+    LaunchedEffect(uiState.viewMode, uiState.isLoading) {
+        if (uiState.viewMode == ChannelViewMode.VIDEOS && !uiState.isLoading &&
+            uiState.videos.isNotEmpty()
+        ) {
             delay(120)
             runCatching { firstVideoFocus.requestFocus() }
         }
@@ -437,10 +449,16 @@ internal fun ChannelBody(
                                     overflow = TextOverflow.Ellipsis,
                                 )
                                 Spacer(Modifier.height(8.dp))
-                                TextButton(
-                                    onClick = onRetry,
-                                    modifier = Modifier.duoFocusRing(RoundedCornerShape(6.dp)),
-                                ) { Text("重试", color = DuoPalette.Pink) }
+                                Text(
+                                    text = "重试",
+                                    color = DuoPalette.Pink,
+                                    fontSize = 12.sp,
+                                    modifier = Modifier
+                                        .duoFocusRing(RoundedCornerShape(6.dp))
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .duoClickable(onClick = onRetry)
+                                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                                )
                             }
                         }
                     }

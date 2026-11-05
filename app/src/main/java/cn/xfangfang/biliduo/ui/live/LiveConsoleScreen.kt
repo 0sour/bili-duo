@@ -3,6 +3,7 @@ package cn.xfangfang.biliduo.ui.live
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -174,6 +175,8 @@ fun LiveConsoleScreen(
     val volumeFocus = remember { FocusRequester() }
     val tabFocus = remember { List(2) { FocusRequester() } }
     val qualityRowFocus = remember { FocusRequester() }
+    val qualityCloseFocus = remember { FocusRequester() }
+    var qualityOpener by remember { mutableStateOf<FocusRequester?>(null) }
 
     val detail = ui.liveDetail
     val qualities = ui.liveQualities
@@ -349,11 +352,17 @@ fun LiveConsoleScreen(
         when {
             overlay == DuoOverlay.QUALITY -> {
                 delay(140L)
-                runCatching { qualityRowFocus.requestFocus() }
+                runCatching {
+                    if (qualities.isEmpty()) {
+                        qualityCloseFocus.requestFocus()
+                    } else {
+                        qualityRowFocus.requestFocus()
+                    }
+                }
             }
             previous == DuoOverlay.QUALITY && overlay == null -> {
                 delay(300L)
-                runCatching { playFocus.requestFocus() }
+                runCatching { (qualityOpener ?: playFocus).requestFocus() }
             }
         }
     }
@@ -375,6 +384,7 @@ fun LiveConsoleScreen(
                     }
                     android.view.KeyEvent.KEYCODE_BUTTON_START,
                     android.view.KeyEvent.KEYCODE_MENU -> {
+                        qualityOpener = null
                         session.openOverlay(DuoOverlay.QUALITY)
                         true
                     }
@@ -405,7 +415,10 @@ fun LiveConsoleScreen(
                 onTogglePlay = { controller.togglePlay() },
                 onRefresh = { vm.refreshLive() },
                 onSeekLive = { controller.seekToLive() },
-                onQuality = { session.openOverlay(DuoOverlay.QUALITY) },
+                onQuality = {
+                    qualityOpener = qualityFocus
+                    session.openOverlay(DuoOverlay.QUALITY)
+                },
                 onVolume = {
                     controller.setVolume(
                         if (playback.volume >= 0.99f) 0f
@@ -454,6 +467,7 @@ fun LiveConsoleScreen(
                 selectedQuality = selectedQuality,
                 selectedIndex = selectedIndex,
                 selectedFocus = qualityRowFocus,
+                closeFocus = qualityCloseFocus,
                 onDismiss = { session.closeOverlay() },
                 onSelect = { quality ->
                     session.closeOverlay()
@@ -1537,6 +1551,7 @@ private fun LiveQualityOverlay(
     selectedQuality: QualityOption?,
     selectedIndex: Int,
     selectedFocus: FocusRequester,
+    closeFocus: FocusRequester,
     onDismiss: () -> Unit,
     onSelect: (QualityOption) -> Unit,
 ) {
@@ -1554,6 +1569,7 @@ private fun LiveQualityOverlay(
                 .clip(RoundedCornerShape(10.dp))
                 .background(LiveSurface)
                 .pointerInput(Unit) { detectTapGestures(onTap = {}) }
+                .focusGroup()
                 .padding(12.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1564,6 +1580,7 @@ private fun LiveQualityOverlay(
                     color = LiveTextSecondary,
                     fontSize = 11.sp,
                     modifier = Modifier
+                        .focusRequester(closeFocus)
                         .duoFocusRing(RoundedCornerShape(4.dp))
                         .clip(RoundedCornerShape(4.dp))
                         .duoClickable(onClick = onDismiss)
@@ -1574,7 +1591,12 @@ private fun LiveQualityOverlay(
             if (qualities.isEmpty()) {
                 Text("清晰度加载中…", color = LiveTextSecondary, fontSize = 12.sp)
             } else {
-                Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(vertical = 7.dp),
+                ) {
                     qualities.forEachIndexed { index, quality ->
                         LiveQualityRow(
                             label = quality.description,

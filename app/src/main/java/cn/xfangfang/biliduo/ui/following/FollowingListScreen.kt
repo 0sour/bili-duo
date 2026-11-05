@@ -159,7 +159,7 @@ fun FollowingListScreen(
         }
     }
 
-    LaunchedEffect(uiState.items.size, uiState.isLoading, searchMode) {
+    LaunchedEffect(uiState.isLoading, searchMode) {
         if (!searchMode && uiState.items.isNotEmpty() && !uiState.isLoading) {
             delay(80)
             runCatching { firstItemFocus.requestFocus() }

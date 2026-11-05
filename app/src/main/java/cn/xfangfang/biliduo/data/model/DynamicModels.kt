@@ -127,6 +127,15 @@ data class DynamicStat(
 
 data class DynamicCount(
     @SerializedName("count") val count: Int = 0,
+    /** Present on the like stat: whether the current account already liked it. */
+    val status: Boolean = false,
+    val forbidden: Boolean = false,
+)
+
+data class DynamicLikeRequest(
+    @SerializedName("dyn_id_str") val dynIdStr: String,
+    /** 1 = like, 2 = cancel. */
+    val up: Int,
 )
 
 data class DynamicCardUi(
@@ -143,6 +152,7 @@ data class DynamicCardUi(
     val commentCount: Int,
     val forwardCount: Int,
     val likeCount: Int,
+    val liked: Boolean = false,
 ) {
     val playbackBvid: String?
         get() = video?.bvid?.takeIf { it.isNotBlank() }
@@ -193,6 +203,7 @@ fun DynamicFeedItem.toCardUi(): DynamicCardUi? {
         commentCount = stat?.comment?.count ?: 0,
         forwardCount = stat?.forward?.count ?: 0,
         likeCount = stat?.like?.count ?: 0,
+        liked = stat?.like?.status ?: false,
     )
 }
 

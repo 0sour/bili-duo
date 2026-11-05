@@ -32,7 +32,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -335,6 +337,7 @@ fun DynamicScreen(
                                     }
                                 }
                             },
+                            onToggleLike = { viewModel.toggleLike(card) },
                         )
                     }
                     item(key = "dynamic_footer") {
@@ -346,6 +349,19 @@ fun DynamicScreen(
                         )
                     }
                 }
+            }
+            state.actionMessage?.let { message ->
+                Text(
+                    text = message,
+                    color = if (message.startsWith("已")) DuoPalette.Pink else DuoPalette.Error,
+                    fontSize = 10.sp,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 12.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(DuoPalette.SurfaceHighest)
+                        .padding(horizontal = 10.dp, vertical = 5.dp),
+                )
             }
         }
     }
@@ -578,6 +594,7 @@ private fun DynamicCard(
     onFocused: (DynamicCardUi) -> Unit,
     onFocusCleared: () -> Unit,
     onClick: () -> Unit,
+    onToggleLike: () -> Unit,
 ) {
     var focused by remember(card.id) { mutableStateOf(false) }
     Column(
@@ -596,6 +613,14 @@ private fun DynamicCard(
                 focused = it.isFocused
                 if (it.isFocused) onFocused(card) else onFocusCleared()
             }
+            .onPreviewKeyEvent { event ->
+                if (event.type == KeyEventType.KeyDown && event.key == Key.X) {
+                    onToggleLike()
+                    true
+                } else {
+                    false
+                }
+            }
             .duoClickable(onClick = onClick)
             .padding(vertical = CardFocusClearance),
     ) {
@@ -607,7 +632,11 @@ private fun DynamicCard(
                 .background(DuoPalette.Surface)
                 .padding(12.dp),
         ) {
-            DynamicAuthorRow(card)
+            DynamicAuthorRow(
+                card = card,
+                showLikeHint = focused,
+                onToggleLike = onToggleLike,
+            )
             if (card.text.isNotBlank()) {
                 Spacer(Modifier.height(8.dp))
                 Text(
@@ -632,13 +661,17 @@ private fun DynamicCard(
                 DynamicForwardBlock(it)
             }
             Spacer(Modifier.height(10.dp))
-            DynamicStatsRow(card)
+            DynamicStatsRow(card = card)
         }
     }
 }
 
 @Composable
-private fun DynamicAuthorRow(card: DynamicCardUi) {
+private fun DynamicAuthorRow(
+    card: DynamicCardUi,
+    showLikeHint: Boolean,
+    onToggleLike: () -> Unit,
+) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(
             modifier = Modifier
@@ -677,6 +710,40 @@ private fun DynamicAuthorRow(card: DynamicCardUi) {
                     color = DuoPalette.Tertiary,
                     fontSize = 10.sp,
                     maxLines = 1,
+                )
+            }
+        }
+        // Tall cards hide the bottom stats while focused; keep the like state
+        // and count in the header, with an X shortcut hint while focused.
+        Row(
+            modifier = Modifier
+                .clip(RoundedCornerShape(6.dp))
+                .clickable(onClick = onToggleLike)
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = if (card.liked) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                contentDescription = if (card.liked) "取消点赞" else "点赞",
+                tint = if (card.liked) DuoPalette.Pink else DuoPalette.Tertiary,
+                modifier = Modifier.size(12.dp),
+            )
+            Spacer(Modifier.width(4.dp))
+            Text(
+                text = formatCount(card.likeCount.toLong()),
+                color = if (card.liked) DuoPalette.Pink else DuoPalette.Tertiary,
+                fontSize = 9.sp,
+            )
+            if (showLikeHint) {
+                Spacer(Modifier.width(5.dp))
+                Text(
+                    text = "X",
+                    color = DuoPalette.Tertiary,
+                    fontSize = 8.sp,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(DuoPalette.SurfaceHigh)
+                        .padding(horizontal = 3.dp, vertical = 1.dp),
                 )
             }
         }
@@ -956,11 +1023,17 @@ private fun DynamicForwardBlock(forward: DynamicForwardUi) {
 }
 
 @Composable
-private fun DynamicStatsRow(card: DynamicCardUi) {
+private fun DynamicStatsRow(
+    card: DynamicCardUi,
+    showLike: Boolean = false,
+) {
+    val text = buildString {
+        append("评论 ${formatCount(card.commentCount.toLong())}  ·  ")
+        append("转发 ${formatCount(card.forwardCount.toLong())}")
+        if (showLike) append("  ·  赞 ${formatCount(card.likeCount.toLong())}")
+    }
     Text(
-        text = "评论 ${formatCount(card.commentCount.toLong())}  ·  " +
-            "转发 ${formatCount(card.forwardCount.toLong())}  ·  " +
-            "赞 ${formatCount(card.likeCount.toLong())}",
+        text = text,
         color = DuoPalette.Tertiary,
         fontSize = 10.sp,
         maxLines = 1,
@@ -1237,7 +1310,7 @@ private fun DynamicDetailOverlay(
                 )
             }
             Spacer(Modifier.height(12.dp))
-            DynamicStatsRow(card)
+            DynamicStatsRow(card, showLike = true)
             Spacer(Modifier.height(10.dp))
             Text(
                 text = "方向键滚动 · A 查看大图 · B 返回列表",
@@ -1488,7 +1561,7 @@ private fun DynamicTextOverlay(
                 DynamicForwardBlock(it)
             }
             Spacer(Modifier.height(16.dp))
-            DynamicStatsRow(card)
+            DynamicStatsRow(card, showLike = true)
             Spacer(Modifier.height(10.dp))
             Text(
                 text = "方向键滚动 · B 返回列表",

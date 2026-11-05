@@ -72,6 +72,33 @@ class DynamicModelsTest {
         assertEquals(3, card.forwardCount)
         assertEquals(45, card.likeCount)
         assertTrue(card.images.isEmpty())
+        assertEquals(false, card.liked)
+    }
+
+    @Test
+    fun mapsLikedStatusFromModuleStat() {
+        val data = feed(
+            """
+            {
+              "items": [{
+                "id_str": "9002",
+                "modules": {
+                  "module_author": { "mid": 1, "name": "UP" },
+                  "module_dynamic": { "desc": { "text": "已赞动态" } },
+                  "module_stat": {
+                    "comment": { "count": 1 },
+                    "forward": { "count": 2 },
+                    "like": { "count": 3, "status": true }
+                  }
+                }
+              }]
+            }
+            """.trimIndent()
+        )
+
+        val card = data.items.orEmpty().single().toCardUi()!!
+        assertEquals(3, card.likeCount)
+        assertTrue(card.liked)
     }
 
     @Test

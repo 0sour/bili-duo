@@ -81,10 +81,17 @@ class InputRouter(
         val repeating = event.repeatCount > 0
 
         // Holding a direction must move exactly one grid cell, holding B must
-        // not pop several destinations, and holding a shoulder button must not
-        // race through tabs. These keys have no repeat semantics in the bottom
-        // UI; the first press is still delivered below.
-        if (repeating && (isBack(code) || isNavigationKey(code) || isShoulderKey(code))) return true
+        // not pop several destinations, holding a shoulder button must not
+        // race through tabs, and holding X/Y must not toggle twice or spam a
+        // write request. These keys have no repeat semantics in the bottom UI;
+        // the first press is still delivered below.
+        if (repeating && (
+                isBack(code) || isNavigationKey(code) || isShoulderKey(code) ||
+                    code == KeyEvent.KEYCODE_X || code == KeyEvent.KEYCODE_Y
+                )
+        ) {
+            return true
+        }
 
         if (isBack(code)) {
             session.requestBack()

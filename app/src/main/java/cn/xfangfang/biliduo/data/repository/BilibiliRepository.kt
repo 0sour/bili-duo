@@ -322,6 +322,20 @@ class BilibiliRepository(
         }.onFailure { Log.e(BilibiliApp.TAG, "getDynamicSpaceFeed failed", it) }
     }
 
+    suspend fun likeDynamic(dynId: String, liked: Boolean): Result<Unit> {
+        if (BilibiliApi.loginCookies.isBlank() || BilibiliApi.biliJct.isBlank()) {
+            return Result.failure(Exception("请先登录"))
+        }
+        if (BuildConfig.DEBUG) Log.d(BilibiliApp.TAG, "likeDynamic: dynId=$dynId up=${if (liked) 1 else 2}")
+        return runCatching {
+            val response = api.likeDynamic(
+                csrf = BilibiliApi.biliJct,
+                body = DynamicLikeRequest(dynIdStr = dynId, up = if (liked) 1 else 2),
+            )
+            if (response.code != 0) throw Exception(response.message)
+        }.onFailure { Log.e(BilibiliApp.TAG, "likeDynamic failed: dynId=$dynId", it) }
+    }
+
     suspend fun getFollowedLiveAnchors(): Result<List<LiveFollowedAnchor>> {
         val selfMid = BilibiliApi.parseSelfMid()
             ?: return Result.success(emptyList())
@@ -750,11 +764,17 @@ class BilibiliRepository(
         }.onFailure { Log.e(BilibiliApp.TAG, "checkFavoured failed", it) }
     }
 
-    suspend fun dealFavResource(rid: Long, addMediaIds: String, delMediaIds: String): Result<Unit> {
-        if (BuildConfig.DEBUG) Log.d(BilibiliApp.TAG, "dealFavResource: rid=$rid add=$addMediaIds del=$delMediaIds")
+    suspend fun dealFavResource(
+        rid: Long,
+        addMediaIds: String,
+        delMediaIds: String,
+        type: Int = 2,
+    ): Result<Unit> {
+        if (BuildConfig.DEBUG) Log.d(BilibiliApp.TAG, "dealFavResource: rid=$rid type=$type add=$addMediaIds del=$delMediaIds")
         return runCatching {
             val response = api.dealFavResource(
                 rid = rid,
+                type = type,
                 addMediaIds = addMediaIds,
                 delMediaIds = delMediaIds,
                 csrf = BilibiliApi.biliJct

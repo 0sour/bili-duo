@@ -4,6 +4,23 @@
 `*.apk`），需要时本地 `./gradlew assembleDebug` / `assembleRelease` 生成，或从
 GitHub Releases 下载。
 
+## 0.2.0-rc11（2026-11-05）
+
+- `bili-duo-0.2.0-rc11-release.apk`
+  - R8 minify + resource shrink，正式 release keystore 签名。
+  - APK SHA-256：`905c97fd62f4592d91832f6a959a3f342df06f74db79ace722a297affefb16ff`
+- `bili-duo-0.2.0-rc11-debug.apk`
+  - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
+  - SHA-256：`29e826dc42e8f340c1ffae5143e8bd61b025979d7356ccc214879520d20f6202`
+
+rc11 变更：动态卡片支持点赞/取消点赞（头部显示状态与计数，手柄 X 直点，
+乐观更新+失败回滚）；PGC 选集显示 `badge`（会员/抢先）并在会员专享播放失败时补充
+提示；非视频收藏按资源 type 提交取消请求。手柄/UI 审查修复：清晰度/倍速/下载浮层
+焦点不再漏到背后、设置开关不再抢焦点、搜索/合集/评论错误重试可聚焦、
+清晰度浮层与列表焦点环补足、X/Y 长按去重、分页不再把焦点拉回顶部。
+单测 219，Duo 验证动态点赞 131→132→131（账号已还原），MuMu 验证浮层焦点约束和
+设置开关焦点保持。
+
 ## 0.2.0-rc10（2026-11-05）
 
 - `bili-duo-0.2.0-rc10-release.apk`

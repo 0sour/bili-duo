@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -226,8 +227,8 @@ fun FavoritesScreen(
             )
         }
     }
-    LaunchedEffect(inFolder, uiState.folders.size, uiState.resources.size, uiState.isLoadingFolders, uiState.isLoadingResources, searchMode) {
-        if (!searchMode) {
+    LaunchedEffect(inFolder, uiState.isLoadingFolders, uiState.isLoadingResources, searchMode) {
+        if (!searchMode && !uiState.isLoadingFolders && !uiState.isLoadingResources) {
             delay(80)
             runCatching {
                 if (inFolder) {
@@ -861,10 +862,6 @@ private fun ResourceRow(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                if (item.type != 2) {
-                    Spacer(Modifier.height(2.dp))
-                    Text("非视频收藏，暂不支持取消", color = DuoPalette.Tertiary, fontSize = 9.sp)
-                }
             }
         }
         DuoIconAction(
@@ -910,6 +907,8 @@ private fun FolderActionOverlay(
                         if (selected == 0) onEdit() else onDelete()
                         true
                     }
+                    // The overlay is modal: consume horizontal focus moves too.
+                    Key.DirectionLeft, Key.DirectionRight -> true
                     else -> false
                 }
             }
@@ -1028,6 +1027,7 @@ private fun FolderFormOverlay(
                     indication = null,
                     onClick = {},
                 )
+                .focusGroup()
                 .padding(14.dp),
         ) {
             Text(title, color = DuoPalette.Text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
@@ -1078,7 +1078,9 @@ private fun FolderFormOverlay(
                     maxLines = 2,
                     colors = favoritesFieldColors(),
                     shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .duoTextFieldNavigation(),
                 )
                 Spacer(Modifier.height(8.dp))
                 var privacyFocused by remember { mutableStateOf(false) }

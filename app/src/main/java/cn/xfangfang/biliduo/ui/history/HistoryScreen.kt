@@ -150,7 +150,7 @@ fun HistoryScreen(
         if (shouldLoadMore) viewModel.loadMore()
     }
 
-    LaunchedEffect(displayItems.size, uiState.searchQuery, uiState.isLoading, searchMode) {
+    LaunchedEffect(uiState.isLoading, searchMode) {
         if (!searchMode && displayItems.isNotEmpty() && !uiState.isLoading) {
             delay(80)
             runCatching { firstItemFocus.requestFocus() }

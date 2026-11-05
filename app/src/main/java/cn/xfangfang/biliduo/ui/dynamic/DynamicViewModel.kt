@@ -2,6 +2,7 @@ package cn.xfangfang.biliduo.ui.dynamic
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import cn.xfangfang.biliduo.data.api.BilibiliApi
 import cn.xfangfang.biliduo.data.model.DynamicAuthorUi
 import cn.xfangfang.biliduo.data.model.DynamicCardUi
 import cn.xfangfang.biliduo.data.model.DynamicFilter
@@ -9,6 +10,7 @@ import cn.xfangfang.biliduo.data.model.toCardUi
 import cn.xfangfang.biliduo.data.repository.BilibiliRepository
 import cn.xfangfang.biliduo.ui.duo.cycleIndex
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -25,6 +27,7 @@ data class DynamicUiState(
     val isLoadingMore: Boolean = false,
     val hasMore: Boolean = false,
     val error: String? = null,
+    val actionMessage: String? = null,
 )
 
 class DynamicViewModel(
@@ -36,6 +39,50 @@ class DynamicViewModel(
 
     private var loadJob: Job? = null
     private var requestId = 0
+    private val likeJobs = mutableMapOf<String, Job>()
+    private var messageJob: Job? = null
+
+    /** Optimistically toggles one card's like; rolls back if the API fails. */
+    fun toggleLike(card: DynamicCardUi) {
+        val current = _state.value.items.firstOrNull { it.id == card.id } ?: return
+        if (likeJobs[current.id]?.isActive == true) return
+        if (BilibiliApi.loginCookies.isBlank()) {
+            showActionMessage("请先登录")
+            return
+        }
+        val target = !current.liked
+        val optimisticCount = (current.likeCount + if (target) 1 else -1).coerceAtLeast(0)
+        updateCard(current.id) { it.copy(liked = target, likeCount = optimisticCount) }
+        val job = viewModelScope.launch {
+            repository.likeDynamic(current.id, target)
+                .onSuccess {
+                    showActionMessage(if (target) "已点赞" else "已取消点赞")
+                }
+                .onFailure { failure ->
+                    updateCard(current.id) {
+                        it.copy(liked = current.liked, likeCount = current.likeCount)
+                    }
+                    showActionMessage(failure.message ?: "点赞失败")
+                }
+        }
+        likeJobs[current.id] = job
+        job.invokeOnCompletion { likeJobs.remove(current.id) }
+    }
+
+    private fun updateCard(id: String, transform: (DynamicCardUi) -> DynamicCardUi) {
+        _state.value = _state.value.copy(
+            items = _state.value.items.map { if (it.id == id) transform(it) else it }
+        )
+    }
+
+    private fun showActionMessage(message: String) {
+        messageJob?.cancel()
+        _state.value = _state.value.copy(actionMessage = message)
+        messageJob = viewModelScope.launch {
+            delay(2_200L)
+            _state.value = _state.value.copy(actionMessage = null)
+        }
+    }
 
     fun selectFilter(filter: DynamicFilter) {
         val snapshot = _state.value

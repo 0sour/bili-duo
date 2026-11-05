@@ -194,6 +194,10 @@ fun SettingsScreen(
                 accent = meta.second,
             )
         )
+    }
+    // Changing a switch/danmaku value must not yank focus back to the first
+    // row; only entering a new category does.
+    LaunchedEffect(category) {
         delay(120)
         runCatching { firstRowFocus.requestFocus() }
     }
@@ -495,6 +499,13 @@ private fun CategoryRail(
                 )
             }
         }
+        Spacer(Modifier.weight(1f))
+        Text(
+            text = "← / → 切换分类",
+            color = DuoPalette.Tertiary,
+            fontSize = 9.sp,
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp),
+        )
     }
 }
 

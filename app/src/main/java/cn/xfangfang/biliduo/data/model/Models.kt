@@ -151,7 +151,9 @@ data class VideoPage(
     val cid: Long,
     val page: Int,
     val part: String,
-    val duration: Long
+    val duration: Long,
+    /** PGC badge such as 会员 / 抢先; empty for UGC pages. */
+    val badge: String = "",
 )
 
 data class UgcSeason(

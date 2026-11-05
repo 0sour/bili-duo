@@ -511,7 +511,7 @@ private fun SearchSuggestions(
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 2.dp),
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 7.dp),
     ) {
         item(key = "suggest_header") {
             SectionHeader(title = "搜索建议")
@@ -558,7 +558,7 @@ private fun SearchInitialContent(
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 2.dp),
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 7.dp),
     ) {
         item(key = "history_header") {
             SectionHeader(
