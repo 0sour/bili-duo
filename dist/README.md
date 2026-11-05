@@ -4,6 +4,21 @@
 `*.apk`），需要时本地 `./gradlew assembleDebug` / `assembleRelease` 生成，或从
 GitHub Releases 下载。
 
+## 0.2.0-rc17（2026-11-05）
+
+- `bili-duo-0.2.0-rc17-release.apk`
+  - R8 minify + resource shrink，正式 release keystore 签名。
+  - APK SHA-256：`e812aeee6904a762eaeb6b1aeedf9cc5c9d927a2c9a5f2984fcd6a6e92ef0a5a`
+- `bili-duo-0.2.0-rc17-debug.apk`
+  - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
+  - SHA-256：`913d4ab165fe7a47a021991d3e98b3dd79b9404366317a06519e2f7953cb1409`
+
+rc17 变更：控制台底部 chips 行第一个 chip 的焦点环左边被裁。
+- `horizontalScroll` 按自身矩形裁切；清晰度 chip 顶满滚动视口，选中时焦点环
+  左侧超出视口被裁。
+- 把横向 padding 从 `horizontalScroll` 之前移到滚动内容内侧，并增加到 8dp。
+Duo 真机验证 1080P60 chip 选中时焦点环左侧完整；测试观看历史已删除。
+
 ## 0.2.0-rc16（2026-11-05）
 
 - `bili-duo-0.2.0-rc16-release.apk`

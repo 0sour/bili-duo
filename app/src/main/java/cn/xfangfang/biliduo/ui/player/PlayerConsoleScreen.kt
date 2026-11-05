@@ -1142,8 +1142,10 @@ fun PlayerConsoleScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(38.dp)
-                        .padding(horizontal = 2.dp)
-                        .horizontalScroll(rememberScrollState()),
+                        .horizontalScroll(rememberScrollState())
+                        // Inset the chips inside the scroll viewport so the
+                        // first/last chip's focus ring is not clipped.
+                        .padding(horizontal = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(5.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
