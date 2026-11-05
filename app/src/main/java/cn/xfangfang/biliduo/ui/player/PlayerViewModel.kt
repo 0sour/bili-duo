@@ -479,10 +479,11 @@ class PlayerViewModel(
                 .onFailure { e ->
                     Log.e(BilibiliApp.TAG, "PlayerVM: loadPgcPlayUrl failed", e)
                     val message = e.message ?: "番剧播放链接加载失败"
+                    val episodeBadge = episode.badge.orEmpty()
                     val badgeHint = if (
-                        episode.badge.contains("会员") && !message.contains("大会员")
+                        episodeBadge.contains("会员") && !message.contains("大会员")
                     ) {
-                        "；该集为${episode.badge}专享，请确认大会员状态"
+                        "；该集为${episodeBadge}专享，请确认大会员状态"
                     } else {
                         ""
                     }

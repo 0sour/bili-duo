@@ -2729,9 +2729,10 @@ private fun PartsTab(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f),
                     )
-                    if (page.badge.isNotBlank()) {
+                    val badge = page.badge.orEmpty()
+                    if (badge.isNotBlank()) {
                         Text(
-                            text = page.badge,
+                            text = badge,
                             color = DuoPink,
                             fontSize = 8.sp,
                             maxLines = 1,

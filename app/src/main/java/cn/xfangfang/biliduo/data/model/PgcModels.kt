@@ -47,7 +47,8 @@ data class PgcEpisode(
     val title: String = "",
     @SerializedName("long_title") val longTitle: String = "",
     val duration: Long = 0,
-    val badge: String = "",
+    /** Absent for free episodes; Gson leaves it null rather than "". */
+    val badge: String? = null,
 )
 
 data class PgcStat(

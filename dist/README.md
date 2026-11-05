@@ -4,6 +4,21 @@
 `*.apk`），需要时本地 `./gradlew assembleDebug` / `assembleRelease` 生成，或从
 GitHub Releases 下载。
 
+## 0.2.0-rc12（2026-11-05）
+
+- `bili-duo-0.2.0-rc12-release.apk`
+  - R8 minify + resource shrink，正式 release keystore 签名。
+  - APK SHA-256：`ea36dfc6d8d4f92ddafe100975c15c6a3e86921f7db801ba33fbf0aadad8290d`
+- `bili-duo-0.2.0-rc12-debug.apk`
+  - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
+  - SHA-256：`31a3c4c448af5bba898013edaa22c1da0e7ad41535ad20330c177e693e2b81ef`
+
+rc12 修复：UGC 视频按 R1 切到「分P」标签页崩溃。原因是 rc11 给 `VideoPage`
+新增了非空 `badge: String = ""`，但 Gson 反序列化 UGC 分P（JSON 没有 badge 字段）
+时不会应用 Kotlin 默认值，运行时 `badge` 为 null，`PartsTab` 里 `badge.isNotBlank()`
+抛 NPE。已把 `VideoPage.badge` 和 `PgcEpisode.badge` 改为可空并用 `orEmpty()`；
+新增 2 个 Gson 单测。Duo 实测 UGC「分P」标签页正常显示、无崩溃。
+
 ## 0.2.0-rc11（2026-11-05）
 
 - `bili-duo-0.2.0-rc11-release.apk`

@@ -152,8 +152,12 @@ data class VideoPage(
     val page: Int,
     val part: String,
     val duration: Long,
-    /** PGC badge such as 会员 / 抢先; empty for UGC pages. */
-    val badge: String = "",
+    /**
+     * PGC badge such as 会员 / 抢先; empty for UGC pages. Gson leaves this null
+     * when the field is absent (UGC page JSON has no badge), so it must stay
+     * nullable even though code-built PGC pages always set it.
+     */
+    val badge: String? = null,
 )
 
 data class UgcSeason(
