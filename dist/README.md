@@ -4,6 +4,21 @@
 `*.apk`），需要时本地 `./gradlew assembleDebug` / `assembleRelease` 生成，或从
 GitHub Releases 下载。
 
+## 0.2.0-rc22（2026-11-05）
+
+- `bili-duo-0.2.0-rc22-release.apk`
+  - R8 minify + resource shrink，正式 release keystore 签名。
+  - APK SHA-256：`722b1e45b2a8f93ec215713963e5f13a8f9868c4f0ee769644f895913042e0f3`
+- `bili-duo-0.2.0-rc22-debug.apk`
+  - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
+  - SHA-256：`737d0ddc10a6712a69ff4540404d16b31074f97c44854c7c19d377c6c1f72151`
+
+rc22 变更：评论区首条「展开全文」按上跳到左栏。
+- 首条长评论的展开链接在 LazyColumn 内上方无焦点项，Compose 按几何距离选中左栏
+  播放控制。`CommentsTab` 把「热门」chip 的 requester 传给 `CommentRow`，只给
+  `index == 0` 的展开链接设 `up`；中间评论仍走默认上一条评论操作行。
+Duo 验证：上 → 热门 chip、下 → 点赞，焦点环留在右栏。
+
 ## 0.2.0-rc21（2026-11-05）
 
 - `bili-duo-0.2.0-rc21-release.apk`

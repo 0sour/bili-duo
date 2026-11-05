@@ -29,7 +29,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -2306,6 +2305,9 @@ private fun CommentsTab(
     onReplyToReply: (CommentItem, CommentItem) -> Unit,
     onDelete: (CommentItem) -> Unit,
 ) {
+    // The first comment's expand link has no focusable above it inside the
+    // list; without this anchor Up falls back to the left transport column.
+    val sortFocus = remember { FocusRequester() }
     Column(Modifier.fillMaxSize()) {
         Box(
             modifier = Modifier
@@ -2339,6 +2341,7 @@ private fun CommentsTab(
                 text = "热门",
                 selected = sortMode == 3,
                 onClick = { onSort(3) },
+                modifier = Modifier.focusRequester(sortFocus),
             )
             Spacer(Modifier.width(4.dp))
             CommentSortChip(
@@ -2384,9 +2387,10 @@ private fun CommentsTab(
                         modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
                         contentPadding = PaddingValues(top = 12.dp, bottom = 12.dp),
                     ) {
-                        items(comments, key = { it.rpid }) { comment ->
+                        itemsIndexed(comments, key = { _, comment -> comment.rpid }) { index, comment ->
                             CommentRow(
                                 comment = comment,
+                                upTarget = if (index == 0) sortFocus else null,
                                 liked = likeState[comment.rpid] ?: (comment.action == 1),
                                 likeDelta = likeDelta[comment.rpid] ?: 0,
                                 disliked = dislikeState[comment.rpid] ?: (comment.action == 2),
@@ -2475,10 +2479,11 @@ private fun CommentSortChip(
     text: String,
     selected: Boolean,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val shape = RoundedCornerShape(5.dp)
     Box(
-        modifier = Modifier
+        modifier = modifier
             .height(22.dp)
             .duoFocusRing(shape)
             .clip(shape)
@@ -2517,6 +2522,7 @@ private fun CommentRow(
     onLoadMoreReplies: () -> Unit,
     bodyExpanded: Boolean,
     onToggleBody: () -> Unit,
+    upTarget: FocusRequester? = null,
     onLikeReply: (CommentItem) -> Unit,
     onDislikeReply: (CommentItem) -> Unit,
     onOpenImages: (List<CommentPicture>, Int) -> Unit,
@@ -2574,6 +2580,9 @@ private fun CommentRow(
                             .padding(top = 2.dp)
                             .duoFocusRing(RoundedCornerShape(3.dp))
                             .clip(RoundedCornerShape(3.dp))
+                            .focusProperties {
+                                if (upTarget != null) up = upTarget
+                            }
                             .duoClickable(onClick = onToggleBody)
                             .padding(horizontal = 2.dp, vertical = 2.dp),
                     )
