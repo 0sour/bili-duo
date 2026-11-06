@@ -196,9 +196,10 @@ class BilibiliRepository(
 
     suspend fun getHomeFeed(
         tab: HomeTab,
-        page: Int = 1
+        page: Int = 1,
+        rankingRid: Int = 0,
     ): Result<Pair<List<HomeVideoItem>, Boolean>> {
-        if (BuildConfig.DEBUG) Log.d(BilibiliApp.TAG, "getHomeFeed: tab=$tab page=$page")
+        if (BuildConfig.DEBUG) Log.d(BilibiliApp.TAG, "getHomeFeed: tab=$tab page=$page rid=$rankingRid")
         return runCatching<Pair<List<HomeVideoItem>, Boolean>> {
             when (tab) {
                 HomeTab.RECOMMEND -> {
@@ -224,7 +225,7 @@ class BilibiliRepository(
                     items to hasMore
                 }
                 HomeTab.RANKING -> {
-                    val response = api.getRanking()
+                    val response = api.getRanking(rid = rankingRid)
                     if (BuildConfig.DEBUG) {
                         Log.d(BilibiliApp.TAG, "ranking response: code=${response.code} msg=${response.message}")
                     }

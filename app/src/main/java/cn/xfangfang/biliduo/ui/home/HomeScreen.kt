@@ -113,6 +113,19 @@ fun HomeScreen(
         List(count) { FocusRequester() }
     }
     var pendingAreaFocus by remember { mutableStateOf(false) }
+    val rankingFocusers = remember(homeRankingAreas.size) {
+        List(homeRankingAreas.size) { FocusRequester() }
+    }
+    var pendingRankingFocus by remember { mutableStateOf(false) }
+
+    LaunchedEffect(state.rankingRid, pendingRankingFocus) {
+        if (pendingRankingFocus) {
+            delay(80L)
+            val index = homeRankingAreas.indexOfFirst { it.rid == state.rankingRid }
+            rankingFocusers.getOrNull(index)?.let { runCatching { it.requestFocus() } }
+            pendingRankingFocus = false
+        }
+    }
 
     LaunchedEffect(state.liveAreaId, pendingAreaFocus) {
         if (pendingAreaFocus) {
@@ -179,21 +192,35 @@ fun HomeScreen(
         }
     }
 
-    val cyclePreviousArea: (() -> Unit)? = if (isLive) {
-        {
-            viewModel.cycleLiveArea(-1)
-            pendingAreaFocus = true
+    val cyclePreviousArea: (() -> Unit)? = when {
+        isLive -> {
+            {
+                viewModel.cycleLiveArea(-1)
+                pendingAreaFocus = true
+            }
         }
-    } else {
-        null
+        state.tab == HomeTab.RANKING -> {
+            {
+                viewModel.cycleRankingArea(-1)
+                pendingRankingFocus = true
+            }
+        }
+        else -> null
     }
-    val cycleNextArea: (() -> Unit)? = if (isLive) {
-        {
-            viewModel.cycleLiveArea(1)
-            pendingAreaFocus = true
+    val cycleNextArea: (() -> Unit)? = when {
+        isLive -> {
+            {
+                viewModel.cycleLiveArea(1)
+                pendingAreaFocus = true
+            }
         }
-    } else {
-        null
+        state.tab == HomeTab.RANKING -> {
+            {
+                viewModel.cycleRankingArea(1)
+                pendingRankingFocus = true
+            }
+        }
+        else -> null
     }
 
     Column(
@@ -211,6 +238,14 @@ fun HomeScreen(
             selected = state.tab,
             onSelect = viewModel::selectTab,
         )
+
+        if (state.tab == HomeTab.RANKING) {
+            RankingAreaRow(
+                selectedRid = state.rankingRid,
+                focusRequesters = rankingFocusers,
+                onSelect = viewModel::selectRankingArea,
+            )
+        }
 
         when {
             !isLive && state.isLoading && itemsEmpty -> {
@@ -320,6 +355,55 @@ fun HomeScreen(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RankingAreaRow(
+    selectedRid: Int,
+    focusRequesters: List<FocusRequester>,
+    onSelect: (Int) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(44.dp)
+            .padding(horizontal = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        homeRankingAreas.forEachIndexed { index, area ->
+            val selected = area.rid == selectedRid
+            Box(
+                modifier = Modifier
+                    .height(30.dp)
+                    .then(
+                        if (index < focusRequesters.size) {
+                            Modifier.focusRequester(focusRequesters[index])
+                        } else {
+                            Modifier
+                        }
+                    )
+                    .duoFocusRing(RoundedCornerShape(7.dp))
+                    .clip(RoundedCornerShape(7.dp))
+                    .background(if (selected) HomePink.copy(alpha = 0.14f) else HomeCardBg)
+                    .border(
+                        width = 1.dp,
+                        color = if (selected) HomePink.copy(alpha = 0.5f) else Color.Transparent,
+                        shape = RoundedCornerShape(7.dp),
+                    )
+                    .duoClickable { onSelect(area.rid) }
+                    .padding(horizontal = 9.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = area.label,
+                    color = if (selected) HomePink else Color(0xFFE4E4EA),
+                    fontSize = 10.sp,
+                    fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
+                )
             }
         }
     }

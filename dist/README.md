@@ -4,6 +4,21 @@
 `*.apk`），需要时本地 `./gradlew assembleDebug` / `assembleRelease` 生成，或从
 GitHub Releases 下载。
 
+## 0.2.0-rc30（2026-11-06）
+
+- `bili-duo-0.2.0-rc30-release.apk`
+  - R8 minify，正式 release keystore 签名；可覆盖安装同 key 的 rc29。
+  - APK SHA-256：`7cc493c96e954ea29f82d51aa46e3fc72e0ed02cfd3c3fb1e35637d3232715c2`
+- `bili-duo-0.2.0-rc30-debug.apk`
+  - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
+  - SHA-256：`34b18dddc6b34d2fb0a78982781347bf3f3d0924a4073ce18749156b728803b3`
+
+rc30 变更：
+- 排行 tab 增加「全站/动画/音乐/游戏/知识/生活/影视」分区 chips。
+- L2/R2 循环切换分区并聚焦新 chip；切区保留旧列表到新数据返回。
+- `ranking/v2` 按 `rid` 请求对应分区；chip Down 进首张卡片。
+- 221 单测通过。Duo 验证全站↔动画切换、焦点保持与 Down 进卡。
+
 ## 0.2.0-rc29（2026-11-06）
 
 - `bili-duo-0.2.0-rc29-release.apk`

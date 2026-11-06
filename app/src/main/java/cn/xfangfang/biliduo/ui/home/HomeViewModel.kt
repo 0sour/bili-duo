@@ -16,8 +16,21 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+data class HomeRankingArea(val rid: Int, val label: String)
+
+val homeRankingAreas = listOf(
+    HomeRankingArea(0, "全站"),
+    HomeRankingArea(1, "动画"),
+    HomeRankingArea(3, "音乐"),
+    HomeRankingArea(4, "游戏"),
+    HomeRankingArea(36, "知识"),
+    HomeRankingArea(160, "生活"),
+    HomeRankingArea(181, "影视"),
+)
+
 data class HomeUiState(
     val tab: HomeTab = HomeTab.RECOMMEND,
+    val rankingRid: Int = 0,
     val items: List<HomeVideoItem> = emptyList(),
     val pgcItems: List<PgcSeasonItem> = emptyList(),
     val liveItems: List<LiveRoomItem> = emptyList(),
@@ -104,6 +117,29 @@ class HomeViewModel(
         refresh()
     }
 
+    /** L2/R2 on the ranking tab: wrap through the ranking area chips. */
+    fun cycleRankingArea(delta: Int) {
+        val snapshot = _state.value
+        if (snapshot.tab != HomeTab.RANKING) return
+        val ids = homeRankingAreas.map { it.rid }
+        val index = cycleIndex(ids.indexOf(snapshot.rankingRid), delta, ids.size)
+        selectRankingArea(ids[index])
+    }
+
+    fun selectRankingArea(rid: Int) {
+        val snapshot = _state.value
+        if (snapshot.tab != HomeTab.RANKING || snapshot.rankingRid == rid) return
+        _state.value = snapshot.copy(
+            rankingRid = rid,
+            isLoading = true,
+            isLoadingMore = false,
+            hasMore = false,
+            page = 1,
+            error = null,
+        )
+        refresh()
+    }
+
     fun selectLiveSubArea(areaId: Int) {
         val snapshot = _state.value
         if (snapshot.tab != HomeTab.LIVE || snapshot.liveSubAreaId == areaId) return
@@ -142,6 +178,7 @@ class HomeViewModel(
         requestJob?.cancel()
         val id = ++requestId
         val tab = _state.value.tab
+        val rankingRid = _state.value.rankingRid
         _state.value = _state.value.copy(
             isLoading = true,
             isLoadingMore = false,
@@ -205,7 +242,7 @@ class HomeViewModel(
                     }
                 return@launch
             }
-            repository.getHomeFeed(tab, page = 1)
+            repository.getHomeFeed(tab, page = 1, rankingRid = rankingRid)
                 .onSuccess { (items, hasMore) ->
                     if (id != requestId) return@onSuccess
                     _state.value = _state.value.copy(
@@ -263,7 +300,7 @@ class HomeViewModel(
                     }
                 return@launch
             }
-            repository.getHomeFeed(snapshot.tab, page = nextPage)
+            repository.getHomeFeed(snapshot.tab, page = nextPage, rankingRid = snapshot.rankingRid)
                 .onSuccess { (items, hasMore) ->
                     if (id != requestId) return@onSuccess
                     val merged = (_state.value.items + items).distinctBy { it.bvid }
