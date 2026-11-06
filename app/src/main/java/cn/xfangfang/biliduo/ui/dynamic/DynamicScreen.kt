@@ -1308,26 +1308,26 @@ private fun DynamicCommentsOverlay(
     var loadingMore by remember(card.id) { mutableStateOf(false) }
     var ended by remember(card.id) { mutableStateOf(false) }
     var error by remember(card.id) { mutableStateOf<String?>(null) }
-    var nextCursor by remember(card.id) { mutableStateOf(0) }
+    var page by remember(card.id) { mutableStateOf(1) }
     var focusedOnce by remember(card.id) { mutableStateOf(false) }
     val dynamicId = card.id.toLongOrNull()
 
-    suspend fun load(cursor: Int) {
+    suspend fun load(targetPage: Int) {
         if (dynamicId == null) {
             loading = false
             error = "动态 ID 无效"
             return
         }
-        repository.getComments(dynamicId, page = cursor, type = 17)
+        repository.getDynamicComments(dynamicId, page = targetPage)
             .onSuccess { list ->
                 val fresh = (list.topReplies ?: emptyList()) + (list.replies ?: emptyList())
-                comments = if (cursor == 0) {
+                comments = if (targetPage == 1) {
                     fresh.distinctBy { it.rpid }
                 } else {
                     (comments + fresh).distinctBy { it.rpid }
                 }
-                nextCursor = list.cursor?.next ?: 0
-                ended = list.cursor?.isEnd ?: true
+                page = targetPage
+                ended = fresh.size < 20
                 error = null
             }
             .onFailure { error = it.message ?: "评论加载失败" }
@@ -1335,7 +1335,7 @@ private fun DynamicCommentsOverlay(
         loadingMore = false
     }
 
-    LaunchedEffect(card.id) { load(0) }
+    LaunchedEffect(card.id) { load(1) }
     LaunchedEffect(comments.size) {
         if (comments.isNotEmpty() && !focusedOnce) {
             focusedOnce = true
@@ -1405,7 +1405,7 @@ private fun DynamicCommentsOverlay(
                     onClick = {
                         loading = true
                         error = null
-                        scope.launch { load(0) }
+                        scope.launch { load(1) }
                     },
                 )
             }
@@ -1478,7 +1478,7 @@ private fun DynamicCommentsOverlay(
                                 .background(DuoPalette.Surface)
                                 .duoClickable {
                                     loadingMore = true
-                                    scope.launch { load(nextCursor) }
+                                    scope.launch { load(page + 1) }
                                 }
                                 .padding(vertical = 9.dp),
                             contentAlignment = Alignment.Center,

@@ -898,6 +898,19 @@ class BilibiliRepository(
         }.onFailure { Log.e(BilibiliApp.TAG, "getComments failed", it) }
     }
 
+    /** Dynamic comments use the legacy reply endpoint with type=17. */
+    suspend fun getDynamicComments(oid: Long, page: Int = 1): Result<CommentList> {
+        if (BuildConfig.DEBUG) Log.d(BilibiliApp.TAG, "getDynamicComments: oid=$oid page=$page")
+        return runCatching {
+            val response = api.getReplyList(type = 17, oid = oid, pn = page, pageSize = 20, sort = 0)
+            if (response.code == 0) {
+                response.data ?: CommentList(null)
+            } else {
+                throw Exception(response.message)
+            }
+        }.onFailure { Log.e(BilibiliApp.TAG, "getDynamicComments failed", it) }
+    }
+
     suspend fun getReplies(aid: Long, root: Long, page: Int = 1): Result<CommentList> {
         if (BuildConfig.DEBUG) Log.d(BilibiliApp.TAG, "getReplies: aid=$aid root=$root page=$page")
         return runCatching {

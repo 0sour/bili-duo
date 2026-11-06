@@ -207,6 +207,16 @@ interface BilibiliApi {
         @Query("next") next: Int = 0
     ): ApiResponse<CommentList>
 
+    @GET("x/v2/reply")
+    suspend fun getReplyList(
+        @Query("type") type: Int,
+        @Query("oid") oid: Long,
+        @Query("pn") pn: Int = 1,
+        @Query("ps") pageSize: Int = 20,
+        @Query("sort") sort: Int = 0,
+        @Query("nohot") nohot: Int = 1
+    ): ApiResponse<CommentList>
+
     @GET("x/v2/reply/reply")
     suspend fun getReplies(
         @Query("type") type: Int = 1,
