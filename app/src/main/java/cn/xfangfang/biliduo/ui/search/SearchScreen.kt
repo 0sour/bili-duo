@@ -420,7 +420,7 @@ private fun SearchHeader(
                 .duoTextFieldNavigation()
                 .onFocusChanged {
                     focused = it.isFocused
-                    onFocusChanged(it.isFocused)
+                    onFocusChanged(it.hasFocus)
                 }
                 .onPreviewKeyEvent { event ->
                     if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionCenter) {
@@ -765,7 +765,9 @@ private fun SortRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(36.dp)
+            // 8dp above/below the 32dp tabs keeps the 5.75dp ring inside
+            // the row instead of clipping it on the results below.
+            .height(48.dp)
             .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -829,7 +831,7 @@ private fun SearchResultRow(
                     Modifier
                 }
             )
-            .onFocusChanged { onFocusChanged(it.isFocused) }
+            .onFocusChanged { onFocusChanged(it.hasFocus) }
             .duoClickable(onClick = onClick)
             .padding(6.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -918,7 +920,7 @@ private fun SearchUserRow(
                     Modifier
                 }
             )
-            .onFocusChanged { onFocusChanged(it.isFocused) }
+            .onFocusChanged { onFocusChanged(it.hasFocus) }
             .duoClickable(onClick = onClick)
             .padding(8.dp),
         verticalAlignment = Alignment.CenterVertically,

@@ -1066,7 +1066,7 @@ private fun LiveChatInput(
         enabled = enabled,
         singleLine = true,
         modifier = modifier
-            .height(34.dp)
+            .height(38.dp)
             .focusRequester(focusRequester)
             .onFocusChanged {
                 focused = it.isFocused
@@ -1097,13 +1097,16 @@ private fun LiveChatInput(
                 color = if (focused) LivePink else LiveDivider,
                 shape = RoundedCornerShape(7.dp),
             )
-            .padding(horizontal = 10.dp, vertical = 9.dp),
+            .padding(horizontal = 10.dp, vertical = 8.dp),
         textStyle = TextStyle(color = Color.White, fontSize = 11.sp),
         cursorBrush = SolidColor(LivePink),
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
         keyboardActions = KeyboardActions(onSend = { onImeSend() }),
         decorationBox = { inner ->
-            Box(Modifier.fillMaxWidth()) {
+            Box(
+                Modifier.fillMaxSize(),
+                contentAlignment = Alignment.CenterStart,
+            ) {
                 if (value.isEmpty()) {
                     Text(placeholder, color = LiveTextTertiary, fontSize = 11.sp)
                 }

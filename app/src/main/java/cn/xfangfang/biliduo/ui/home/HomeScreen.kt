@@ -33,6 +33,7 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -195,12 +196,12 @@ fun HomeScreen(
         )
 
         when {
-            state.isLoading && itemsEmpty -> {
+            !isLive && state.isLoading && itemsEmpty -> {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = HomePink, modifier = Modifier.size(28.dp))
                 }
             }
-            state.error != null && itemsEmpty -> {
+            !isLive && state.error != null && itemsEmpty -> {
                 Column(
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.Center,
@@ -220,7 +221,7 @@ fun HomeScreen(
                     )
                 }
             }
-            itemsEmpty -> {
+            !isLive && itemsEmpty -> {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text("暂无内容", color = HomeSecondary, fontSize = 12.sp)
                 }
@@ -243,6 +244,9 @@ fun HomeScreen(
                     followedFocus = followedFocus,
                     subAreaFocus = subAreaFocus,
                     isLoadingMore = state.isLoadingMore,
+                    isLoading = state.isLoading,
+                    error = state.error,
+                    onRetry = viewModel::refresh,
                     onAreaSelected = viewModel::selectLiveArea,
                     onSubAreaSelected = viewModel::selectLiveSubArea,
                     onFocused = { room -> onVideoFocused(room.toTopPreview()) },
@@ -373,6 +377,9 @@ private fun LiveSection(
     followedFocus: FocusRequester,
     subAreaFocus: FocusRequester,
     isLoadingMore: Boolean,
+    isLoading: Boolean,
+    error: String?,
+    onRetry: () -> Unit,
     onAreaSelected: (Int) -> Unit,
     onSubAreaSelected: (Int) -> Unit,
     onFocused: (LiveRoomItem) -> Unit,
@@ -417,6 +424,11 @@ private fun LiveSection(
         if (selectedAreaId == 0 || index > 0) {
             areaRowState.scrollToItem(index)
         }
+    }
+    // Keep the grid at the top when the area changes; the old cards stay
+    // visible until the new response replaces them.
+    LaunchedEffect(selectedAreaId, selectedSubAreaId) {
+        gridState.scrollToItem(0)
     }
     Column(Modifier.fillMaxSize()) {
         LazyRow(
@@ -511,6 +523,12 @@ private fun LiveSection(
                 }
             }
         }
+        if (isLoading && rooms.isNotEmpty()) {
+            LinearProgressIndicator(
+                modifier = Modifier.fillMaxWidth().height(2.dp),
+                color = HomePink,
+            )
+        }
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
             state = gridState,
@@ -519,6 +537,38 @@ private fun LiveSection(
             verticalArrangement = Arrangement.spacedBy(0.dp),
             modifier = Modifier.fillMaxSize(),
         ) {
+            if (rooms.isEmpty()) {
+                item(span = { GridItemSpan(2) }) {
+                    Box(
+                        Modifier.fillMaxWidth().height(200.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        when {
+                            isLoading -> CircularProgressIndicator(
+                                color = HomePink,
+                                modifier = Modifier.size(24.dp),
+                            )
+                            error != null -> Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                            ) {
+                                Text(error, color = Color(0xFFFF9AA9), fontSize = 11.sp)
+                                Text(
+                                    text = "重试",
+                                    color = HomePink,
+                                    fontSize = 11.sp,
+                                    modifier = Modifier
+                                        .padding(top = 6.dp)
+                                        .duoFocusRing(RoundedCornerShape(6.dp))
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .duoClickable(onClick = onRetry)
+                                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                                )
+                            }
+                            else -> Text("暂无直播", color = HomeSecondary, fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
             itemsIndexed(rooms, key = { _, room -> room.roomId }) { index, room ->
                 LiveRoomCard(
                     room = room,
@@ -724,7 +774,7 @@ private fun LiveRoomCard(
             )
             .onFocusChanged {
                 focused = it.isFocused
-                onFocusChanged(it.isFocused)
+                onFocusChanged(it.hasFocus)
             }
             .duoClickable(onClick = onClick)
             .padding(vertical = CardFocusClearance),
@@ -876,7 +926,7 @@ private fun PgcSeasonCard(
             .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
             .onFocusChanged {
                 focused = it.isFocused
-                onFocusChanged(it.isFocused)
+                onFocusChanged(it.hasFocus)
             }
             .duoClickable(onClick = onClick)
             .padding(vertical = CardFocusClearance),
@@ -1033,7 +1083,7 @@ private fun HomeVideoCard(
             .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
             .onFocusChanged {
                 focused = it.isFocused
-                onFocusChanged(it.isFocused)
+                onFocusChanged(it.hasFocus)
             }
             .duoClickable(onClick = onClick)
             .padding(vertical = CardFocusClearance),

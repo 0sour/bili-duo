@@ -687,7 +687,7 @@ private fun DownloadCard(
             .background(DuoPalette.Surface)
             .border(
                 width = 2.dp,
-                color = if (contentFocused || actionFocused) Color.White else Color.Transparent,
+                color = if (contentFocused) Color.White else Color.Transparent,
                 shape = shape,
             ),
         verticalAlignment = Alignment.CenterVertically,
@@ -757,7 +757,7 @@ private fun DownloadCard(
         }
 
         Column(
-            modifier = Modifier.padding(end = 4.dp),
+            modifier = Modifier.padding(end = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             when {
@@ -819,7 +819,7 @@ private fun DownloadGroupHeader(
             .background(DuoPalette.Surface)
             .border(
                 width = 2.dp,
-                color = if (contentFocused || actionFocused) Color.White else Color.Transparent,
+                color = if (contentFocused) Color.White else Color.Transparent,
                 shape = shape,
             ),
         verticalAlignment = Alignment.CenterVertically,
@@ -880,7 +880,7 @@ private fun DownloadGroupHeader(
             contentDescription = "删除整组",
             tint = if (actionFocused) DuoPalette.Error else DuoPalette.Tertiary,
             onFocusChanged = { actionFocused = it },
-            modifier = Modifier.padding(end = 4.dp).focusRequester(actionFocus),
+            modifier = Modifier.padding(end = 8.dp).focusRequester(actionFocus),
             onClick = { onDelete(actionFocus) },
         )
     }
@@ -952,7 +952,7 @@ private fun DownloadSubRow(
             icon = Icons.Default.Delete,
             contentDescription = "删除分P",
             tint = DuoPalette.Tertiary,
-            modifier = Modifier.padding(end = 4.dp).focusRequester(actionFocus),
+            modifier = Modifier.padding(end = 8.dp).focusRequester(actionFocus),
             onClick = { onDelete(actionFocus) },
         )
     }

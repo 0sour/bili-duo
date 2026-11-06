@@ -4,6 +4,28 @@
 `*.apk`），需要时本地 `./gradlew assembleDebug` / `assembleRelease` 生成，或从
 GitHub Releases 下载。
 
+## 0.2.0-rc23（2026-11-06）
+
+- `bili-duo-0.2.0-rc23-release.apk`
+  - R8 minify + resource shrink，正式 release keystore 签名。
+  - APK SHA-256：`9007c83ad8143713bded17b16508971932e29224e474551d66794ab77f5eeab3`
+- `bili-duo-0.2.0-rc23-debug.apk`
+  - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
+  - SHA-256：`db6648e07d2e84bd0eb14cc2d0492951f8b6b24951b1f3279afd9d54731cb476`
+
+rc23 变更（P0 可用性收口）：
+- 二级页 `DuoPageHeader` 44→56dp；设置页返回键接入焦点链（首行/分类栏 Up 到返回）。
+- 历史/收藏/关注/下载卡片与删除按钮、搜索排序、UP 主 tabs、评论排序、控制台
+  右栏 tab、下载浮层的焦点环余量统一修正。
+- 评论头像可聚焦（A 进 UP 主页），首条评论 Up 回排序 chip；评论 L2/R2 切
+  热门/最新，排序请求加 requestId 防旧响应覆盖。
+- 左栏「发一条弹幕」与 chips 左对齐；弹幕颜色改 6 色块；直播输入框 38dp 且占位
+  居中。
+- 直播父/子分区切换保留旧列表 + inline loading；动态 UP/图文筛选可同时生效。
+- 上屏旧卡片清除加 250ms 防抖、卡片焦点改 `hasFocus`；Detail 分享补 `NEW_TASK`。
+- 221 单测通过。MuMu 验证：tab/评论排序环、颜色色块、直播输入框、直播页布局；
+  Duo 真机回归待用户带机测试。
+
 ## 0.2.0-rc22（2026-11-05）
 
 - `bili-duo-0.2.0-rc22-release.apk`

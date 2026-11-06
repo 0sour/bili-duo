@@ -1,5 +1,6 @@
 package cn.xfangfang.biliduo.ui.top
 
+import android.os.SystemClock
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -195,8 +196,13 @@ class TopScreenViewModel(
     private var detailJob: Job? = null
     private var clearJob: Job? = null
     private var personJob: Job? = null
+    // Focus events for adjacent cards can arrive out of order (new focus
+    // before the old card's clear). Ignore a clear that follows a fresh
+    // focus immediately, otherwise repeated Down flashes the idle screen.
+    private var lastFocusAt = 0L
 
     fun onVideoFocused(seed: TopPreviewUi) {
+        lastFocusAt = SystemClock.uptimeMillis()
         clearJob?.cancel()
         detailJob?.cancel()
         if (seed.bvid.isBlank()) {
@@ -345,10 +351,15 @@ class TopScreenViewModel(
     }
 
     fun onFocusCleared() {
+        if (SystemClock.uptimeMillis() - lastFocusAt < 250L) {
+            // The clear belongs to the card we just left; the new card's
+            // preview is already on screen.
+            return
+        }
         detailJob?.cancel()
         clearJob?.cancel()
         clearJob = viewModelScope.launch {
-            delay(180L)
+            delay(250L)
             if (_state.value.mode == TopScreenMode.PREVIEW ||
                 _state.value.mode == TopScreenMode.DYNAMIC
             ) {

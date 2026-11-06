@@ -434,7 +434,9 @@ private fun HistoryRow(
             .background(DuoPalette.Surface)
             .border(
                 width = 2.dp,
-                color = if (contentFocused || actionFocused) Color.White else Color.Transparent,
+                // The delete button owns its own ring; lighting the whole
+                // card for it made the card border look clipped.
+                color = if (contentFocused) Color.White else Color.Transparent,
                 shape = shape,
             ),
         verticalAlignment = Alignment.CenterVertically,
@@ -551,7 +553,8 @@ private fun HistoryRow(
             tint = if (actionFocused) DuoPalette.Secondary else DuoPalette.Tertiary,
             onFocusChanged = { actionFocused = it },
             modifier = Modifier
-                .padding(end = 2.dp)
+                // 8dp leaves room for the 5.75dp ring inside the card clip.
+                .padding(end = 8.dp)
                 .focusRequester(actionFocus),
             onClick = { onDelete(actionFocus) },
         )

@@ -635,7 +635,7 @@ private fun FolderRow(
             .background(DuoPalette.Surface)
             .border(
                 width = 2.dp,
-                color = if (contentFocused || actionFocused) Color.White else Color.Transparent,
+                color = if (contentFocused) Color.White else Color.Transparent,
                 shape = shape,
             ),
         verticalAlignment = Alignment.CenterVertically,
@@ -702,7 +702,7 @@ private fun FolderRow(
             contentDescription = "收藏夹操作",
             tint = if (actionFocused) DuoPalette.Pink else DuoPalette.Secondary,
             onFocusChanged = { actionFocused = it },
-            modifier = Modifier.padding(end = 4.dp).focusRequester(actionFocus),
+            modifier = Modifier.padding(end = 8.dp).focusRequester(actionFocus),
             onClick = { onAction(actionFocus) },
         )
     }
@@ -798,7 +798,7 @@ private fun ResourceRow(
             .background(DuoPalette.Surface)
             .border(
                 width = 2.dp,
-                color = if (contentFocused || actionFocused) Color.White else Color.Transparent,
+                color = if (contentFocused) Color.White else Color.Transparent,
                 shape = shape,
             ),
         verticalAlignment = Alignment.CenterVertically,
@@ -869,7 +869,7 @@ private fun ResourceRow(
             contentDescription = "取消收藏",
             tint = if (actionFocused) DuoPalette.Error else DuoPalette.Tertiary,
             onFocusChanged = { actionFocused = it },
-            modifier = Modifier.padding(end = 2.dp).focusRequester(actionFocus),
+            modifier = Modifier.padding(end = 8.dp).focusRequester(actionFocus),
             onClick = { onRemove(actionFocus) },
         )
     }

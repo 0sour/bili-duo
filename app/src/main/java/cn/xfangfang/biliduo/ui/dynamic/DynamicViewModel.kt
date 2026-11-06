@@ -86,12 +86,17 @@ class DynamicViewModel(
 
     fun selectFilter(filter: DynamicFilter) {
         val snapshot = _state.value
-        if (snapshot.authorMid == null && snapshot.filter == filter) return
+        if (snapshot.filter == filter) return
         loadJob?.cancel()
-        _state.value = DynamicUiState(
-            authors = snapshot.authors,
+        // Keep the current author and the visible cards; the type filter is
+        // applied together with the author filter instead of resetting it.
+        _state.value = snapshot.copy(
             filter = filter,
+            offset = "",
             isLoading = true,
+            isLoadingMore = false,
+            hasMore = false,
+            error = null,
         )
         refresh()
     }
@@ -116,12 +121,15 @@ class DynamicViewModel(
     fun selectAuthor(author: DynamicAuthorUi) {
         if (author.mid <= 0L || _state.value.authorMid == author.mid) return
         loadJob?.cancel()
-        _state.value = DynamicUiState(
-            authors = _state.value.authors,
+        // Keep the current type filter; UP + 图文/视频 must both stay active.
+        _state.value = _state.value.copy(
             authorMid = author.mid,
             authorName = author.name,
-            filter = DynamicFilter.ALL,
+            offset = "",
             isLoading = true,
+            isLoadingMore = false,
+            hasMore = false,
+            error = null,
         )
         refresh()
     }
@@ -129,10 +137,14 @@ class DynamicViewModel(
     fun clearAuthor() {
         if (_state.value.authorMid == null) return
         loadJob?.cancel()
-        _state.value = DynamicUiState(
-            authors = _state.value.authors,
-            filter = DynamicFilter.ALL,
+        _state.value = _state.value.copy(
+            authorMid = null,
+            authorName = "",
+            offset = "",
             isLoading = true,
+            isLoadingMore = false,
+            hasMore = false,
+            error = null,
         )
         refresh()
     }
@@ -157,17 +169,22 @@ class DynamicViewModel(
             result
                 .onSuccess { feed ->
                     if (id != requestId) return@onSuccess
-                    val cards = feed.items.orEmpty().mapNotNull { it.toCardUi() }
+                    val allCards = feed.items.orEmpty().mapNotNull { it.toCardUi() }
+                    val cards = if (authorMid != null) {
+                        allCards.filter { it.matchesFilter(filter) }
+                    } else {
+                        allCards
+                    }
                     val nextOffset = feed.offset.orEmpty()
                     _state.value = _state.value.copy(
                         items = cards,
                         authors = if (authorMid == null) {
-                            mergeAuthors(_state.value.authors, cards)
+                            mergeAuthors(_state.value.authors, allCards)
                         } else {
                             _state.value.authors
                         },
                         offset = nextOffset,
-                        hasMore = feed.hasMore && nextOffset.isNotBlank() && cards.isNotEmpty(),
+                        hasMore = feed.hasMore && nextOffset.isNotBlank() && allCards.isNotEmpty(),
                         isLoading = false,
                         isLoadingMore = false,
                         error = null,
@@ -203,17 +220,22 @@ class DynamicViewModel(
             result
                 .onSuccess { feed ->
                     if (id != requestId) return@onSuccess
-                    val more = feed.items.orEmpty().mapNotNull { it.toCardUi() }
+                    val allMore = feed.items.orEmpty().mapNotNull { it.toCardUi() }
+                    val more = if (authorMid != null) {
+                        allMore.filter { it.matchesFilter(snapshot.filter) }
+                    } else {
+                        allMore
+                    }
                     val nextOffset = feed.offset.orEmpty()
                     _state.value = _state.value.copy(
                         items = (_state.value.items + more).distinctBy { it.id },
                         authors = if (authorMid == null) {
-                            mergeAuthors(_state.value.authors, more)
+                            mergeAuthors(_state.value.authors, allMore)
                         } else {
                             _state.value.authors
                         },
                         offset = nextOffset.ifBlank { snapshot.offset },
-                        hasMore = feed.hasMore && more.isNotEmpty() &&
+                        hasMore = feed.hasMore && allMore.isNotEmpty() &&
                             nextOffset.isNotBlank() && nextOffset != snapshot.offset,
                         isLoadingMore = false,
                         error = null,
@@ -242,4 +264,15 @@ class DynamicViewModel(
             .map { DynamicAuthorUi(it.authorMid, it.authorName, it.authorFace) }
         return (current + incoming).distinctBy { it.mid }.take(24)
     }
+}
+
+/**
+ * The author feed endpoint (`feed/space`) has no type parameter, so the type
+ * filter is applied locally. "图文" means every non-video card, including
+ * pure text; "视频" includes forwards that carry a video.
+ */
+private fun DynamicCardUi.matchesFilter(filter: DynamicFilter): Boolean = when (filter) {
+    DynamicFilter.ALL -> true
+    DynamicFilter.VIDEO -> playbackBvid != null
+    DynamicFilter.IMAGE -> playbackBvid == null
 }

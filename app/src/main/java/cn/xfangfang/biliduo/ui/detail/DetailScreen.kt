@@ -993,7 +993,10 @@ private fun DetailContent(
                                 putExtra(Intent.EXTRA_TEXT, shareText)
                             }
                             try {
-                                context.startActivity(Intent.createChooser(intent, "分享到"))
+                                // Presentation context is not an Activity.
+                                val chooser = Intent.createChooser(intent, "分享到")
+                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                context.startActivity(chooser)
                             } catch (e: Exception) {
                                 Toast.makeText(context, "未找到可分享的应用", Toast.LENGTH_SHORT).show()
                             }

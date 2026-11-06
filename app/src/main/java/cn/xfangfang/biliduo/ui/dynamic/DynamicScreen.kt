@@ -193,8 +193,11 @@ fun DynamicScreen(
         firstFocused = false
         runCatching { listState.scrollToItem(0) }
     }
-    LaunchedEffect(state.filter, state.authorMid, state.items.size) {
-        if (!firstFocused && state.items.isNotEmpty()) {
+    LaunchedEffect(state.filter, state.authorMid, state.items.size, state.isLoading) {
+        // Wait for the new filter's response; while loading we keep the old
+        // cards visible, but focusing them would leave focus on a card that
+        // is about to be replaced.
+        if (!firstFocused && !state.isLoading && state.items.isNotEmpty()) {
             delay(120L)
             runCatching { firstFocus.requestFocus() }
             firstFocused = true
@@ -610,8 +613,8 @@ private fun DynamicCard(
                 }
             )
             .onFocusChanged {
-                focused = it.isFocused
-                if (it.isFocused) onFocused(card) else onFocusCleared()
+                focused = it.hasFocus
+                if (it.hasFocus) onFocused(card) else onFocusCleared()
             }
             .onPreviewKeyEvent { event ->
                 if (event.type == KeyEventType.KeyDown && event.key == Key.X) {

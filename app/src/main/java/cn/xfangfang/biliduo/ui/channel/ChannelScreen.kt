@@ -677,7 +677,8 @@ private fun ChannelModeTabs(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(38.dp),
+            // Room for the 30dp tabs' 5.75dp focus ring.
+            .height(46.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         ChannelModeTab(

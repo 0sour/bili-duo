@@ -125,6 +125,7 @@ import cn.xfangfang.biliduo.ui.detail.pickDefaultFolderId
 import cn.xfangfang.biliduo.ui.duo.duoClickable
 import cn.xfangfang.biliduo.ui.duo.duoFocusRing
 import cn.xfangfang.biliduo.ui.duo.duoTextFieldNavigation
+import cn.xfangfang.biliduo.ui.duo.duoTabCycling
 import cn.xfangfang.biliduo.util.fixPic
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -230,6 +231,7 @@ fun PlayerConsoleScreen(
     }
     var nextCursor by remember(aid) { mutableIntStateOf(0) }
     var commentsLoaded by remember(aid) { mutableStateOf(false) }
+    var commentsRequestId by remember(aid) { mutableIntStateOf(0) }
     var commentSort by remember(aid) { mutableIntStateOf(3) }
     var commentLikeState by remember(aid) { mutableStateOf<Map<Long, Boolean>>(emptyMap()) }
     var commentLikeDelta by remember(aid) { mutableStateOf<Map<Long, Int>>(emptyMap()) }
@@ -414,14 +416,18 @@ fun PlayerConsoleScreen(
         }
     }
 
-    suspend fun loadComments(cursor: Int) {
+    suspend fun loadComments(cursor: Int, force: Boolean = false) {
         val videoAid = ui.videoInfo?.aid ?: return
-        if (commentsLoading) return
+        if (commentsLoading && !force) return
+        val requestId = ++commentsRequestId
         commentsLoading = true
         commentsError = null
         try {
             val result = repository.getComments(videoAid, page = cursor, mode = commentSort)
             result.onSuccess { list ->
+                // A sort switch may have started a newer request; discard this
+                // response instead of mixing two sort orders.
+                if (requestId != commentsRequestId) return@onSuccess
                 val fresh = (list.topReplies ?: emptyList()) + (list.replies ?: emptyList())
                 comments = if (cursor == 0) {
                     fresh.distinctBy { it.rpid }
@@ -432,16 +438,17 @@ fun PlayerConsoleScreen(
                 commentsEnded = list.cursor?.isEnd ?: true
                 commentsLoaded = true
             }.onFailure {
+                if (requestId != commentsRequestId) return@onFailure
                 commentsError = it.message ?: "评论加载失败"
             }
         } finally {
-            commentsLoading = false
+            if (requestId == commentsRequestId) commentsLoading = false
         }
     }
 
     LaunchedEffect(selectedTab, aid, commentSort) {
         if (selectedTab == 0 && aid != null && !commentsLoaded) {
-            loadComments(0)
+            loadComments(0, force = true)
         }
     }
 
@@ -1063,7 +1070,12 @@ fun PlayerConsoleScreen(
                 if (!ui.isPgc) {
                     Spacer(Modifier.height(8.dp))
                     Row(
-                        modifier = Modifier.fillMaxWidth().height(30.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            // Match the chips row's 8dp scroll inset so the
+                            // input box and quality chip share a left edge.
+                            .padding(horizontal = 8.dp)
+                            .height(30.dp),
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -1086,7 +1098,7 @@ fun PlayerConsoleScreen(
                                     pendingOverlayFocus = danmakuSendFocus
                                     session.openOverlay(DuoOverlay.DANMAKU_SEND)
                                 }
-                                .padding(horizontal = 9.dp),
+                                .padding(horizontal = 7.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Icon(
@@ -1309,7 +1321,11 @@ fun PlayerConsoleScreen(
                 Spacer(Modifier.weight(1f))
                 Text(
                     text = "方向键选择 · A 确认 · B 返回\n" +
-                        "LB/RB 切换 tab · X 弹幕 · START 菜单",
+                        if (selectedTab == 0) {
+                            "LB/RB 切 tab · L2/R2 评论排序 · X 弹幕 · START 菜单"
+                        } else {
+                            "LB/RB 切换 tab · X 弹幕 · START 菜单"
+                        },
                     color = DuoTextTertiary,
                     fontSize = 9.5.sp,
                     lineHeight = 14.sp,
@@ -1336,8 +1352,10 @@ fun PlayerConsoleScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(40.dp)
-                        .padding(start = 12.dp, end = 12.dp, top = 6.dp),
+                        // Keep 6dp below the 34dp tabs so the ring does not
+                        // collide with the divider/content underneath.
+                        .height(46.dp)
+                        .padding(start = 12.dp, end = 12.dp, top = 6.dp, bottom = 6.dp),
                     verticalAlignment = Alignment.Bottom,
                     horizontalArrangement = Arrangement.spacedBy(18.dp),
                 ) {
@@ -1424,6 +1442,7 @@ fun PlayerConsoleScreen(
                                 openCommentComposer(target = reply, root = root)
                             },
                             onDelete = ::requestDeleteComment,
+                            onAuthorClick = onUploaderClick,
                         )
                         1 -> RelatedTab(
                             items = related,
@@ -1671,7 +1690,7 @@ fun PlayerConsoleScreen(
                     .heightIn(max = 320.dp)
                     .verticalScroll(rememberScrollState())
                     // Keep chip focus rings clear of the scroll viewport.
-                    .padding(horizontal = 8.dp, vertical = 2.dp),
+                    .padding(horizontal = 8.dp, vertical = 7.dp),
             ) {
                 Text("清晰度", color = DuoTextSecondary, fontSize = 10.sp)
                 Spacer(Modifier.height(4.dp))
@@ -2117,7 +2136,7 @@ private fun IntroTab(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 10.dp, vertical = 6.dp),
+            .padding(horizontal = 10.dp, vertical = 8.dp),
     ) {
         if (info == null) {
             Text(
@@ -2186,7 +2205,7 @@ private fun IntroTab(
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(8.dp))
                     .background(DuoSurface)
-                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Row(
@@ -2221,6 +2240,7 @@ private fun IntroTab(
                         )
                     }
                 }
+                Spacer(Modifier.width(8.dp))
                 ConsoleChip(
                     text = when {
                         followBusy -> "处理中…"
@@ -2304,11 +2324,21 @@ private fun CommentsTab(
     onReply: (CommentItem) -> Unit,
     onReplyToReply: (CommentItem, CommentItem) -> Unit,
     onDelete: (CommentItem) -> Unit,
+    onAuthorClick: (Long) -> Unit,
 ) {
     // The first comment's expand link has no focusable above it inside the
     // list; without this anchor Up falls back to the left transport column.
     val sortFocus = remember { FocusRequester() }
-    Column(Modifier.fillMaxSize()) {
+    Column(
+        Modifier
+            .fillMaxSize()
+            // L2/R2 switch the comment sort without stealing L1/R1 from the
+            // right-pane tab cycling handled by the console root.
+            .duoTabCycling(
+                onPreviousSection = { if (sortMode != 3) onSort(3) },
+                onNextSection = { if (sortMode != 2) onSort(2) },
+            ),
+    ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -2327,7 +2357,8 @@ private fun CommentsTab(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(30.dp)
+                // The 22dp sort chips need 6dp+ above/below for their ring.
+                .height(40.dp)
                 .padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -2416,6 +2447,7 @@ private fun CommentsTab(
                                 onDelete = { onDelete(comment) },
                                 onReplyReply = { reply -> onReplyToReply(comment, reply) },
                                 onDeleteReply = { reply -> onDelete(reply) },
+                                onAuthorClick = onAuthorClick,
                             )
                         }
                         item {
@@ -2532,17 +2564,37 @@ private fun CommentRow(
     onDelete: () -> Unit,
     onReplyReply: (CommentItem) -> Unit,
     onDeleteReply: (CommentItem) -> Unit,
+    onAuthorClick: (Long) -> Unit,
 ) {
+    val avatarFocus = remember { FocusRequester() }
+    var avatarFocused by remember { mutableStateOf(false) }
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.fillMaxWidth().padding(vertical = 9.dp)) {
-            AsyncImage(
-                model = fixPic(comment.member.avatar),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.size(32.dp).clip(CircleShape).background(DuoSurfaceHigh),
-            )
-            Spacer(Modifier.width(8.dp))
-            Column(Modifier.weight(1f)) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .focusRequester(avatarFocus)
+                    .focusProperties { if (upTarget != null) up = upTarget }
+                    .onFocusChanged { avatarFocused = it.isFocused }
+                    .duoClickable { onAuthorClick(comment.member.mid) },
+            ) {
+                AsyncImage(
+                    model = fixPic(comment.member.avatar),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        // 6dp clearance keeps the ring inside the focus
+                        // target, so bring-into-view cannot clip it at the
+                        // top of the comment list.
+                        .padding(6.dp)
+                        .duoFocusRing(CircleShape, focused = avatarFocused)
+                        .clip(CircleShape)
+                        .background(DuoSurfaceHigh),
+                )
+            }
+            Spacer(Modifier.width(2.dp))
+            Column(Modifier.weight(1f).padding(top = 6.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = comment.member.uname,
@@ -2581,7 +2633,10 @@ private fun CommentRow(
                             .duoFocusRing(RoundedCornerShape(3.dp))
                             .clip(RoundedCornerShape(3.dp))
                             .focusProperties {
-                                if (upTarget != null) up = upTarget
+                                // Up from the link goes to the comment avatar;
+                                // only the first comment's avatar jumps to the
+                                // sort chip, keeping the ring in the right pane.
+                                if (upTarget != null) up = avatarFocus
                             }
                             .duoClickable(onClick = onToggleBody)
                             .padding(horizontal = 2.dp, vertical = 2.dp),
@@ -3370,11 +3425,7 @@ private fun DanmakuSendOverlay(
                 value = danmakuModeLabel(mode),
                 onClick = { onMode(nextDanmakuMode(mode)) },
             )
-            DanmakuSettingRow(
-                label = "颜色",
-                value = danmakuColorLabel(color),
-                onClick = { onColor(nextDanmakuColor(color)) },
-            )
+            DanmakuColorRow(color = color, onColor = onColor)
             Spacer(Modifier.height(8.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -3831,22 +3882,59 @@ private fun danmakuModeLabel(mode: Int): String = when (mode) {
     else -> "滚动"
 }
 
-private val danmakuColorOptions = listOf(
-    0xFFFFFFL to "白色",
-    0xFB7299L to "粉色",
-    0xFFD700L to "黄色",
-    0x66CCFFL to "蓝色",
-    0x7BDD7BL to "绿色",
+private val danmakuSendColors = listOf(
+    0xFFFFFFL, 0xFB7299L, 0xFFD700L, 0x66CCFFL, 0x7BDD7BL, 0xB18CFFL,
 )
 
-private fun nextDanmakuColor(color: Long): Long {
-    val index = danmakuColorOptions.indexOfFirst { it.first == color }
-    val next = if (index < 0) 0 else (index + 1) % danmakuColorOptions.size
-    return danmakuColorOptions[next].first
+@Composable
+private fun DanmakuColorRow(color: Long, onColor: (Long) -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().height(44.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = "颜色",
+            color = Color.White,
+            fontSize = 12.sp,
+            modifier = Modifier.weight(1f),
+        )
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            danmakuSendColors.forEach { value ->
+                val selected = value == color
+                val checkColor = if (value == 0xFFFFFFL || value == 0xFFD700L ||
+                    value == 0x66CCFFL || value == 0x7BDD7BL
+                ) {
+                    Color.Black
+                } else {
+                    Color.White
+                }
+                Box(
+                    modifier = Modifier
+                        .size(26.dp)
+                        .duoFocusRing(CircleShape)
+                        .clip(CircleShape)
+                        // The send API stores RGB; add the opaque alpha for
+                        // Compose or every swatch renders transparent.
+                        .background(Color((0xFF000000L or value).toInt()))
+                        .duoClickable { onColor(value) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (selected) {
+                        Text(
+                            text = "✓",
+                            color = checkColor,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
+                }
+            }
+        }
+    }
 }
-
-private fun danmakuColorLabel(color: Long): String =
-    danmakuColorOptions.firstOrNull { it.first == color }?.second ?: "白色"
 
 private fun formatTime(ms: Long): String {
     val total = (ms / 1000L).coerceAtLeast(0L)

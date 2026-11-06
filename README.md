@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc22-FB7299">
+  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc23-FB7299">
   <img alt="status" src="https://img.shields.io/badge/status-untested%20RC-orange">
   <img alt="Android" src="https://img.shields.io/badge/Android-24%2B-3DDC84?logo=android&logoColor=white">
   <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-1.9.23-7F52FF?logo=kotlin&logoColor=white">
@@ -23,7 +23,7 @@
 上屏只负责视频画面，下屏用一块 `Presentation` 承载完整 UI；手柄和触摸共用同一棵
 Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，也没有上屏 OSD。
 
-> 当前版本：**0.2.0-rc22**（versionCode 23）
+> 当前版本：**0.2.0-rc23**（versionCode 24）
 > 状态：功能完整的 **未测试 RC**，221 个单元测试通过，已在 MuMu 与 Duo 真机做核心
 > 路径验证，尚未完成全流程回归。
 
@@ -174,6 +174,11 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
     左侧方向键失灵；该功能已整体移除，`InputRouter` 不再处理摇杆事件。
   - rc22 评论区焦点：首条评论的「展开全文」按上会跳到左栏播放控制；给它显式指定
     `up` 到排序 chip，焦点留在右栏（Duo 验证）。
+  - rc23 可用性收口：二级页 Header 44→56dp 且返回键接入焦点链；历史/收藏/关注/
+    下载卡片与删除按钮的焦点环裁切；搜索/UP 主/评论/控制台 tab 行环裁切；评论头像
+    可聚焦进 UP 主页；评论 L2/R2 切热门/最新；弹幕输入与 chips 左对齐；弹幕颜色
+    改为色块；直播输入提示不再裁切；直播分区切换不再全屏闪烁；动态 UP+图文可同时
+    筛选；上屏连续按 Down 不再闪回默认页。
   - 登录、个人中心、历史/收藏/关注只读浏览；弹幕发送→撤回闭环。
 
 ### 未实现（代码层面）

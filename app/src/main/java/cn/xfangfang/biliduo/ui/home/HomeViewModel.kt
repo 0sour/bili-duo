@@ -93,7 +93,8 @@ class HomeViewModel(
         _state.value = snapshot.copy(
             liveAreaId = areaId,
             liveSubAreaId = 0,
-            liveItems = emptyList(),
+            // Keep the previous grid visible while the new area loads; the
+            // header/chips must not unmount or the switch flashes.
             isLoading = true,
             isLoadingMore = false,
             hasMore = false,
@@ -108,7 +109,6 @@ class HomeViewModel(
         if (snapshot.tab != HomeTab.LIVE || snapshot.liveSubAreaId == areaId) return
         _state.value = snapshot.copy(
             liveSubAreaId = areaId,
-            liveItems = emptyList(),
             isLoading = true,
             isLoadingMore = false,
             hasMore = false,

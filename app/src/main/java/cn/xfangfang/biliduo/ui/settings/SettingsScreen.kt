@@ -107,7 +107,8 @@ private val settingsCategories = listOf(
  * category rail and Up/Down stop at the list edges. Without this, focus
  * can fall through to the global app rail (e.g. Down from the last row).
  */
-private val SettingsTopEdge = Modifier.focusProperties { up = FocusRequester.Cancel }
+private fun settingsTopEdge(backFocus: FocusRequester) =
+    Modifier.focusProperties { up = backFocus }
 
 private const val REPOSITORY_URL = "https://github.com/0sour/bili-duo"
 private const val ISSUES_URL = "https://github.com/0sour/bili-duo/issues"
@@ -138,6 +139,7 @@ fun SettingsScreen(
     val clearRowFocus = remember { FocusRequester() }
     val clearAllFocus = remember { FocusRequester() }
     val firstRowFocus = remember { FocusRequester() }
+    val backFocus = remember { FocusRequester() }
     val categoryFocus = remember { List(settingsCategories.size) { FocusRequester() } }
     val scrollState = rememberScrollState()
 
@@ -331,7 +333,13 @@ fun SettingsScreen(
                 },
             ),
     ) {
-        DuoPageHeader(title = "设置", onBack = onBack)
+        DuoPageHeader(
+            title = "设置",
+            onBack = onBack,
+            backModifier = Modifier
+                .focusRequester(backFocus)
+                .focusProperties { up = FocusRequester.Cancel },
+        )
 
         Row(Modifier.fillMaxSize()) {
             CategoryRail(
@@ -339,6 +347,7 @@ fun SettingsScreen(
                 onSelect = { category = it },
                 onEnter = { selectCategory(it, focusContent = true) },
                 focusRequesters = categoryFocus,
+                backFocus = backFocus,
             )
             Column(
                 modifier = Modifier
@@ -375,6 +384,7 @@ fun SettingsScreen(
                             AppSettings.wifiOnlyPlayback = it
                         },
                         firstFocus = firstRowFocus,
+                        backFocus = backFocus,
                         bottomModifier = bottomEdgeModifier,
                     )
                     1 -> NetworkSettings(
@@ -384,15 +394,18 @@ fun SettingsScreen(
                             AppSettings.wifiOnlyDownload = it
                         },
                         firstFocus = firstRowFocus,
+                        backFocus = backFocus,
                         bottomModifier = bottomEdgeModifier,
                     )
                     2 -> AppearanceSettings(
                         firstFocus = firstRowFocus,
+                        backFocus = backFocus,
                         bottomModifier = bottomEdgeModifier,
                     )
                     3 -> DanmakuSettings(
                         ui = playerUi,
                         firstFocus = firstRowFocus,
+                        backFocus = backFocus,
                         bottomModifier = bottomEdgeModifier,
                         onEnabled = { playerViewModel?.setDanmakuEnabled(it) },
                         onOpacity = { playerViewModel?.setDanmakuOpacity(it) },
@@ -408,6 +421,7 @@ fun SettingsScreen(
                         searchHistoryCount = searchHistory.size,
                         downloadDir = downloadDir,
                         firstFocus = firstRowFocus,
+                        backFocus = backFocus,
                         bottomModifier = bottomEdgeModifier,
                         clearFocus = clearRowFocus,
                         clearAllFocus = clearAllFocus,
@@ -426,6 +440,7 @@ fun SettingsScreen(
                     )
                     else -> AboutSettings(
                         firstFocus = firstRowFocus,
+                        backFocus = backFocus,
                         bottomModifier = bottomEdgeModifier,
                         onOpenRepository = { openRepository() },
                         onOpenIssues = { openRepository(ISSUES_URL) },
@@ -537,6 +552,7 @@ private fun CategoryRail(
     onSelect: (Int) -> Unit,
     onEnter: (Int) -> Unit,
     focusRequesters: List<FocusRequester>,
+    backFocus: FocusRequester? = null,
 ) {
     Column(
         modifier = Modifier
@@ -556,7 +572,7 @@ private fun CategoryRail(
                     .focusProperties {
                         left = FocusRequester.Cancel
                         right = FocusRequester.Cancel
-                        if (index == 0) up = FocusRequester.Cancel
+                        if (index == 0) up = backFocus ?: FocusRequester.Cancel
                         if (index == settingsCategories.lastIndex) down = FocusRequester.Cancel
                     }
                     .duoFocusRing(RoundedCornerShape(8.dp))
@@ -612,6 +628,7 @@ private fun PlaySettings(
     wifiOnlyPlayback: Boolean,
     onWifiOnlyPlayback: (Boolean) -> Unit,
     firstFocus: FocusRequester,
+    backFocus: FocusRequester,
     bottomModifier: Modifier,
 ) {
     SettingsSection("播放")
@@ -620,7 +637,7 @@ private fun PlaySettings(
         subtitle = "移动网络下不开始播放，避免消耗流量",
         checked = wifiOnlyPlayback,
         focusRequester = firstFocus,
-        modifier = SettingsTopEdge,
+        modifier = settingsTopEdge(backFocus),
         onToggle = { onWifiOnlyPlayback(!wifiOnlyPlayback) },
     )
     Spacer(Modifier.height(10.dp))
@@ -639,6 +656,7 @@ private fun NetworkSettings(
     wifiOnlyDownload: Boolean,
     onWifiOnlyDownload: (Boolean) -> Unit,
     firstFocus: FocusRequester,
+    backFocus: FocusRequester,
     bottomModifier: Modifier,
 ) {
     val context = LocalContext.current
@@ -649,7 +667,7 @@ private fun NetworkSettings(
         subtitle = "移动网络下暂停下载任务",
         checked = wifiOnlyDownload,
         focusRequester = firstFocus,
-        modifier = SettingsTopEdge,
+        modifier = settingsTopEdge(backFocus),
         onToggle = { onWifiOnlyDownload(!wifiOnlyDownload) },
     )
     Spacer(Modifier.height(10.dp))
@@ -664,6 +682,7 @@ private fun NetworkSettings(
 @Composable
 private fun AppearanceSettings(
     firstFocus: FocusRequester,
+    backFocus: FocusRequester,
     bottomModifier: Modifier,
 ) {
     SettingsSection("外观")
@@ -671,7 +690,7 @@ private fun AppearanceSettings(
         title = "主题",
         value = "深色（固定）",
         focusRequester = firstFocus,
-        modifier = SettingsTopEdge,
+        modifier = settingsTopEdge(backFocus),
     )
     SettingsInfoRow("模式条", "底部常驻，显示当前手柄所有权")
     SettingsInfoRow(
@@ -693,6 +712,7 @@ private fun AppearanceSettings(
 private fun DanmakuSettings(
     ui: PlayerUiState?,
     firstFocus: FocusRequester,
+    backFocus: FocusRequester,
     bottomModifier: Modifier,
     onEnabled: (Boolean) -> Unit,
     onOpacity: (Float) -> Unit,
@@ -714,7 +734,7 @@ private fun DanmakuSettings(
         subtitle = "进入播放时沿用上次开关",
         checked = enabled,
         focusRequester = firstFocus,
-        modifier = SettingsTopEdge,
+        modifier = settingsTopEdge(backFocus),
         onToggle = { onEnabled(!enabled) },
     )
     SettingsValueRow(
@@ -761,6 +781,7 @@ private fun StorageSettings(
     searchHistoryCount: Int,
     downloadDir: String,
     firstFocus: FocusRequester,
+    backFocus: FocusRequester,
     bottomModifier: Modifier,
     clearFocus: FocusRequester,
     clearAllFocus: FocusRequester,
@@ -774,7 +795,7 @@ private fun StorageSettings(
         title = "已下载",
         value = "$completed 个已完成 / 共 $total 个",
         focusRequester = firstFocus,
-        modifier = SettingsTopEdge,
+        modifier = settingsTopEdge(backFocus),
     )
     SettingsInfoRow("占用空间", formatBytes(bytes))
     SettingsInfoRow("下载目录", downloadDir)
@@ -813,6 +834,7 @@ private fun StorageSettings(
 @Composable
 private fun AboutSettings(
     firstFocus: FocusRequester,
+    backFocus: FocusRequester,
     bottomModifier: Modifier,
     onOpenRepository: () -> Unit,
     onOpenIssues: () -> Unit,
@@ -822,7 +844,7 @@ private fun AboutSettings(
         title = "版本",
         value = "v${BuildConfig.VERSION_NAME}",
         focusRequester = firstFocus,
-        modifier = SettingsTopEdge,
+        modifier = settingsTopEdge(backFocus),
     )
     SettingsInfoRow("状态", "未测试 RC")
     SettingsActionRow(

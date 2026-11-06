@@ -83,12 +83,15 @@ fun DuoPageHeader(
     title: String,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    backModifier: Modifier = Modifier,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(44.dp)
+            // 56dp leaves 8dp above/below the 40dp button so the 5.75dp
+            // focus ring is not clipped by the screen edge or the content.
+            .height(56.dp)
             .padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -96,6 +99,7 @@ fun DuoPageHeader(
             icon = Icons.AutoMirrored.Filled.ArrowBack,
             contentDescription = "返回",
             onClick = onBack,
+            modifier = backModifier,
         )
         Spacer(Modifier.width(2.dp))
         Text(
