@@ -4,6 +4,20 @@
 `*.apk`），需要时本地 `./gradlew assembleDebug` / `assembleRelease` 生成，或从
 GitHub Releases 下载。
 
+## 0.2.0-rc29（2026-11-06）
+
+- `bili-duo-0.2.0-rc29-release.apk`
+  - R8 minify，正式 release keystore 签名；可覆盖安装同 key 的 rc28。
+  - APK SHA-256：`f10108eac76cf03182b79a5752b97a212cf2aab88f6bb27e53748470eb05de86`
+- `bili-duo-0.2.0-rc29-debug.apk`
+  - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
+  - SHA-256：`7aa34b506fb3bc5909e54a1f560a5674c4a50a6f04727c97cdaad1f29620a781`
+
+rc29 变更：
+- 按用户要求移除「一键三连」入口、`performTriple`/`tripleBusy` 和默认收藏夹逻辑。
+- 投币弹窗只保留 1 枚/2 枚选择与确认；收藏弹窗与关注 Up 焦点修复不变。
+- 221 单测通过。Duo 截图验证投币弹窗底部无三连行。
+
 ## 0.2.0-rc28（2026-11-06）
 
 - `bili-duo-0.2.0-rc28-release.apk`

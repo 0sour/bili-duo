@@ -122,9 +122,7 @@ import cn.xfangfang.biliduo.data.repository.BilibiliRepository
 import cn.xfangfang.biliduo.duo.DuoMode
 import cn.xfangfang.biliduo.duo.DuoOverlay
 import cn.xfangfang.biliduo.duo.DuoSessionViewModel
-import cn.xfangfang.biliduo.ui.detail.favouredFolderIds
 import cn.xfangfang.biliduo.ui.detail.parseDedeUserId
-import cn.xfangfang.biliduo.ui.detail.pickDefaultFolderId
 import cn.xfangfang.biliduo.ui.duo.duoClickable
 import cn.xfangfang.biliduo.ui.duo.duoFocusRing
 import cn.xfangfang.biliduo.ui.duo.duoTextFieldNavigation
@@ -222,7 +220,6 @@ fun PlayerConsoleScreen(
     var coinBusy by remember(aid) { mutableStateOf(false) }
     var coinDelta by remember(aid) { mutableStateOf(0L) }
     var coinChoice by remember { mutableIntStateOf(1) }
-    var tripleBusy by remember { mutableStateOf(false) }
     var favFolders by remember { mutableStateOf<List<FavFolder>>(emptyList()) }
     var favFoldersLoading by remember { mutableStateOf(false) }
     var favFoldersError by remember { mutableStateOf<String?>(null) }
@@ -880,79 +877,6 @@ fun PlayerConsoleScreen(
                 }
                 .onFailure { toast(it.message ?: "投币失败，请检查硬币余额") }
             coinBusy = false
-        }
-    }
-
-    fun performTriple() {
-        val info = ui.videoInfo ?: return
-        if (BilibiliApi.loginCookies.isBlank()) {
-            toast("请先登录")
-            return
-        }
-        if (tripleBusy || coinBusy || likeBusy || favBusy) return
-        if (isLiked == null || isFavorited == null || coinsGiven == null) {
-            toast("状态加载中")
-            return
-        }
-        val uid = parseDedeUserId(BilibiliApi.loginCookies)
-        if (uid == null) {
-            toast("登录状态异常")
-            return
-        }
-        val needCoins = (2 - (coinsGiven ?: 0)).coerceAtLeast(0)
-        if (isLiked == true && isFavorited == true && needCoins == 0) {
-            toast("已经三连过了")
-            return
-        }
-        scope.launch {
-            tripleBusy = true
-            var defaultFolderId: Long? = null
-            if (isFavorited != true) {
-                val folders = repository.getFavFolders(uid, rid = info.aid).getOrElse {
-                    toast(it.message ?: "收藏夹加载失败")
-                    tripleBusy = false
-                    return@launch
-                }
-                defaultFolderId = pickDefaultFolderId(folders)
-                if (defaultFolderId == null) {
-                    toast("请先在网页端创建收藏夹")
-                    tripleBusy = false
-                    return@launch
-                }
-            }
-            if (isLiked != true) {
-                val liked = repository.likeVideo(info.aid, true)
-                if (liked.isFailure) {
-                    toast(liked.exceptionOrNull()?.message ?: "点赞失败")
-                    tripleBusy = false
-                    return@launch
-                }
-                isLiked = true
-                likeDelta += 1L
-            }
-            if (isFavorited != true && defaultFolderId != null) {
-                val favResult = repository.dealFavResource(info.aid, defaultFolderId.toString(), "")
-                if (favResult.isFailure) {
-                    toast(favResult.exceptionOrNull()?.message ?: "收藏失败")
-                    tripleBusy = false
-                    return@launch
-                }
-                isFavorited = true
-                favDelta += 1L
-            }
-            if (needCoins > 0) {
-                val coinResult = repository.addVideoCoin(info.aid, multiply = needCoins)
-                if (coinResult.isFailure) {
-                    toast(coinResult.exceptionOrNull()?.message ?: "投币失败，请检查硬币余额")
-                    tripleBusy = false
-                    return@launch
-                }
-                coinsGiven = (coinsGiven ?: 0) + needCoins
-                coinDelta += needCoins.toLong()
-            }
-            toast("三连成功")
-            session.closeOverlay()
-            tripleBusy = false
         }
     }
 
@@ -1996,7 +1920,6 @@ fun PlayerConsoleScreen(
         val firstOptionFocus = remember { FocusRequester() }
         val secondOptionFocus = remember { FocusRequester() }
         val confirmFocus = remember { FocusRequester() }
-        val tripleFocus = remember { FocusRequester() }
         val remaining = (2 - (coinsGiven ?: 0)).coerceAtLeast(1)
         val amount = coinChoice.coerceIn(1, remaining)
         LaunchedEffect(focusEpoch) {
@@ -2034,7 +1957,7 @@ fun PlayerConsoleScreen(
                         .fillMaxWidth()
                         .height(36.dp)
                         .focusRequester(confirmFocus)
-                        .focusProperties { down = tripleFocus }
+                        .focusProperties { down = FocusRequester.Cancel }
                         .duoFocusRing(RoundedCornerShape(7.dp))
                         .clip(RoundedCornerShape(7.dp))
                         .background(DuoPink)
@@ -2048,16 +1971,6 @@ fun PlayerConsoleScreen(
                         fontWeight = FontWeight.Medium,
                     )
                 }
-                Spacer(Modifier.height(12.dp))
-                Text("一键三连", color = DuoTextSecondary, fontSize = 10.sp)
-                Spacer(Modifier.height(4.dp))
-                OverlayRow(
-                    label = if (tripleBusy) "三连处理中…" else "点赞 + 投币 + 收藏到默认收藏夹",
-                    selected = false,
-                    focusRequester = tripleFocus,
-                    onClick = { performTriple() },
-                    modifier = Modifier.focusProperties { down = FocusRequester.Cancel },
-                )
             }
         }
     }
