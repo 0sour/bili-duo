@@ -75,6 +75,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import cn.xfangfang.biliduo.data.api.BilibiliApi
+import cn.xfangfang.biliduo.data.model.CommentItem
 import cn.xfangfang.biliduo.data.model.DynamicAuthorUi
 import cn.xfangfang.biliduo.data.model.DynamicCardUi
 import cn.xfangfang.biliduo.data.model.DynamicFilter
@@ -85,6 +86,7 @@ import cn.xfangfang.biliduo.ui.common.DuoEmptyState
 import cn.xfangfang.biliduo.ui.common.DuoPalette
 import cn.xfangfang.biliduo.ui.common.DuoPillButton
 import cn.xfangfang.biliduo.ui.duo.duoClickable
+import cn.xfangfang.biliduo.data.repository.BilibiliRepository
 import cn.xfangfang.biliduo.ui.duo.duoFocusRing
 import cn.xfangfang.biliduo.ui.duo.duoTabCycling
 import cn.xfangfang.biliduo.ui.top.TopAmbientUi
@@ -187,6 +189,8 @@ fun DynamicScreen(
     }
     var focusedIndex by remember { mutableStateOf<Int?>(null) }
     var overlay by remember { mutableStateOf<DynamicOverlay?>(null) }
+    var commentsCard by remember { mutableStateOf<DynamicCardUi?>(null) }
+    var commentsReturnFocus by remember { mutableStateOf<FocusRequester?>(null) }
     val loggedIn = BilibiliApi.parseSelfMid() != null
 
     fun closeToList() {
@@ -443,6 +447,26 @@ fun DynamicScreen(
             },
             onOpenGallery = { openGallery(current, it) },
             onIndexChange = { changeImage(current, it) },
+            onComments = { card, focus ->
+                commentsReturnFocus = focus
+                commentsCard = card
+            },
+        )
+    }
+
+    commentsCard?.let { card ->
+        DynamicCommentsOverlay(
+            card = card,
+            session = session,
+            onReaderBack = { closeToList() },
+            onClose = {
+                commentsCard = null
+                val target = commentsReturnFocus
+                scope.launch {
+                    delay(100L)
+                    runCatching { target?.requestFocus() }
+                }
+            },
         )
     }
 }
@@ -1092,6 +1116,7 @@ private fun DynamicForwardBlock(forward: DynamicForwardUi) {
 private fun DynamicStatsRow(
     card: DynamicCardUi,
     showLike: Boolean = false,
+    onComments: (() -> Unit)? = null,
 ) {
     val text = buildString {
         append("评论 ${formatCount(card.commentCount.toLong())}  ·  ")
@@ -1103,6 +1128,13 @@ private fun DynamicStatsRow(
         color = DuoPalette.Tertiary,
         fontSize = 10.sp,
         maxLines = 1,
+        modifier = if (onComments != null) {
+            Modifier
+                .clip(RoundedCornerShape(4.dp))
+                .pointerInput(Unit) { detectTapGestures { onComments() } }
+        } else {
+            Modifier
+        },
     )
 }
 
@@ -1148,6 +1180,7 @@ private fun DynamicReaderLayer(
     onBack: () -> Unit,
     onOpenGallery: (Int) -> Unit,
     onIndexChange: (Int) -> Unit,
+    onComments: (DynamicCardUi, FocusRequester) -> Unit,
 ) {
     val focus = remember { FocusRequester() }
     val scroll = rememberScrollState()
@@ -1215,6 +1248,14 @@ private fun DynamicReaderLayer(
                         shareCurrent()
                         true
                     }
+                    Key.Y -> {
+                        if (overlay is DynamicOverlay.Detail || overlay is DynamicOverlay.Text) {
+                            onComments(overlay.card, focus)
+                            true
+                        } else {
+                            false
+                        }
+                    }
                     else -> false
                 }
             }
@@ -1232,6 +1273,7 @@ private fun DynamicReaderLayer(
                 onBack = onBack,
                 onOpenGallery = onOpenGallery,
                 onShare = shareCurrent,
+                onComments = { onComments(overlay.card, focus) },
             )
             is DynamicOverlay.Gallery -> DynamicGalleryOverlay(
                 card = overlay.card,
@@ -1246,6 +1288,214 @@ private fun DynamicReaderLayer(
                 onBack = onBack,
                 onShare = shareCurrent,
             )
+        }
+    }
+}
+
+@Composable
+private fun DynamicCommentsOverlay(
+    card: DynamicCardUi,
+    session: DuoSessionViewModel?,
+    onReaderBack: () -> Unit,
+    onClose: () -> Unit,
+) {
+    val repository = remember { BilibiliRepository() }
+    val scope = rememberCoroutineScope()
+    val firstFocus = remember { FocusRequester() }
+    val loadMoreFocus = remember { FocusRequester() }
+    var comments by remember(card.id) { mutableStateOf<List<CommentItem>>(emptyList()) }
+    var loading by remember(card.id) { mutableStateOf(true) }
+    var loadingMore by remember(card.id) { mutableStateOf(false) }
+    var ended by remember(card.id) { mutableStateOf(false) }
+    var error by remember(card.id) { mutableStateOf<String?>(null) }
+    var nextCursor by remember(card.id) { mutableStateOf(0) }
+    var focusedOnce by remember(card.id) { mutableStateOf(false) }
+    val dynamicId = card.id.toLongOrNull()
+
+    suspend fun load(cursor: Int) {
+        if (dynamicId == null) {
+            loading = false
+            error = "动态 ID 无效"
+            return
+        }
+        repository.getComments(dynamicId, page = cursor, type = 17)
+            .onSuccess { list ->
+                val fresh = (list.topReplies ?: emptyList()) + (list.replies ?: emptyList())
+                comments = if (cursor == 0) {
+                    fresh.distinctBy { it.rpid }
+                } else {
+                    (comments + fresh).distinctBy { it.rpid }
+                }
+                nextCursor = list.cursor?.next ?: 0
+                ended = list.cursor?.isEnd ?: true
+                error = null
+            }
+            .onFailure { error = it.message ?: "评论加载失败" }
+        loading = false
+        loadingMore = false
+    }
+
+    LaunchedEffect(card.id) { load(0) }
+    LaunchedEffect(comments.size) {
+        if (comments.isNotEmpty() && !focusedOnce) {
+            focusedOnce = true
+            delay(80L)
+            runCatching { firstFocus.requestFocus() }
+        }
+    }
+    DisposableEffect(session, card.id) {
+        session?.setBackInterceptor {
+            onClose()
+            true
+        }
+        onDispose {
+            // The reader layer stays mounted behind this overlay; restore its
+            // B action instead of clearing the interceptor.
+            session?.setBackInterceptor {
+                onReaderBack()
+                true
+            }
+        }
+    }
+
+    Column(Modifier.fillMaxSize().background(DuoPalette.Bg)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().height(54.dp).padding(horizontal = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(CircleShape)
+                    .background(DuoPalette.SurfaceHigh)
+                    .pointerInput(Unit) { detectTapGestures { onClose() } },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("←", color = DuoPalette.Text, fontSize = 18.sp)
+            }
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = "动态评论",
+                    color = DuoPalette.Text,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = "${card.authorName} · ${formatCount(card.commentCount.toLong())} 条",
+                    color = DuoPalette.Tertiary,
+                    fontSize = 10.sp,
+                )
+            }
+            Text("B 返回", color = DuoPalette.Tertiary, fontSize = 10.sp)
+        }
+        when {
+            loading -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = DuoPalette.Pink, strokeWidth = 2.dp, modifier = Modifier.size(22.dp))
+            }
+            error != null && comments.isEmpty() -> Column(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(error.orEmpty(), color = DuoPalette.Error, fontSize = 11.sp)
+                Spacer(Modifier.height(8.dp))
+                DuoPillButton(
+                    text = "重试",
+                    onClick = {
+                        loading = true
+                        error = null
+                        scope.launch { load(0) }
+                    },
+                )
+            }
+            comments.isEmpty() -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                Text("暂无评论", color = DuoPalette.Tertiary, fontSize = 11.sp)
+            }
+            else -> LazyColumn(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                itemsIndexed(comments, key = { _, item -> item.rpid }) { index, comment ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .then(
+                                if (index == 0) Modifier.focusRequester(firstFocus) else Modifier
+                            )
+                            .duoFocusRing(RoundedCornerShape(6.dp))
+                            .focusable()
+                            .padding(4.dp),
+                        verticalAlignment = Alignment.Top,
+                    ) {
+                        Box(
+                            modifier = Modifier.size(30.dp).clip(CircleShape).background(DuoPalette.SurfaceHigh),
+                        ) {
+                            if (comment.member.avatar.isNotBlank()) {
+                                AsyncImage(
+                                    model = fixPic(comment.member.avatar),
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize(),
+                                )
+                            }
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Column(Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    comment.member.uname,
+                                    color = DuoPalette.Secondary,
+                                    fontSize = 10.sp,
+                                    maxLines = 1,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                Text("赞 ${comment.like}", color = DuoPalette.Tertiary, fontSize = 9.sp)
+                            }
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                comment.content.message,
+                                color = DuoPalette.Text,
+                                fontSize = 12.sp,
+                                lineHeight = 18.sp,
+                            )
+                        }
+                    }
+                }
+                item {
+                    if (loadingMore) {
+                        Box(Modifier.fillMaxWidth().padding(10.dp), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(color = DuoPalette.Pink, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
+                        }
+                    } else if (!ended) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .focusRequester(loadMoreFocus)
+                                .duoFocusRing(RoundedCornerShape(6.dp))
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(DuoPalette.Surface)
+                                .duoClickable {
+                                    loadingMore = true
+                                    scope.launch { load(nextCursor) }
+                                }
+                                .padding(vertical = 9.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text("加载更多评论", color = DuoPalette.Pink, fontSize = 10.sp)
+                        }
+                    } else {
+                        Text(
+                            "没有更多评论了",
+                            color = DuoPalette.Tertiary,
+                            fontSize = 10.sp,
+                            modifier = Modifier.fillMaxWidth().padding(10.dp),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -1332,6 +1582,7 @@ private fun DynamicDetailOverlay(
     onBack: () -> Unit,
     onOpenGallery: (Int) -> Unit,
     onShare: () -> Unit,
+    onComments: () -> Unit,
 ) {
     Column(Modifier.fillMaxSize().background(DuoPalette.Bg)) {
         ReaderHeader(
@@ -1417,10 +1668,10 @@ private fun DynamicDetailOverlay(
                 )
             }
             Spacer(Modifier.height(12.dp))
-            DynamicStatsRow(card, showLike = true)
+            DynamicStatsRow(card, showLike = true, onComments = onComments)
             Spacer(Modifier.height(10.dp))
             Text(
-                text = "方向键滚动 · A 查看大图 · X 复制链接 · B 返回列表",
+                text = "方向键滚动 · A 查看大图 · X 复制链接 · Y 评论 · B 返回列表",
                 color = DuoPalette.Tertiary,
                 fontSize = 10.sp,
             )

@@ -880,10 +880,15 @@ class BilibiliRepository(
         }.onFailure { Log.e(BilibiliApp.TAG, "getPlayUrlDash exception", it) }
     }
 
-    suspend fun getComments(aid: Long, page: Int = 0, mode: Int = 3): Result<CommentList> {
-        if (BuildConfig.DEBUG) Log.d(BilibiliApp.TAG, "getComments: aid=$aid page=$page mode=$mode")
+    suspend fun getComments(
+        aid: Long,
+        page: Int = 0,
+        mode: Int = 3,
+        type: Int = 1,
+    ): Result<CommentList> {
+        if (BuildConfig.DEBUG) Log.d(BilibiliApp.TAG, "getComments: oid=$aid type=$type page=$page mode=$mode")
         return runCatching {
-            val response = api.getComments(oid = aid, mode = mode, next = page)
+            val response = api.getComments(type = type, oid = aid, mode = mode, next = page)
             if (BuildConfig.DEBUG) Log.d(BilibiliApp.TAG, "getComments response: code=${response.code} msg=${response.message}")
             if (response.code == 0) {
                 response.data ?: CommentList(null)

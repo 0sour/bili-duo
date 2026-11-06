@@ -40,7 +40,6 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -610,11 +609,9 @@ private fun LiveLeftPane(
                     )
                 }
             }
-            LiveTransportButton(
-                icon = Icons.Filled.SkipNext,
-                description = "回到直播",
-                focusRequester = liveEdgeFocus,
-                enabled = !ui.isLoading,
+            LiveChip(
+                text = "回到直播",
+                modifier = Modifier.focusRequester(liveEdgeFocus),
                 onClick = onSeekLive,
             )
         }

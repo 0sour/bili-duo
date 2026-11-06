@@ -4,6 +4,21 @@
 `*.apk`），需要时本地 `./gradlew assembleDebug` / `assembleRelease` 生成，或从
 GitHub Releases 下载。
 
+## 0.2.0-rc33（2026-11-06）
+
+- `bili-duo-0.2.0-rc33-release.apk`
+  - R8 minify，正式 release keystore 签名；可覆盖安装同 key 的 rc32。
+  - APK SHA-256：`706e3ebb5371e36b96d69db83420639d117927f99153a5fa48256599f742d4e9`
+- `bili-duo-0.2.0-rc33-debug.apk`
+  - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
+  - SHA-256：`d33a03a7a62e1adcfb92837c78a3e89e2fbd402a3709af52c0c65c916909735b`
+
+rc33 变更：
+- 动态详情/纯文字阅读 Y 或点击评论数打开动态评论（type=17，只读、分页、重试）。
+- 评论浮层关闭后恢复阅读层 B interceptor，不会直接退出动态。
+- 直播「回到直播」改为文字按钮，移除 SkipNext 图标歧义。
+- 221 单测通过；Duo 构建后离线，未安装验证。
+
 ## 0.2.0-rc32（2026-11-06）
 
 - `bili-duo-0.2.0-rc32-release.apk`
