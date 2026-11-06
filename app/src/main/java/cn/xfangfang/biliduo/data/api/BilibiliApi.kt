@@ -413,6 +413,33 @@ interface BilibiliApi {
         @Query("aid") aid: Long
     ): ApiResponse<FavouredData>
 
+    @GET("x/web-interface/archive/has/like")
+    suspend fun hasLikedVideo(
+        @Query("aid") aid: Long
+    ): ApiResponse<Int>
+
+    @FormUrlEncoded
+    @POST("x/web-interface/archive/like")
+    suspend fun likeVideo(
+        @Field("aid") aid: Long,
+        @Field("like") like: Int,
+        @Field("csrf") csrf: String
+    ): ApiResponse<Any>
+
+    @GET("x/web-interface/archive/coins")
+    suspend fun getVideoCoins(
+        @Query("aid") aid: Long
+    ): ApiResponse<VideoCoinsData>
+
+    @FormUrlEncoded
+    @POST("x/web-interface/coin/add")
+    suspend fun addVideoCoin(
+        @Field("aid") aid: Long,
+        @Field("multiply") multiply: Int = 1,
+        @Field("select_like") selectLike: Int = 0,
+        @Field("csrf") csrf: String
+    ): ApiResponse<Any>
+
     @FormUrlEncoded
     @POST("x/v3/fav/resource/deal")
     suspend fun dealFavResource(

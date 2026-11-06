@@ -142,6 +142,10 @@ data class VideoStat(
     val share: Long = 0
 )
 
+data class VideoCoinsData(
+    val multiply: Int = 0
+)
+
 data class DanmakuPostData(
     val dmid: Long = 0L,
     val dmstr: String = "",

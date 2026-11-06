@@ -4,6 +4,25 @@
 `*.apk`），需要时本地 `./gradlew assembleDebug` / `assembleRelease` 生成，或从
 GitHub Releases 下载。
 
+## 0.2.0-rc27（2026-11-06）
+
+- `bili-duo-0.2.0-rc27-release.apk`
+  - R8 minify，正式 release keystore 签名；可覆盖安装同 key 的 rc26。
+  - APK SHA-256：`ea4dd2e84dc14cde8d9acf12153cb8f1c97c1a366ab77f45bf1dd55c0cdb5e30`
+- `bili-duo-0.2.0-rc27-debug.apk`
+  - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
+  - SHA-256：`52b231fbdbcffe322c2da77121a6b045a3c2ef8004cde34ac82b58cc35d4dd02`
+
+rc27 变更（P1 首批）：
+- 播放页右栏 tab 改为「简介 / 评论 / 分P(选集) / 推荐」，默认简介；评论/推荐懒加载
+  与 L2/R2 评论排序只在对应 tab 生效。
+- 简介页操作行改为「点赞 / 投币 / 收藏 / 下载」，统计行增加硬币数；点赞、投币、
+  收藏计数即时更新并显示选中态。
+- 点赞 `x/web-interface/archive/like`：点赞 `like=1`，**取消点赞 `like=2`**；传
+  `like=0` 会返回 -400「请求错误」。
+- 221 单测通过。Duo 验证：默认简介、R1 切评论/分P/推荐、点赞 389→390→389 并
+  恢复未点赞。投币不可撤回，未由助手实测。
+
 ## 0.2.0-rc26（2026-11-06）
 
 - `bili-duo-0.2.0-rc26-release.apk`

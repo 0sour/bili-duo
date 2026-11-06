@@ -42,6 +42,8 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.MonetizationOn
+import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -143,6 +145,13 @@ private val speedOptions = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f)
  * Bottom-screen player console. Owns no ExoPlayer: all transport commands go to
  * [PlayerController], all metadata comes from the Activity-scoped [PlayerViewModel].
  */
+// Right-pane tab order. Keep these in sync with the tab row and the
+// lazy-load effects below.
+private const val TAB_INTRO = 0
+private const val TAB_COMMENTS = 1
+private const val TAB_PARTS = 2
+private const val TAB_RELATED = 3
+
 @Composable
 fun PlayerConsoleScreen(
     bvid: String,
@@ -164,7 +173,7 @@ fun PlayerConsoleScreen(
     val repository = remember { BilibiliRepository() }
     val keyboard = LocalSoftwareKeyboardController.current
 
-    var selectedTab by remember { mutableIntStateOf(0) }
+    var selectedTab by remember { mutableIntStateOf(TAB_INTRO) }
     var seekDrag by remember { mutableStateOf<Float?>(null) }
     val playFocus = remember { FocusRequester() }
     val backFocus = remember { FocusRequester() }
@@ -199,6 +208,13 @@ fun PlayerConsoleScreen(
     var followBusy by remember(ownerMid) { mutableStateOf(false) }
     var isFavorited by remember(aid) { mutableStateOf<Boolean?>(null) }
     var favBusy by remember(aid) { mutableStateOf(false) }
+    var favDelta by remember(aid) { mutableStateOf(0L) }
+    var isLiked by remember(aid) { mutableStateOf<Boolean?>(null) }
+    var likeBusy by remember(aid) { mutableStateOf(false) }
+    var likeDelta by remember(aid) { mutableStateOf(0L) }
+    var coinsGiven by remember(aid) { mutableStateOf<Int?>(null) }
+    var coinBusy by remember(aid) { mutableStateOf(false) }
+    var coinDelta by remember(aid) { mutableStateOf(0L) }
 
     var comments by remember(aid) { mutableStateOf<List<CommentItem>>(emptyList()) }
     var commentsLoading by remember(aid) { mutableStateOf(false) }
@@ -411,9 +427,13 @@ fun PlayerConsoleScreen(
         val info = ui.videoInfo ?: return@LaunchedEffect
         isFollowed = null
         isFavorited = null
+        isLiked = null
+        coinsGiven = null
         if (BilibiliApi.loginCookies.isNotBlank()) {
             repository.checkRelation(info.owner.mid).onSuccess { isFollowed = it }
             repository.checkFavoured(info.aid).onSuccess { isFavorited = it }
+            repository.checkVideoLiked(info.aid).onSuccess { isLiked = it }
+            repository.checkVideoCoins(info.aid).onSuccess { coinsGiven = it }
         }
     }
 
@@ -448,7 +468,7 @@ fun PlayerConsoleScreen(
     }
 
     LaunchedEffect(selectedTab, aid, commentSort) {
-        if (selectedTab == 0 && aid != null && !commentsLoaded) {
+        if (selectedTab == TAB_COMMENTS && aid != null && !commentsLoaded) {
             loadComments(0, force = true)
         }
     }
@@ -468,7 +488,7 @@ fun PlayerConsoleScreen(
 
     LaunchedEffect(selectedTab, ui.videoInfo?.bvid) {
         val relatedBvid = ui.videoInfo?.bvid ?: return@LaunchedEffect
-        if (selectedTab == 1 && !relatedLoaded) {
+        if (selectedTab == TAB_RELATED && !relatedLoaded) {
             relatedLoading = true
             repository.getRelatedVideos(relatedBvid)
                 .onSuccess { videos ->
@@ -753,9 +773,63 @@ fun PlayerConsoleScreen(
             }
             result.onSuccess {
                 isFavorited = !current
+                favDelta += if (current) -1L else 1L
                 toast(if (current) "已取消收藏" else "已收藏")
             }.onFailure { toast(it.message ?: "操作失败") }
             favBusy = false
+        }
+    }
+
+    fun toggleLike() {
+        val info = ui.videoInfo ?: return
+        if (BilibiliApi.loginCookies.isBlank()) {
+            toast("请先登录")
+            return
+        }
+        if (likeBusy) return
+        if (isLiked == null) {
+            toast("点赞状态加载中")
+            return
+        }
+        val current = isLiked == true
+        scope.launch {
+            likeBusy = true
+            repository.likeVideo(info.aid, !current)
+                .onSuccess {
+                    isLiked = !current
+                    likeDelta += if (current) -1L else 1L
+                    toast(if (current) "已取消点赞" else "已点赞")
+                }
+                .onFailure { toast(it.message ?: "操作失败") }
+            likeBusy = false
+        }
+    }
+
+    fun giveCoin() {
+        val info = ui.videoInfo ?: return
+        if (BilibiliApi.loginCookies.isBlank()) {
+            toast("请先登录")
+            return
+        }
+        if (coinBusy) return
+        if (coinsGiven == null) {
+            toast("投币状态加载中")
+            return
+        }
+        if ((coinsGiven ?: 0) >= 2) {
+            toast("已投过 2 枚硬币")
+            return
+        }
+        scope.launch {
+            coinBusy = true
+            repository.addVideoCoin(info.aid, multiply = 1)
+                .onSuccess {
+                    coinsGiven = (coinsGiven ?: 0) + 1
+                    coinDelta += 1L
+                    toast("已投币")
+                }
+                .onFailure { toast(it.message ?: "投币失败，请检查硬币余额") }
+            coinBusy = false
         }
     }
 
@@ -830,7 +904,7 @@ fun PlayerConsoleScreen(
 
     fun playRelated(item: UserVideoItem) {
         controller.reportNow()
-        selectedTab = 0
+        selectedTab = TAB_INTRO
         vm.load(item.bvid)
     }
 
@@ -1335,7 +1409,7 @@ fun PlayerConsoleScreen(
                 Spacer(Modifier.weight(1f))
                 Text(
                     text = "方向键选择 · A 确认 · B 返回\n" +
-                        if (selectedTab == 0) {
+                        if (selectedTab == TAB_COMMENTS) {
                             "LB/RB 切 tab · L2/R2 评论排序 · X 弹幕 · START 菜单"
                         } else {
                             "LB/RB 切换 tab · X 弹幕 · START 菜单"
@@ -1374,40 +1448,40 @@ fun PlayerConsoleScreen(
                     horizontalArrangement = Arrangement.spacedBy(18.dp),
                 ) {
                     ConsoleTab(
+                        text = "简介",
+                        selected = selectedTab == TAB_INTRO,
+                        modifier = tabUp,
+                        focusRequester = tabFocus[TAB_INTRO],
+                        onClick = { selectedTab = TAB_INTRO },
+                    )
+                    ConsoleTab(
                         text = "评论",
                         count = ui.videoInfo?.stat?.reply ?: 0L,
-                        selected = selectedTab == 0,
+                        selected = selectedTab == TAB_COMMENTS,
                         modifier = tabUp,
-                        focusRequester = tabFocus[0],
-                        onClick = { selectedTab = 0 },
-                    )
-                    ConsoleTab(
-                        text = "推荐",
-                        selected = selectedTab == 1,
-                        modifier = tabUp,
-                        focusRequester = tabFocus[1],
-                        onClick = { selectedTab = 1 },
-                    )
-                    ConsoleTab(
-                        text = "简介",
-                        selected = selectedTab == 2,
-                        modifier = tabUp,
-                        focusRequester = tabFocus[2],
-                        onClick = { selectedTab = 2 },
+                        focusRequester = tabFocus[TAB_COMMENTS],
+                        onClick = { selectedTab = TAB_COMMENTS },
                     )
                     ConsoleTab(
                         text = if (ui.isPgc) "选集" else "分P",
-                        selected = selectedTab == 3,
+                        selected = selectedTab == TAB_PARTS,
                         modifier = tabUp,
-                        focusRequester = tabFocus[3],
-                        onClick = { selectedTab = 3 },
+                        focusRequester = tabFocus[TAB_PARTS],
+                        onClick = { selectedTab = TAB_PARTS },
+                    )
+                    ConsoleTab(
+                        text = "推荐",
+                        selected = selectedTab == TAB_RELATED,
+                        modifier = tabUp,
+                        focusRequester = tabFocus[TAB_RELATED],
+                        onClick = { selectedTab = TAB_RELATED },
                     )
                 }
                 Box(Modifier.fillMaxWidth().height(1.dp).background(DuoDivider))
 
                 Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                     when (selectedTab) {
-                        0 -> CommentsTab(
+                        TAB_COMMENTS -> CommentsTab(
                             comments = comments,
                             loading = commentsLoading,
                             ended = commentsEnded,
@@ -1448,25 +1522,34 @@ fun PlayerConsoleScreen(
                             hotSortFocus = commentHotFocus,
                             latestSortFocus = commentLatestFocus,
                         )
-                        1 -> RelatedTab(
+                        TAB_RELATED -> RelatedTab(
                             items = related,
                             loading = relatedLoading,
                             onPlay = { playRelated(it) },
                         )
-                        2 -> IntroTab(
+                        TAB_INTRO -> IntroTab(
                             uiState = ui,
                             isPgc = ui.isPgc,
                             isFollowed = isFollowed,
                             followBusy = followBusy,
                             isFavorited = isFavorited,
                             favBusy = favBusy,
+                            isLiked = isLiked,
+                            likeBusy = likeBusy,
+                            isCoined = (coinsGiven ?: 0) > 0,
+                            coinBusy = coinBusy,
+                            likeCount = (ui.videoInfo?.stat?.like ?: 0L) + likeDelta,
+                            coinCount = (ui.videoInfo?.stat?.coin ?: 0L) + coinDelta,
+                            favCount = (ui.videoInfo?.stat?.favorite ?: 0L) + favDelta,
                             onFollow = { toggleFollow() },
+                            onLike = { toggleLike() },
+                            onCoin = { giveCoin() },
                             onFavorite = { toggleFavorite() },
                             onDownload = { startDownload() },
                             onPlay = { controller.togglePlay() },
                             onUploaderClick = { ownerMid?.let(onUploaderClick) },
                         )
-                        3 -> PartsTab(
+                        TAB_PARTS -> PartsTab(
                             pages = ui.pages,
                             isPgc = ui.isPgc,
                             currentCid = ui.currentPage?.cid,
@@ -1495,7 +1578,7 @@ fun PlayerConsoleScreen(
                             true
                         }
                         android.view.KeyEvent.KEYCODE_BUTTON_L2 -> {
-                            if (selectedTab == 0) {
+                            if (selectedTab == TAB_COMMENTS) {
                                 applyCommentSort(3)
                                 scope.launch {
                                     delay(80L)
@@ -1507,7 +1590,7 @@ fun PlayerConsoleScreen(
                             }
                         }
                         android.view.KeyEvent.KEYCODE_BUTTON_R2 -> {
-                            if (selectedTab == 0) {
+                            if (selectedTab == TAB_COMMENTS) {
                                 applyCommentSort(2)
                                 scope.launch {
                                     delay(80L)
@@ -2153,7 +2236,16 @@ private fun IntroTab(
     followBusy: Boolean,
     isFavorited: Boolean?,
     favBusy: Boolean,
+    isLiked: Boolean?,
+    likeBusy: Boolean,
+    isCoined: Boolean,
+    coinBusy: Boolean,
+    likeCount: Long,
+    coinCount: Long,
+    favCount: Long,
     onFollow: () -> Unit,
+    onLike: () -> Unit,
+    onCoin: () -> Unit,
     onFavorite: () -> Unit,
     onDownload: () -> Unit,
     onPlay: () -> Unit,
@@ -2207,9 +2299,11 @@ private fun IntroTab(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     StatText("▶ ${formatCount(info.stat.view)}")
                     Spacer(Modifier.width(8.dp))
-                    StatText("👍 ${formatCount(info.stat.like)}")
+                    StatText("👍 ${formatCount(likeCount)}")
                     Spacer(Modifier.width(8.dp))
-                    StatText("⭐ ${formatCount(info.stat.favorite)}")
+                    StatText("币 ${formatCount(coinCount)}")
+                    Spacer(Modifier.width(8.dp))
+                    StatText("⭐ ${formatCount(favCount)}")
                 }
                 Spacer(Modifier.height(3.dp))
                 Text(
@@ -2284,6 +2378,28 @@ private fun IntroTab(
             Spacer(Modifier.height(6.dp))
 
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                ActionPill(
+                    icon = Icons.Filled.ThumbUp,
+                    text = when {
+                        likeBusy -> "处理中"
+                        isLiked == true -> "已点赞"
+                        else -> "点赞"
+                    },
+                    active = isLiked == true,
+                    onClick = onLike,
+                    modifier = Modifier.focusProperties { down = FocusRequester.Cancel },
+                )
+                ActionPill(
+                    icon = Icons.Filled.MonetizationOn,
+                    text = when {
+                        coinBusy -> "处理中"
+                        isCoined -> "已投币"
+                        else -> "投币"
+                    },
+                    active = isCoined,
+                    onClick = onCoin,
+                    modifier = Modifier.focusProperties { down = FocusRequester.Cancel },
+                )
                 ActionPill(
                     icon = if (isFavorited == true) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                     text = when {

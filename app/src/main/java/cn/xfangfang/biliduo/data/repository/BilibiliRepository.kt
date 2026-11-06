@@ -764,6 +764,44 @@ class BilibiliRepository(
         }.onFailure { Log.e(BilibiliApp.TAG, "checkFavoured failed", it) }
     }
 
+    suspend fun checkVideoLiked(aid: Long): Result<Boolean> {
+        return runCatching {
+            val response = api.hasLikedVideo(aid = aid)
+            if (response.code == 0) (response.data ?: 0) != 0 else throw Exception(response.message)
+        }.onFailure { Log.e(BilibiliApp.TAG, "checkVideoLiked failed", it) }
+    }
+
+    suspend fun likeVideo(aid: Long, liked: Boolean): Result<Unit> {
+        return runCatching {
+            val response = api.likeVideo(
+                aid = aid,
+                // Bilibili uses 1 for like and 2 for cancel; 0 returns -400.
+                like = if (liked) 1 else 2,
+                csrf = BilibiliApi.biliJct,
+            )
+            if (response.code != 0) throw Exception(response.message)
+        }.onFailure { Log.e(BilibiliApp.TAG, "likeVideo failed", it) }
+    }
+
+    suspend fun checkVideoCoins(aid: Long): Result<Int> {
+        return runCatching {
+            val response = api.getVideoCoins(aid = aid)
+            if (response.code == 0) response.data?.multiply ?: 0 else throw Exception(response.message)
+        }.onFailure { Log.e(BilibiliApp.TAG, "checkVideoCoins failed", it) }
+    }
+
+    suspend fun addVideoCoin(aid: Long, multiply: Int = 1): Result<Unit> {
+        return runCatching {
+            val response = api.addVideoCoin(
+                aid = aid,
+                multiply = multiply,
+                selectLike = 0,
+                csrf = BilibiliApi.biliJct,
+            )
+            if (response.code != 0) throw Exception(response.message)
+        }.onFailure { Log.e(BilibiliApp.TAG, "addVideoCoin failed", it) }
+    }
+
     suspend fun dealFavResource(
         rid: Long,
         addMediaIds: String,
