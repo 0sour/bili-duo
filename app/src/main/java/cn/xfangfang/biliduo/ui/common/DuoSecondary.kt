@@ -39,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
@@ -250,6 +251,7 @@ fun DuoEmptyState(
     actionText: String? = null,
     onAction: (() -> Unit)? = null,
     focusRequester: FocusRequester? = null,
+    upFocus: FocusRequester? = null,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -268,6 +270,11 @@ fun DuoEmptyState(
                 text = actionText,
                 onClick = onAction,
                 focusRequester = focusRequester,
+                modifier = if (upFocus != null) {
+                    Modifier.focusProperties { up = upFocus }
+                } else {
+                    Modifier
+                },
             )
         }
     }

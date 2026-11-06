@@ -97,6 +97,7 @@ fun DownloadsScreen(
     val searchFocus = remember { FocusRequester() }
     val firstItemFocus = remember { FocusRequester() }
     val emptyActionFocus = remember { FocusRequester() }
+    val backFocus = remember { FocusRequester() }
     var searchMode by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf(DownloadFilter.ALL) }
@@ -326,6 +327,7 @@ fun DownloadsScreen(
         DuoPageHeader(
             title = "我的下载",
             onBack = { if (searchMode) exitSearch() else onBack() },
+            backModifier = Modifier.focusRequester(backFocus),
             actions = {
                 if (activeDownloadCount > 0) {
                     DuoIconAction(
@@ -408,6 +410,7 @@ fun DownloadsScreen(
                         actionText = "去首页找视频",
                         onAction = onBrowse,
                         focusRequester = emptyActionFocus,
+                        upFocus = backFocus,
                     )
                 }
                 displayItems.isEmpty() -> {
@@ -437,6 +440,7 @@ fun DownloadsScreen(
                             }
                         },
                         focusRequester = emptyActionFocus,
+                        upFocus = backFocus,
                     )
                 }
                 else -> {

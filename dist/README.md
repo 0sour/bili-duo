@@ -4,6 +4,21 @@
 `*.apk`），需要时本地 `./gradlew assembleDebug` / `assembleRelease` 生成，或从
 GitHub Releases 下载。
 
+## 0.2.0-rc25（2026-11-06）
+
+- `bili-duo-0.2.0-rc25-release.apk`
+  - R8 minify，正式 release keystore 签名；可覆盖安装同 key 的 rc24。
+  - APK SHA-256：`1734a0fb564965e887587667ee950d0a0530af7dd830d349d862c47f53a52064`
+- `bili-duo-0.2.0-rc25-debug.apk`
+  - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
+  - SHA-256：`6164cb847dcbfa0e67a3dae2daece5dddd42d88e294ab913720d52c5aeab467e`
+
+rc25 变更：
+- 下载页空态（无下载 / 筛选为空）的动作按钮「去首页找视频」「查看全部」按上时
+  显式回到页头返回键，不再跳到左侧 rail 的「搜索」。
+- `DuoEmptyState` 增加可选 `upFocus`；不影响未传该参数的页面。
+- 221 单测通过。Duo 截图验证：按钮聚焦后 Up → 返回键白环。
+
 ## 0.2.0-rc24（2026-11-06）
 
 - `bili-duo-0.2.0-rc24-release.apk`
