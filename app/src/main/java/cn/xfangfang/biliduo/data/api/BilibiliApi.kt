@@ -20,6 +20,7 @@ import retrofit2.http.Body
 import retrofit2.http.Field
 import retrofit2.http.FormUrlEncoded
 import retrofit2.http.GET
+import retrofit2.http.Headers
 import retrofit2.http.POST
 import retrofit2.http.Query
 import java.security.MessageDigest
@@ -207,6 +208,21 @@ interface BilibiliApi {
         @Query("next") next: Int = 0
     ): ApiResponse<CommentList>
 
+    @GET("x/v2/reply/wbi/main")
+    suspend fun getDynamicCommentsWbi(
+        @Query("type") type: Int = 17,
+        @Query("oid") oid: Long,
+        @Query("mode") mode: Int = 3,
+        @Query("pagination_str") paginationStr: String = "{\"offset\":\"\"}",
+        @Query("plat") plat: Int = 1,
+        @Query("web_location") webLocation: String = "1315875",
+        @Query("seek_rpid") seekRpid: String = ""
+    ): ApiResponse<CommentList>
+
+    @Headers(
+        "Referer: https://t.bilibili.com/",
+        "Origin: https://t.bilibili.com",
+    )
     @GET("x/v2/reply")
     suspend fun getReplyList(
         @Query("type") type: Int,

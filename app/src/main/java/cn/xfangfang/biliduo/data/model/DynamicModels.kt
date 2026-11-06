@@ -31,8 +31,15 @@ data class DynamicFeedItem(
     @SerializedName("id_str") val idStr: String = "",
     @SerializedName("id") val id: Long = 0,
     @SerializedName("type") val type: String = "",
+    @SerializedName("basic") val basic: DynamicBasic? = null,
     @SerializedName("modules") val modules: DynamicModules? = null,
     @SerializedName("orig") val orig: DynamicFeedItem? = null,
+)
+
+data class DynamicBasic(
+    /** Comment oid; differs from the dynamic id for opus/video cards. */
+    @SerializedName("comment_id_str") val commentIdStr: String = "",
+    @SerializedName("comment_type") val commentType: Int = 17,
 )
 
 data class DynamicModules(
@@ -153,6 +160,9 @@ data class DynamicCardUi(
     val forwardCount: Int,
     val likeCount: Int,
     val liked: Boolean = false,
+    /** Resolved comment target from item.basic, not always the dynamic id. */
+    val commentOid: Long = 0L,
+    val commentType: Int = 17,
 ) {
     val playbackBvid: String?
         get() = video?.bvid?.takeIf { it.isNotBlank() }
@@ -189,8 +199,12 @@ fun DynamicFeedItem.toCardUi(): DynamicCardUi? {
     val forward = orig?.toForwardUi()
     val stat = module.stat
 
+    val commentOid = basic?.commentIdStr?.toLongOrNull() ?: id
+    val commentType = basic?.commentType?.takeIf { it > 0 } ?: 17
     return DynamicCardUi(
         id = idStr.ifBlank { id.toString() },
+        commentOid = commentOid,
+        commentType = commentType,
         authorMid = author?.mid ?: 0L,
         authorName = author?.name.orEmpty().ifBlank { "未知用户" },
         authorFace = author?.face.orEmpty(),

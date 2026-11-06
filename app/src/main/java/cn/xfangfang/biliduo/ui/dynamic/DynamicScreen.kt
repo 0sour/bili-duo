@@ -1310,7 +1310,7 @@ private fun DynamicCommentsOverlay(
     var error by remember(card.id) { mutableStateOf<String?>(null) }
     var page by remember(card.id) { mutableStateOf(1) }
     var focusedOnce by remember(card.id) { mutableStateOf(false) }
-    val dynamicId = card.id.toLongOrNull()
+    val dynamicId = card.commentOid.takeIf { it > 0L }
 
     suspend fun load(targetPage: Int) {
         if (dynamicId == null) {
@@ -1318,7 +1318,7 @@ private fun DynamicCommentsOverlay(
             error = "动态 ID 无效"
             return
         }
-        repository.getDynamicComments(dynamicId, page = targetPage)
+        repository.getDynamicComments(dynamicId, type = card.commentType, page = targetPage)
             .onSuccess { list ->
                 val fresh = (list.topReplies ?: emptyList()) + (list.replies ?: emptyList())
                 comments = if (targetPage == 1) {
