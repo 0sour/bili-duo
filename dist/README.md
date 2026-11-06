@@ -4,6 +4,21 @@
 `*.apk`），需要时本地 `./gradlew assembleDebug` / `assembleRelease` 生成，或从
 GitHub Releases 下载。
 
+## 0.2.0-rc26（2026-11-06）
+
+- `bili-duo-0.2.0-rc26-release.apk`
+  - R8 minify，正式 release keystore 签名；可覆盖安装同 key 的 rc25。
+  - APK SHA-256：`b1fe7e297e4df27ea173ae7beadde1e3e6b10f3f9ec0bdcfb9ad7724bd7a2314`
+- `bili-duo-0.2.0-rc26-debug.apk`
+  - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
+  - SHA-256：`b18b56e65392830f4f3541ae2da128644a8edb67a856ad204a34eaf8f4dc152c`
+
+rc26 变更：
+- 下载页返回键与页头所有图标（暂停/继续/清除/搜索）的 Down 显式进入内容：
+  搜索态进搜索框，有任务进当前筛选 chip，空态进「去首页找视频」。
+- 修复搜索图标按 Down 落到左侧 rail 的问题。
+- 221 单测通过。Duo 截图验证：搜索图标聚焦 → Down → 空态按钮白环。
+
 ## 0.2.0-rc25（2026-11-06）
 
 - `bili-duo-0.2.0-rc25-release.apk`

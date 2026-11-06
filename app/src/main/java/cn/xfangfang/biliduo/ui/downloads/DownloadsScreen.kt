@@ -46,6 +46,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
@@ -315,6 +316,14 @@ fun DownloadsScreen(
         lastFilterShortcutAt = SystemClock.uptimeMillis()
     }
 
+    // Down from the header must enter the page content, never the app rail.
+    fun contentFocus(): FocusRequester = when {
+        searchMode -> searchFocus
+        items.isNotEmpty() -> filterFocusers.getOrNull(filters.indexOf(filter)) ?: firstItemFocus
+        else -> emptyActionFocus
+    }
+    val headerDown = Modifier.focusProperties { down = contentFocus() }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -327,7 +336,7 @@ fun DownloadsScreen(
         DuoPageHeader(
             title = "我的下载",
             onBack = { if (searchMode) exitSearch() else onBack() },
-            backModifier = Modifier.focusRequester(backFocus),
+            backModifier = Modifier.focusRequester(backFocus).then(headerDown),
             actions = {
                 if (activeDownloadCount > 0) {
                     DuoIconAction(
@@ -335,6 +344,7 @@ fun DownloadsScreen(
                         contentDescription = "全部暂停",
                         tint = DuoPalette.Secondary,
                         onClick = { viewModel.pauseAll() },
+                        modifier = headerDown,
                     )
                 }
                 if (resumableCount > 0) {
@@ -343,6 +353,7 @@ fun DownloadsScreen(
                         contentDescription = "全部继续",
                         tint = DuoPalette.Pink,
                         onClick = { requestResumeAll() },
+                        modifier = headerDown,
                     )
                 }
                 if (completedCount > 0) {
@@ -354,6 +365,7 @@ fun DownloadsScreen(
                             pendingActionFocus = null
                             confirmClearCompleted = true
                         },
+                        modifier = headerDown,
                     )
                 }
                 DuoIconAction(
@@ -363,6 +375,7 @@ fun DownloadsScreen(
                     onClick = {
                         if (searchMode) exitSearch() else searchMode = true
                     },
+                    modifier = headerDown,
                 )
             },
         )
