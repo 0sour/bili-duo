@@ -1244,6 +1244,14 @@ private fun DynamicReaderLayer(
                         }
                         true
                     }
+                    Key.ButtonL1, Key.ButtonR1 -> {
+                        if (overlay is DynamicOverlay.Detail || overlay is DynamicOverlay.Text) {
+                            onComments(overlay.card, focus)
+                            true
+                        } else {
+                            false
+                        }
+                    }
                     Key.X -> {
                         shareCurrent()
                         true
@@ -1671,7 +1679,7 @@ private fun DynamicDetailOverlay(
             DynamicStatsRow(card, showLike = true, onComments = onComments)
             Spacer(Modifier.height(10.dp))
             Text(
-                text = "方向键滚动 · A 查看大图 · X 复制链接 · Y 评论 · B 返回列表",
+                text = "方向键滚动 · LB/RB 评论 · X 复制链接 · B 返回列表",
                 color = DuoPalette.Tertiary,
                 fontSize = 10.sp,
             )
@@ -1926,7 +1934,7 @@ private fun DynamicTextOverlay(
             DynamicStatsRow(card, showLike = true)
             Spacer(Modifier.height(10.dp))
             Text(
-                text = "方向键滚动 · X 复制链接 · B 返回列表",
+                text = "方向键滚动 · LB/RB 评论 · X 复制链接 · B 返回列表",
                 color = DuoPalette.Tertiary,
                 fontSize = 10.sp,
             )
