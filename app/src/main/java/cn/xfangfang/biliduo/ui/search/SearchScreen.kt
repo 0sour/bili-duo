@@ -1,5 +1,6 @@
 package cn.xfangfang.biliduo.ui.search
 
+import android.os.SystemClock
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -104,6 +105,11 @@ fun SearchScreen(
     val focusManager = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
     var searchFocused by remember { mutableStateOf(false) }
+    var lastShortcutAt by remember { mutableStateOf(0L) }
+    var chipFocusCount by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+    val onChipFocusChanged: (Boolean) -> Unit = { focused ->
+        chipFocusCount = (chipFocusCount + if (focused) 1 else -1).coerceAtLeast(0)
+    }
     val editingQuery = state.query.isNotBlank() && state.query.trim() != state.submittedQuery
     val showSuggestions = editingQuery && state.suggestions.isNotEmpty()
 
@@ -159,6 +165,12 @@ fun SearchScreen(
         state.users.firstOrNull()?.mid,
     ) {
         delay(120L)
+        // L1/R1 and L2/R2 move focus to the chip they switched; do not steal
+        // it back to the first result in the same gesture window.
+        if (SystemClock.uptimeMillis() - lastShortcutAt < 600L) return@LaunchedEffect
+        // A chip owns focus after L1/R1 or L2/R2; never pull it back to the
+        // first result when a reload finishes.
+        if (chipFocusCount > 0) return@LaunchedEffect
         val hasItems = if (state.searchType == SearchType.USER) {
             state.users.isNotEmpty()
         } else {
@@ -170,6 +182,31 @@ fun SearchScreen(
             searchFocus
         }
         runCatching { target.requestFocus() }
+    }
+
+    val typeFocusers = remember { List(SearchType.values().size) { FocusRequester() } }
+    val sortFocusers = remember { List(SearchSort.options.size) { FocusRequester() } }
+    var pendingTypeFocus by remember { mutableStateOf(false) }
+    var pendingSortFocus by remember { mutableStateOf(false) }
+
+    LaunchedEffect(state.searchType, pendingTypeFocus) {
+        if (pendingTypeFocus) {
+            delay(80L)
+            runCatching {
+                typeFocusers[SearchType.values().indexOf(state.searchType)].requestFocus()
+            }
+            pendingTypeFocus = false
+        }
+    }
+    LaunchedEffect(state.sortBy, pendingSortFocus) {
+        if (pendingSortFocus) {
+            delay(80L)
+            runCatching {
+                sortFocusers[SearchSort.options.indexOfFirst { it.value == state.sortBy.value }]
+                    .requestFocus()
+            }
+            pendingSortFocus = false
+        }
     }
 
     val submitSearch: () -> Unit = {
@@ -187,15 +224,21 @@ fun SearchScreen(
             when (event.key) {
                 Key.ButtonR1 -> {
                     viewModel.setSearchType(types[(typeIndex + 1) % types.size])
+                    lastShortcutAt = SystemClock.uptimeMillis()
+                    pendingTypeFocus = true
                     true
                 }
                 Key.ButtonL1 -> {
                     viewModel.setSearchType(types[(typeIndex - 1 + types.size) % types.size])
+                    lastShortcutAt = SystemClock.uptimeMillis()
+                    pendingTypeFocus = true
                     true
                 }
                 Key.Y, Key.ButtonR2 -> {
                     if (state.searchType == SearchType.VIDEO) {
                         viewModel.nextSort()
+                    lastShortcutAt = SystemClock.uptimeMillis()
+                        pendingSortFocus = true
                         true
                     } else {
                         false
@@ -204,6 +247,8 @@ fun SearchScreen(
                 Key.ButtonL2 -> {
                     if (state.searchType == SearchType.VIDEO) {
                         viewModel.prevSort()
+                    lastShortcutAt = SystemClock.uptimeMillis()
+                        pendingSortFocus = true
                         true
                     } else {
                         false
@@ -270,7 +315,20 @@ fun SearchScreen(
             SearchTypeRow(
                 selected = state.searchType,
                 onSelect = viewModel::setSearchType,
+                focusRequesters = typeFocusers,
+                onChipFocusChanged = onChipFocusChanged,
             )
+            // Keep the sort row mounted while a new sort loads. If it is
+            // removed with the result list, the L2/R2 focus request has no
+            // target and the ring falls back to the first result.
+            if (state.searchType == SearchType.VIDEO) {
+                SortRow(
+                    selected = state.sortBy,
+                    onSelect = viewModel::setSortBy,
+                    focusRequesters = sortFocusers,
+                    onChipFocusChanged = onChipFocusChanged,
+                )
+            }
             val hasItems = if (state.searchType == SearchType.USER) {
                 state.users.isNotEmpty()
             } else {
@@ -337,10 +395,6 @@ fun SearchScreen(
                 }
 
                 else -> {
-                    SortRow(
-                        selected = state.sortBy,
-                        onSelect = viewModel::setSortBy,
-                    )
                     LazyColumn(
                         state = listState,
                         modifier = Modifier.fillMaxSize(),
@@ -712,6 +766,8 @@ private fun HotChip(
 private fun SearchTypeRow(
     selected: SearchType,
     onSelect: (SearchType) -> Unit,
+    focusRequesters: List<FocusRequester> = emptyList(),
+    onChipFocusChanged: (Boolean) -> Unit = {},
 ) {
     Row(
         modifier = Modifier
@@ -720,11 +776,19 @@ private fun SearchTypeRow(
             .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        SearchType.values().forEach { type ->
+        SearchType.values().forEachIndexed { index, type ->
             val isSelected = type == selected
             Box(
                 modifier = Modifier
                     .height(28.dp)
+                    .then(
+                        if (index < focusRequesters.size) {
+                            Modifier.focusRequester(focusRequesters[index])
+                        } else {
+                            Modifier
+                        }
+                    )
+                    .onFocusChanged { onChipFocusChanged(it.isFocused) }
                     .duoFocusRing(RoundedCornerShape(14.dp))
                     .clip(RoundedCornerShape(14.dp))
                     .background(
@@ -761,6 +825,8 @@ private fun SearchTypeRow(
 private fun SortRow(
     selected: SearchSortOption,
     onSelect: (SearchSortOption) -> Unit,
+    focusRequesters: List<FocusRequester> = emptyList(),
+    onChipFocusChanged: (Boolean) -> Unit = {},
 ) {
     Row(
         modifier = Modifier
@@ -771,11 +837,19 @@ private fun SortRow(
             .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        SearchSort.options.forEach { option ->
+        SearchSort.options.forEachIndexed { index, option ->
             val isSelected = option.value == selected.value
             Column(
                 modifier = Modifier
                     .height(32.dp)
+                    .then(
+                        if (index < focusRequesters.size) {
+                            Modifier.focusRequester(focusRequesters[index])
+                        } else {
+                            Modifier
+                        }
+                    )
+                    .onFocusChanged { onChipFocusChanged(it.isFocused) }
                     .duoFocusRing(RoundedCornerShape(6.dp))
                     .clip(RoundedCornerShape(6.dp))
                     .duoClickable { onSelect(option) }

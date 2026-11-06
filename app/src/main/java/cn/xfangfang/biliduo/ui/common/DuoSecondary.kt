@@ -101,7 +101,8 @@ fun DuoPageHeader(
             onClick = onBack,
             modifier = backModifier,
         )
-        Spacer(Modifier.width(2.dp))
+        // 8dp keeps the back button's 5.75dp ring clear of the title text.
+        Spacer(Modifier.width(8.dp))
         Text(
             text = title,
             color = DuoPalette.Text,

@@ -125,7 +125,6 @@ import cn.xfangfang.biliduo.ui.detail.pickDefaultFolderId
 import cn.xfangfang.biliduo.ui.duo.duoClickable
 import cn.xfangfang.biliduo.ui.duo.duoFocusRing
 import cn.xfangfang.biliduo.ui.duo.duoTextFieldNavigation
-import cn.xfangfang.biliduo.ui.duo.duoTabCycling
 import cn.xfangfang.biliduo.util.fixPic
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -207,6 +206,8 @@ fun PlayerConsoleScreen(
     var commentsError by remember(aid) { mutableStateOf<String?>(null) }
     val selfMid = remember { BilibiliApi.parseSelfMid() }
     val commentComposeFocus = remember { FocusRequester() }
+    val commentHotFocus = remember { FocusRequester() }
+    val commentLatestFocus = remember { FocusRequester() }
     var commentDraft by remember { mutableStateOf("") }
     var commentReplyTarget by remember { mutableStateOf<CommentItem?>(null) }
     var commentReplyRoot by remember { mutableStateOf<CommentItem?>(null) }
@@ -450,6 +451,19 @@ fun PlayerConsoleScreen(
         if (selectedTab == 0 && aid != null && !commentsLoaded) {
             loadComments(0, force = true)
         }
+    }
+
+    fun applyCommentSort(sort: Int) {
+        if (sort == commentSort) return
+        commentSort = sort
+        comments = emptyList()
+        commentsLoaded = false
+        nextCursor = 0
+        commentsEnded = false
+        expandedReplies = emptySet()
+        repliesByRoot = emptyMap()
+        repliesPage = emptyMap()
+        expandedComments = emptySet()
     }
 
     LaunchedEffect(selectedTab, ui.videoInfo?.bvid) {
@@ -1406,19 +1420,7 @@ fun PlayerConsoleScreen(
                             repliesByRoot = repliesByRoot,
                             repliesLoading = repliesLoading,
                             repliesError = repliesError,
-                            onSort = { sort ->
-                                if (sort != commentSort) {
-                                    commentSort = sort
-                                    comments = emptyList()
-                                    commentsLoaded = false
-                                    nextCursor = 0
-                                    commentsEnded = false
-                                    expandedReplies = emptySet()
-                                    repliesByRoot = emptyMap()
-                                    repliesPage = emptyMap()
-                                    expandedComments = emptySet()
-                                }
-                            },
+                            onSort = ::applyCommentSort,
                             onRetry = { scope.launch { loadComments(0) } },
                             onLoadMore = { scope.launch { loadComments(nextCursor) } },
                             onLike = ::toggleCommentLike,
@@ -1443,6 +1445,8 @@ fun PlayerConsoleScreen(
                             },
                             onDelete = ::requestDeleteComment,
                             onAuthorClick = onUploaderClick,
+                            hotSortFocus = commentHotFocus,
+                            latestSortFocus = commentLatestFocus,
                         )
                         1 -> RelatedTab(
                             items = related,
@@ -1489,6 +1493,30 @@ fun PlayerConsoleScreen(
                         android.view.KeyEvent.KEYCODE_BUTTON_R1 -> {
                             cycleTab(1)
                             true
+                        }
+                        android.view.KeyEvent.KEYCODE_BUTTON_L2 -> {
+                            if (selectedTab == 0) {
+                                applyCommentSort(3)
+                                scope.launch {
+                                    delay(80L)
+                                    runCatching { commentHotFocus.requestFocus() }
+                                }
+                                true
+                            } else {
+                                false
+                            }
+                        }
+                        android.view.KeyEvent.KEYCODE_BUTTON_R2 -> {
+                            if (selectedTab == 0) {
+                                applyCommentSort(2)
+                                scope.launch {
+                                    delay(80L)
+                                    runCatching { commentLatestFocus.requestFocus() }
+                                }
+                                true
+                            } else {
+                                false
+                            }
                         }
                         android.view.KeyEvent.KEYCODE_BUTTON_X,
                         android.view.KeyEvent.KEYCODE_X -> {
@@ -2325,20 +2353,10 @@ private fun CommentsTab(
     onReplyToReply: (CommentItem, CommentItem) -> Unit,
     onDelete: (CommentItem) -> Unit,
     onAuthorClick: (Long) -> Unit,
+    hotSortFocus: FocusRequester,
+    latestSortFocus: FocusRequester,
 ) {
-    // The first comment's expand link has no focusable above it inside the
-    // list; without this anchor Up falls back to the left transport column.
-    val sortFocus = remember { FocusRequester() }
-    Column(
-        Modifier
-            .fillMaxSize()
-            // L2/R2 switch the comment sort without stealing L1/R1 from the
-            // right-pane tab cycling handled by the console root.
-            .duoTabCycling(
-                onPreviousSection = { if (sortMode != 3) onSort(3) },
-                onNextSection = { if (sortMode != 2) onSort(2) },
-            ),
-    ) {
+    Column(Modifier.fillMaxSize()) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -2372,13 +2390,14 @@ private fun CommentsTab(
                 text = "热门",
                 selected = sortMode == 3,
                 onClick = { onSort(3) },
-                modifier = Modifier.focusRequester(sortFocus),
+                modifier = Modifier.focusRequester(hotSortFocus),
             )
             Spacer(Modifier.width(4.dp))
             CommentSortChip(
                 text = "最新",
                 selected = sortMode == 2,
                 onClick = { onSort(2) },
+                modifier = Modifier.focusRequester(latestSortFocus),
             )
         }
         Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -2421,7 +2440,7 @@ private fun CommentsTab(
                         itemsIndexed(comments, key = { _, comment -> comment.rpid }) { index, comment ->
                             CommentRow(
                                 comment = comment,
-                                upTarget = if (index == 0) sortFocus else null,
+                                upTarget = if (index == 0) hotSortFocus else null,
                                 liked = likeState[comment.rpid] ?: (comment.action == 1),
                                 likeDelta = likeDelta[comment.rpid] ?: 0,
                                 disliked = dislikeState[comment.rpid] ?: (comment.action == 2),
@@ -3420,11 +3439,7 @@ private fun DanmakuSendOverlay(
                 Text(error, color = DuoPink, fontSize = 10.sp)
             }
             Spacer(Modifier.height(6.dp))
-            DanmakuSettingRow(
-                label = "位置",
-                value = danmakuModeLabel(mode),
-                onClick = { onMode(nextDanmakuMode(mode)) },
-            )
+            DanmakuPositionRow(mode = mode, onMode = onMode)
             DanmakuColorRow(color = color, onColor = onColor)
             Spacer(Modifier.height(8.dp))
             Row(
@@ -3888,51 +3903,98 @@ private val danmakuSendColors = listOf(
 
 @Composable
 private fun DanmakuColorRow(color: Long, onColor: (Long) -> Unit) {
+    DanmakuOptionRow(label = "颜色") {
+        danmakuSendColors.forEach { value ->
+            val selected = value == color
+            val checkColor = if (value == 0xFFFFFFL || value == 0xFFD700L ||
+                value == 0x66CCFFL || value == 0x7BDD7BL
+            ) {
+                Color.Black
+            } else {
+                Color.White
+            }
+            Box(
+                modifier = Modifier
+                    .size(26.dp)
+                    .duoFocusRing(CircleShape)
+                    .clip(CircleShape)
+                    // The send API stores RGB; add the opaque alpha for
+                    // Compose or every swatch renders transparent.
+                    .background(Color((0xFF000000L or value).toInt()))
+                    .duoClickable { onColor(value) },
+                contentAlignment = Alignment.Center,
+            ) {
+                if (selected) {
+                    Text(
+                        text = "✓",
+                        color = checkColor,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+            }
+        }
+    }
+}
+
+private val danmakuPositionOptions = listOf(1 to "滚动", 5 to "顶部", 4 to "底部")
+
+@Composable
+private fun DanmakuPositionRow(mode: Int, onMode: (Int) -> Unit) {
+    DanmakuOptionRow(label = "位置") {
+        danmakuPositionOptions.forEach { (value, label) ->
+            val selected = mode == value
+            Box(
+                modifier = Modifier
+                    .height(28.dp)
+                    .duoFocusRing(RoundedCornerShape(50))
+                    .clip(RoundedCornerShape(50))
+                    .background(
+                        if (selected) DuoPink.copy(alpha = 0.16f) else DuoSurfaceHigh
+                    )
+                    .border(
+                        width = 1.dp,
+                        color = if (selected) DuoPink else Color.Transparent,
+                        shape = RoundedCornerShape(50),
+                    )
+                    .duoClickable { onMode(value) }
+                    .padding(horizontal = 12.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = label,
+                    color = if (selected) DuoPink else Color(0xFFD8D8DE),
+                    fontSize = 10.sp,
+                )
+            }
+        }
+    }
+}
+
+/** Shared label/option layout so 位置 and 颜色 line up on the same grid. */
+@Composable
+private fun DanmakuOptionRow(
+    label: String,
+    content: @Composable RowScope.() -> Unit,
+) {
     Row(
-        modifier = Modifier.fillMaxWidth().height(44.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(44.dp)
+            .padding(horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            text = "颜色",
+            text = label,
             color = Color.White,
             fontSize = 12.sp,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.width(44.dp),
         )
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
-        ) {
-            danmakuSendColors.forEach { value ->
-                val selected = value == color
-                val checkColor = if (value == 0xFFFFFFL || value == 0xFFD700L ||
-                    value == 0x66CCFFL || value == 0x7BDD7BL
-                ) {
-                    Color.Black
-                } else {
-                    Color.White
-                }
-                Box(
-                    modifier = Modifier
-                        .size(26.dp)
-                        .duoFocusRing(CircleShape)
-                        .clip(CircleShape)
-                        // The send API stores RGB; add the opaque alpha for
-                        // Compose or every swatch renders transparent.
-                        .background(Color((0xFF000000L or value).toInt()))
-                        .duoClickable { onColor(value) },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    if (selected) {
-                        Text(
-                            text = "✓",
-                            color = checkColor,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                        )
-                    }
-                }
-            }
-        }
+            content = content,
+        )
     }
 }
 

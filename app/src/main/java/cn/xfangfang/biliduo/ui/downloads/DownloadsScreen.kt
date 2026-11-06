@@ -1,5 +1,6 @@
 package cn.xfangfang.biliduo.ui.downloads
 
+import android.os.SystemClock
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -105,6 +106,7 @@ fun DownloadsScreen(
     var confirmDeleteGroup by remember { mutableStateOf<DownloadGroup?>(null) }
     var confirmClearCompleted by remember { mutableStateOf(false) }
     var pendingActionFocus by remember { mutableStateOf<FocusRequester?>(null) }
+    var lastFilterShortcutAt by remember { mutableStateOf(0L) }
     val expandedMap = remember { mutableStateMapOf<String, Boolean>() }
 
     val displayItems = remember(items, searchQuery, filter) {
@@ -189,6 +191,7 @@ fun DownloadsScreen(
     LaunchedEffect(displayItems.size, searchMode, filter) {
         if (!searchMode) {
             delay(80)
+            if (SystemClock.uptimeMillis() - lastFilterShortcutAt < 600L) return@LaunchedEffect
             val target = if (displayItems.isNotEmpty()) firstItemFocus else emptyActionFocus
             runCatching { target.requestFocus() }
         }
@@ -293,10 +296,22 @@ fun DownloadsScreen(
     }
 
     val filters = DownloadFilter.values()
+    val filterFocusers = remember(filters.size) { List(filters.size) { FocusRequester() } }
+    var pendingFilterFocus by remember { mutableStateOf(false) }
+    LaunchedEffect(filter, pendingFilterFocus) {
+        if (pendingFilterFocus) {
+            delay(80L)
+            val index = filters.indexOf(filter)
+            filterFocusers.getOrNull(index)?.let { runCatching { it.requestFocus() } }
+            pendingFilterFocus = false
+        }
+    }
     fun cycleFilter(step: Int) {
         val index = filters.indexOf(filter)
         if (index < 0) return
         filter = filters[(index + step + filters.size) % filters.size]
+        pendingFilterFocus = true
+        lastFilterShortcutAt = SystemClock.uptimeMillis()
     }
 
     Column(
@@ -376,6 +391,7 @@ fun DownloadsScreen(
         if (items.isNotEmpty()) {
             DownloadFilterRow(
                 selected = filter,
+                focusRequesters = filterFocusers,
                 allCount = totalDownloadCount,
                 activeCount = totalDownloadCount - completedCount,
                 completedCount = completedCount,
@@ -605,6 +621,7 @@ private fun DownloadFilterRow(
     activeCount: Int,
     completedCount: Int,
     onSelect: (DownloadFilter) -> Unit,
+    focusRequesters: List<FocusRequester> = emptyList(),
 ) {
     Row(
         modifier = Modifier
@@ -613,7 +630,7 @@ private fun DownloadFilterRow(
             .padding(horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        DownloadFilter.values().forEach { filter ->
+        DownloadFilter.values().forEachIndexed { index, filter ->
             val count = when (filter) {
                 DownloadFilter.ALL -> allCount
                 DownloadFilter.ACTIVE -> activeCount
@@ -623,6 +640,13 @@ private fun DownloadFilterRow(
             Row(
                 modifier = Modifier
                     .height(28.dp)
+                    .then(
+                        if (index < focusRequesters.size) {
+                            Modifier.focusRequester(focusRequesters[index])
+                        } else {
+                            Modifier
+                        }
+                    )
                     .duoFocusRing(RoundedCornerShape(14.dp))
                     .clip(RoundedCornerShape(14.dp))
                     .background(

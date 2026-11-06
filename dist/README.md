@@ -4,6 +4,29 @@
 `*.apk`），需要时本地 `./gradlew assembleDebug` / `assembleRelease` 生成，或从
 GitHub Releases 下载。
 
+## 0.2.0-rc24（2026-11-06）
+
+- `bili-duo-0.2.0-rc24-release.apk`
+  - R8 minify，正式 release keystore 签名；可覆盖安装同 key 的 rc23。
+  - APK SHA-256：`91217a4a4b59dc843cd425a6306562e18f3ecd1ca1ba9f1b9d16c7f2dfa0b132`
+- `bili-duo-0.2.0-rc24-debug.apk`
+  - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
+  - SHA-256：`160f490f3162c2a418bdba0973527b49f74fe89322bc6f4f494a7646b53507cc`
+
+rc24 变更（焦点保持与返回修复）：
+- 评论 L2/R2 提到控制台根处理：焦点在左栏任意位置也能切热门/最新，切换后指示器
+  停在新选中的 chip 上。
+- 搜索类型/排序、首页直播父分区、动态类型/UP、下载筛选、UP 主空间视频/合集在
+  L1/R1、L2/R2 切换后焦点留在新选中项；列表首项自动聚焦增加 600ms 抑制窗口。
+- 搜索排序行在结果加载/空态期间保持挂载，切排序不再因 requester 无目标丢焦点。
+- 二级页 `DuoPageHeader` 返回键与标题间距 2→8dp，焦点环不再压字。
+- 弹幕发送弹窗「位置」改为滚动/顶部/底部横向单选，`DanmakuOptionRow` 统一
+  label 宽度与内缩，和颜色行对齐。
+- `MainActivity` B 返回 220ms 节流 + 只在根页以上 pop，pop 过渡改淡出；连续按 B
+  不再出现只有左侧栏、右侧空白的页面。
+- 221 单测通过。Duo 实测：评论 L2/R2（含左栏）、搜索 R2、动态 R1/L2、首页直播
+  L2、历史返回环、快速连按 B。
+
 ## 0.2.0-rc23（2026-11-06）
 
 - `bili-duo-0.2.0-rc23-release.apk`

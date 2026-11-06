@@ -1,5 +1,6 @@
 package cn.xfangfang.biliduo.ui.dynamic
 
+import android.os.SystemClock
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -151,6 +152,35 @@ fun DynamicScreen(
     val retryFocus = remember { FocusRequester() }
     val scope = rememberCoroutineScope()
     var firstFocused by remember { mutableStateOf(false) }
+    val filterFocusers = remember { List(DynamicFilter.entries.size) { FocusRequester() } }
+    val authorFocusers = remember(state.authors) {
+        List(state.authors.size + 1) { FocusRequester() }
+    }
+    var pendingFilterFocus by remember { mutableStateOf(false) }
+    var pendingAuthorFocus by remember { mutableStateOf(false) }
+    var lastShortcutAt by remember { mutableStateOf(0L) }
+
+    LaunchedEffect(state.filter, pendingFilterFocus) {
+        if (pendingFilterFocus) {
+            delay(80L)
+            runCatching { filterFocusers[state.filter.ordinal].requestFocus() }
+            pendingFilterFocus = false
+        }
+    }
+    LaunchedEffect(state.authorMid, state.authors.size, pendingAuthorFocus) {
+        if (pendingAuthorFocus) {
+            delay(80L)
+            val index = if (state.authorMid == null) {
+                0
+            } else {
+                state.authors.indexOfFirst { it.mid == state.authorMid } + 1
+            }
+            if (index in authorFocusers.indices) {
+                runCatching { authorFocusers[index].requestFocus() }
+            }
+            pendingAuthorFocus = false
+        }
+    }
     var focusedIndex by remember { mutableStateOf<Int?>(null) }
     var overlay by remember { mutableStateOf<DynamicOverlay?>(null) }
     val loggedIn = BilibiliApi.parseSelfMid() != null
@@ -190,7 +220,9 @@ fun DynamicScreen(
         }
     }
     LaunchedEffect(state.filter, state.authorMid) {
-        firstFocused = false
+        // Keep the initial first-card focus only for the first load. On a
+        // user-initiated filter change the chip keeps focus; the list is
+        // reachable with Down.
         runCatching { listState.scrollToItem(0) }
     }
     LaunchedEffect(state.filter, state.authorMid, state.items.size, state.isLoading) {
@@ -199,6 +231,7 @@ fun DynamicScreen(
         // is about to be replaced.
         if (!firstFocused && !state.isLoading && state.items.isNotEmpty()) {
             delay(120L)
+            if (SystemClock.uptimeMillis() - lastShortcutAt < 600L) return@LaunchedEffect
             runCatching { firstFocus.requestFocus() }
             firstFocused = true
         }
@@ -243,16 +276,33 @@ fun DynamicScreen(
             .duoTabCycling(
                 // Without a session the page is a login prompt; switching the
                 // filters there would fire anonymous requests for nothing.
-                onPreviousTab = if (loggedIn) ({ viewModel.cycleFilter(-1) }) else null,
-                onNextTab = if (loggedIn) ({ viewModel.cycleFilter(1) }) else null,
-                onPreviousSection = if (loggedIn) ({ viewModel.cycleAuthor(-1) }) else null,
-                onNextSection = if (loggedIn) ({ viewModel.cycleAuthor(1) }) else null,
+                onPreviousTab = if (loggedIn) ({
+                    viewModel.cycleFilter(-1)
+                    pendingFilterFocus = true
+                    lastShortcutAt = SystemClock.uptimeMillis()
+                }) else null,
+                onNextTab = if (loggedIn) ({
+                    viewModel.cycleFilter(1)
+                    pendingFilterFocus = true
+                    lastShortcutAt = SystemClock.uptimeMillis()
+                }) else null,
+                onPreviousSection = if (loggedIn) ({
+                    viewModel.cycleAuthor(-1)
+                    pendingAuthorFocus = true
+                    lastShortcutAt = SystemClock.uptimeMillis()
+                }) else null,
+                onNextSection = if (loggedIn) ({
+                    viewModel.cycleAuthor(1)
+                    pendingAuthorFocus = true
+                    lastShortcutAt = SystemClock.uptimeMillis()
+                }) else null,
             ),
     ) {
         DynamicHeader(
             selectedFilter = state.filter,
             onFilterSelected = viewModel::selectFilter,
             onRefresh = viewModel::refresh,
+            focusRequesters = filterFocusers,
         )
         if (state.authors.isNotEmpty()) {
             DynamicAuthorRow(
@@ -260,6 +310,7 @@ fun DynamicScreen(
                 selectedMid = state.authorMid,
                 firstFocus = authorFocus,
                 downFocusRequester = firstFocus,
+                focusRequesters = authorFocusers,
                 onAll = viewModel::clearAuthor,
                 onSelect = viewModel::selectAuthor,
             )
@@ -397,6 +448,7 @@ private fun DynamicHeader(
     selectedFilter: DynamicFilter,
     onFilterSelected: (DynamicFilter) -> Unit,
     onRefresh: () -> Unit,
+    focusRequesters: List<FocusRequester> = emptyList(),
 ) {
     Row(
         modifier = Modifier
@@ -412,10 +464,11 @@ private fun DynamicHeader(
             fontWeight = FontWeight.SemiBold,
         )
         Spacer(Modifier.width(14.dp))
-        DynamicFilter.entries.forEach { filter ->
+        DynamicFilter.entries.forEachIndexed { index, filter ->
             DynamicChip(
                 text = filter.label,
                 selected = filter == selectedFilter,
+                focusRequester = focusRequesters.getOrNull(index),
                 onClick = { onFilterSelected(filter) },
             )
             Spacer(Modifier.width(6.dp))
@@ -431,6 +484,7 @@ private fun DynamicAuthorRow(
     selectedMid: Long?,
     firstFocus: FocusRequester,
     downFocusRequester: FocusRequester,
+    focusRequesters: List<FocusRequester> = emptyList(),
     onAll: () -> Unit,
     onSelect: (DynamicAuthorUi) -> Unit,
 ) {
@@ -469,10 +523,11 @@ private fun DynamicAuthorRow(
                 onClick = onAll,
             )
         }
-        items(authors, key = { it.mid }) { author ->
+        itemsIndexed(authors, key = { _, author -> author.mid }) { index, author ->
             DynamicAuthorChip(
                 author = author,
                 selected = selectedMid == author.mid,
+                focusRequester = focusRequesters.getOrNull(index + 1),
                 downFocusRequester = downFocusRequester,
                 onClick = { onSelect(author) },
             )
@@ -557,11 +612,15 @@ private fun DynamicChip(
     text: String,
     selected: Boolean,
     onClick: () -> Unit,
+    focusRequester: FocusRequester? = null,
 ) {
     val shape = RoundedCornerShape(14.dp)
     Box(
         modifier = Modifier
             .height(28.dp)
+            .then(
+                if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier
+            )
             .duoFocusRing(shape)
             .clip(shape)
             .background(

@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
@@ -103,6 +104,28 @@ fun HomeScreen(
     val areaFocus = remember { FocusRequester() }
     val followedFocus = remember { FocusRequester() }
     val subAreaFocus = remember { FocusRequester() }
+    val areaFocusers = remember(state.liveAreas) {
+        List(state.liveAreas.size) { FocusRequester() }
+    }
+    val subAreaFocusers = remember(state.liveAreaId, state.liveAreas) {
+        val count = state.liveAreas.firstOrNull { it.id == state.liveAreaId }
+            ?.subAreas?.size ?: 0
+        List(count) { FocusRequester() }
+    }
+    var pendingAreaFocus by remember { mutableStateOf(false) }
+
+    LaunchedEffect(state.liveAreaId, pendingAreaFocus) {
+        if (pendingAreaFocus) {
+            delay(80L)
+            if (state.liveAreaId == 0) {
+                runCatching { areaFocus.requestFocus() }
+            } else {
+                val index = state.liveAreas.indexOfFirst { it.id == state.liveAreaId }
+                areaFocusers.getOrNull(index)?.let { runCatching { it.requestFocus() } }
+            }
+            pendingAreaFocus = false
+        }
+    }
     var focusedTab by remember { mutableStateOf<HomeTab?>(null) }
     val isPgc = state.tab.isPgc
     val isLive = state.tab.isLive
@@ -135,18 +158,6 @@ fun HomeScreen(
         }
     }
 
-    // Choosing a live area reloads the grid; return focus to the first room.
-    // The sub-area row stays reachable with Up from the first card. Keying on
-    // isLoading (not list size) avoids stealing focus when a page is appended.
-    LaunchedEffect(state.liveAreaId, state.liveSubAreaId, state.isLoading, isLive) {
-        if (isLive && !state.isLoading && state.liveItems.isNotEmpty() &&
-            focusedTab == HomeTab.LIVE
-        ) {
-            delay(120L)
-            runCatching { firstFocus.requestFocus() }
-        }
-    }
-
     val shouldLoadMore by remember {
         derivedStateOf {
             val lastVisible = gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
@@ -169,12 +180,18 @@ fun HomeScreen(
     }
 
     val cyclePreviousArea: (() -> Unit)? = if (isLive) {
-        { viewModel.cycleLiveArea(-1) }
+        {
+            viewModel.cycleLiveArea(-1)
+            pendingAreaFocus = true
+        }
     } else {
         null
     }
     val cycleNextArea: (() -> Unit)? = if (isLive) {
-        { viewModel.cycleLiveArea(1) }
+        {
+            viewModel.cycleLiveArea(1)
+            pendingAreaFocus = true
+        }
     } else {
         null
     }
@@ -243,6 +260,8 @@ fun HomeScreen(
                     areaFocus = areaFocus,
                     followedFocus = followedFocus,
                     subAreaFocus = subAreaFocus,
+                    areaFocusRequesters = areaFocusers,
+                    subAreaFocusRequesters = subAreaFocusers,
                     isLoadingMore = state.isLoadingMore,
                     isLoading = state.isLoading,
                     error = state.error,
@@ -376,6 +395,8 @@ private fun LiveSection(
     areaFocus: FocusRequester,
     followedFocus: FocusRequester,
     subAreaFocus: FocusRequester,
+    areaFocusRequesters: List<FocusRequester> = emptyList(),
+    subAreaFocusRequesters: List<FocusRequester> = emptyList(),
     isLoadingMore: Boolean,
     isLoading: Boolean,
     error: String?,
@@ -446,10 +467,11 @@ private fun LiveSection(
                     onClick = { onAreaSelected(0) },
                 )
             }
-            items(areas, key = { it.id }) { area ->
+            itemsIndexed(areas, key = { _, area -> area.id }) { index, area ->
                 LiveAreaChip(
                     text = area.name,
                     selected = selectedAreaId == area.id,
+                    focusRequester = areaFocusRequesters.getOrNull(index),
                     downFocusRequester = areaDownFocus,
                     onClick = { onAreaSelected(area.id) },
                 )
@@ -499,12 +521,13 @@ private fun LiveSection(
                                 onClick = { onSubAreaSelected(0) },
                             )
                         }
-                        items(subAreas, key = { it.id }) { area ->
+                        itemsIndexed(subAreas, key = { _, area -> area.id }) { index, area ->
                             val areaId = area.id.toIntOrNull() ?: 0
                             LiveAreaChip(
                                 text = area.name,
                                 selected = selectedSubAreaId == areaId,
                                 subtle = true,
+                                focusRequester = subAreaFocusRequesters.getOrNull(index),
                                 upFocusRequester = areaFocus,
                                 downFocusRequester = subAreaDownFocus,
                                 onClick = { onSubAreaSelected(areaId) },

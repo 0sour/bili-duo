@@ -1,5 +1,6 @@
 package cn.xfangfang.biliduo.ui.channel
 
+import android.os.SystemClock
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -91,6 +92,17 @@ fun ChannelScreen(
     val focusRequester = remember { FocusRequester() }
     val followFocus = remember { FocusRequester() }
     val firstVideoFocus = remember { FocusRequester() }
+    val modeFocusers = remember { List(2) { FocusRequester() } }
+    var pendingModeFocus by remember { mutableStateOf(false) }
+    var lastModeShortcutAt by remember { mutableStateOf(0L) }
+    LaunchedEffect(uiState.viewMode, pendingModeFocus) {
+        if (pendingModeFocus) {
+            delay(80L)
+            val index = if (uiState.viewMode == ChannelViewMode.VIDEOS) 0 else 1
+            modeFocusers[index].let { runCatching { it.requestFocus() } }
+            pendingModeFocus = false
+        }
+    }
     val scope = rememberCoroutineScope()
     val keyboardController = LocalSoftwareKeyboardController.current
     val inSeason = uiState.viewMode == ChannelViewMode.SEASON_DETAIL
@@ -163,14 +175,17 @@ fun ChannelScreen(
         onDispose { onFocusCleared() }
     }
 
-    // Focus the first video after an initial load (or when returning to the
-    // VIDEOS tab), but not when loadMore appends a page.
+    // Focus the first video only on the initial load. Switching 视频/合集 with
+    // L1/R1 keeps focus on the selected chip; Down reaches the list.
+    var initialVideoFocusDone by remember { mutableStateOf(false) }
     LaunchedEffect(uiState.viewMode, uiState.isLoading) {
-        if (uiState.viewMode == ChannelViewMode.VIDEOS && !uiState.isLoading &&
-            uiState.videos.isNotEmpty()
+        if (!initialVideoFocusDone && uiState.viewMode == ChannelViewMode.VIDEOS &&
+            !uiState.isLoading && uiState.videos.isNotEmpty()
         ) {
             delay(120)
+            if (SystemClock.uptimeMillis() - lastModeShortcutAt < 600L) return@LaunchedEffect
             runCatching { firstVideoFocus.requestFocus() }
+            initialVideoFocusDone = true
         }
     }
 
@@ -209,8 +224,16 @@ fun ChannelScreen(
             ChannelViewMode.SEASONS
         }
         Modifier.duoTabCycling(
-            onPreviousTab = { viewModel.switchMode(other) },
-            onNextTab = { viewModel.switchMode(other) },
+            onPreviousTab = {
+                viewModel.switchMode(other)
+                pendingModeFocus = true
+                lastModeShortcutAt = SystemClock.uptimeMillis()
+            },
+            onNextTab = {
+                viewModel.switchMode(other)
+                pendingModeFocus = true
+                lastModeShortcutAt = SystemClock.uptimeMillis()
+            },
         )
     } else {
         Modifier
@@ -321,6 +344,7 @@ fun ChannelScreen(
                 },
                 followFocus = followFocus,
                 firstVideoFocus = firstVideoFocus,
+                modeFocusRequesters = modeFocusers,
                 listState = listState,
                 modifier = Modifier.fillMaxSize()
             )
@@ -358,6 +382,7 @@ internal fun ChannelBody(
     onToggleFollow: () -> Unit,
     followFocus: FocusRequester? = null,
     firstVideoFocus: FocusRequester? = null,
+    modeFocusRequesters: List<FocusRequester> = emptyList(),
     listState: LazyListState,
     modifier: Modifier = Modifier
 ) {
@@ -412,6 +437,7 @@ internal fun ChannelBody(
                     videoCount = uiState.userCard?.archive_count?.takeIf { it > 0 }
                         ?: uiState.videos.size,
                     seasonCount = uiState.seasons.size.takeIf { uiState.seasons.isNotEmpty() },
+                    focusRequesters = modeFocusRequesters,
                     onSelectVideos = { onSwitchMode(ChannelViewMode.VIDEOS) },
                     onSelectSeasons = { onSwitchMode(ChannelViewMode.SEASONS) },
                 )
@@ -673,6 +699,7 @@ private fun ChannelModeTabs(
     seasonCount: Int?,
     onSelectVideos: () -> Unit,
     onSelectSeasons: () -> Unit,
+    focusRequesters: List<FocusRequester> = emptyList(),
 ) {
     Row(
         modifier = Modifier
@@ -685,6 +712,7 @@ private fun ChannelModeTabs(
             label = "视频",
             count = videoCount,
             selected = videosSelected,
+            focusRequester = focusRequesters.getOrNull(0),
             onClick = onSelectVideos,
         )
         Spacer(Modifier.width(8.dp))
@@ -692,6 +720,7 @@ private fun ChannelModeTabs(
             label = "合集",
             count = seasonCount,
             selected = !videosSelected,
+            focusRequester = focusRequesters.getOrNull(1),
             onClick = onSelectSeasons,
         )
         Spacer(Modifier.weight(1f))
@@ -709,10 +738,14 @@ private fun ChannelModeTab(
     count: Int?,
     selected: Boolean,
     onClick: () -> Unit,
+    focusRequester: FocusRequester? = null,
 ) {
     Row(
         modifier = Modifier
             .height(30.dp)
+            .then(
+                if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier
+            )
             .duoFocusRing(RoundedCornerShape(15.dp))
             .clip(RoundedCornerShape(15.dp))
             .background(if (selected) DuoPalette.Pink.copy(alpha = 0.16f) else DuoPalette.SurfaceHigh)

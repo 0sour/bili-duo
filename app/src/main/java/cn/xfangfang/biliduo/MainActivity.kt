@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.graphics.drawable.ColorDrawable
 import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
 import android.hardware.input.InputManager
 import android.view.InputDevice
 import android.view.KeyEvent
@@ -307,8 +308,17 @@ fun MainScreen(
     }
 
     LaunchedEffect(navController, duoSession) {
+        var lastBackAt = 0L
         duoSession.backRequests.collect {
-            navController.popBackStack()
+            // Rapid B presses used to interrupt the pop transition and leave
+            // the NavHost on a blank destination. Throttle pops to one per
+            // transition and never pop the start destination.
+            val now = SystemClock.uptimeMillis()
+            if (now - lastBackAt < 220L) return@collect
+            lastBackAt = now
+            if (navController.previousBackStackEntry != null) {
+                navController.popBackStack()
+            }
         }
     }
 
@@ -369,7 +379,9 @@ fun MainScreen(
                 enterTransition = { fadeIn(tween(160)) },
                 exitTransition = { fadeOut(tween(120)) },
                 popEnterTransition = { fadeIn(tween(160)) },
-                popExitTransition = { slideOutHorizontally(tween(180)) { it } },
+                // A slide-out pop can be left half-finished by rapid B
+                // presses, leaving an empty NavHost. Fade is idempotent.
+                popExitTransition = { fadeOut(tween(120)) },
             ) {
                 composable(Screen.Home.route) {
                     HomeScreen(
