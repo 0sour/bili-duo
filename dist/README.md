@@ -4,6 +4,23 @@
 `*.apk`），需要时本地 `./gradlew assembleDebug` / `assembleRelease` 生成，或从
 GitHub Releases 下载。
 
+## 0.2.0-rc31（2026-11-06）
+
+- `bili-duo-0.2.0-rc31-release.apk`
+  - R8 minify，正式 release keystore 签名；可覆盖安装同 key 的 rc30。
+  - APK SHA-256：`fad357098a46db6f607a2ed43ebd097bb0ef26b9aa9ccc3d0f945870bc83ad0b`
+- `bili-duo-0.2.0-rc31-debug.apk`
+  - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
+  - SHA-256：`2c282013686b6439c9e6343b6ccb9844b230b4956df3486d0fc22a7f76db60e5`
+
+rc31 变更：
+- 读取 `nav` 大会员状态；非会员时 1080P+ / PGC 1080P 显示「大会员」并阻止切换。
+- PGC `is_preview` 显示「试看」徽标与结束提示；试看结束不自动跳下一集。
+- 视频 `is_upower_exclusive` 显示充电专属说明，播放失败时补充提示。
+- durl 线路没有 DASH 时清晰度弹窗提示「当前线路不支持切换清晰度」。
+- 221 单测通过。Duo 当前账号为大会员，验证清晰度列表无锁、PGC 正常播放；
+  非会员锁标/试看/充电专属待补测。
+
 ## 0.2.0-rc30（2026-11-06）
 
 - `bili-duo-0.2.0-rc30-release.apk`

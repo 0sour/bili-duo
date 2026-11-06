@@ -70,6 +70,10 @@ data class PlayerUiState(
     /** 0 = unlimited. */
     val danmakuMaxOnScreen: Int = 0,
     val isPgc: Boolean = false,
+    /** null = still checking; false for logged-out or non-VIP. */
+    val isVip: Boolean? = null,
+    val isPreview: Boolean = false,
+    val previewToast: String = "",
     val isLive: Boolean = false,
     val liveRoomId: Long = 0L,
     val liveDetail: LiveRoomDetail? = null,
@@ -97,6 +101,7 @@ class PlayerViewModel(
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
 
     private var cachedDashData: DashData? = null
+    private var vipJob: Job? = null
     private var loadJob: Job? = null
     private var playUrlJob: Job? = null
     private var danmakuJob: Job? = null
@@ -121,6 +126,25 @@ class PlayerViewModel(
             subtitleBottomPaddingDp = subtitleStyle.bottomPaddingDp,
         )
         viewModelScope.launch { repository.flushPendingReports(pendingReportManager) }
+    }
+
+    private fun fetchVipStatus() {
+        if (BilibiliApi.loginCookies.isBlank()) {
+            _uiState.value = _uiState.value.copy(isVip = false)
+            return
+        }
+        if (vipJob?.isActive == true) return
+        vipJob = viewModelScope.launch {
+            repository.getNavInfo()
+                .onSuccess { nav ->
+                    _uiState.value = _uiState.value.copy(isVip = nav.vipStatus == 1)
+                }
+                .onFailure {
+                    // Keep null on a transient failure: locking qualities for a
+                    // VIP because /nav failed would be worse than letting the
+                    // play-url call reject an unavailable stream.
+                }
+        }
     }
 
     fun load(bvid: String, cid: Long? = null, source: PlaybackSource = PlaybackSource.ONLINE) {
@@ -224,6 +248,7 @@ class PlayerViewModel(
             _uiState.value = withCurrentDanmakuSettings(
                 PlayerUiState(isLoading = true)
             )
+            fetchVipStatus()
 
             repository.getVideoInfo(bvid)
                 .onSuccess { info ->
@@ -396,6 +421,7 @@ class PlayerViewModel(
         _uiState.value = withCurrentDanmakuSettings(
             PlayerUiState(isLoading = true, isPgc = true)
         )
+        fetchVipStatus()
         loadJob = viewModelScope.launch {
             repository.getPgcSeason(seasonId)
                 .onSuccess { detail ->
@@ -513,6 +539,8 @@ class PlayerViewModel(
                 resumePositionMs = resumeMs,
                 isLoading = true,
                 videoUrl = null,
+                isPreview = false,
+                previewToast = "",
                 videoInfo = info?.copy(
                     bvid = episode.bvid,
                     aid = episode.aid,
@@ -738,6 +766,7 @@ class PlayerViewModel(
 
     fun selectQuality(quality: QualityOption) {
         if (quality.quality == _uiState.value.currentQuality?.quality) return
+        if (quality.vipOnly && _uiState.value.isVip == false) return
         Log.d(BilibiliApp.TAG, "PlayerVM: selectQuality qn=${quality.quality} desc=${quality.description}")
 
         val dash = cachedDashData ?: return
@@ -791,7 +820,15 @@ class PlayerViewModel(
                 }
                 .onFailure { e ->
                     Log.e(BilibiliApp.TAG, "PlayerVM: loadPlayUrlDash failed", e)
-                    _uiState.value = _uiState.value.copy(isLoading = false, error = e.message ?: "加载播放链接失败")
+                    val message = e.message ?: "加载播放链接失败"
+                    val hint = if (_uiState.value.videoInfo?.isUpowerExclusive == true &&
+                        !message.contains("充电")
+                    ) {
+                        "；该视频为充电专属，请先为 UP 主充电"
+                    } else {
+                        ""
+                    }
+                    _uiState.value = _uiState.value.copy(isLoading = false, error = message + hint)
                 }
         }
     }
@@ -801,7 +838,7 @@ class PlayerViewModel(
         if (dash != null) {
             cachedDashData = dash
 
-            val qualities = buildQualityList(playUrlInfo, dash)
+            val qualities = buildQualityList(playUrlInfo, dash, _uiState.value.isPgc)
             val defaultQuality = qualities.firstOrNull()
 
             val videoStream = defaultQuality?.let { pickVideoStream(dash.video, it.quality) }
@@ -816,7 +853,9 @@ class PlayerViewModel(
                 dashVideo = videoStream,
                 dashAudio = audioStream,
                 isDash = true,
-                isLoading = false
+                isLoading = false,
+                isPreview = playUrlInfo.isPreview == 1,
+                previewToast = playUrlInfo.previewToast.orEmpty(),
             )
             Log.d(BilibiliApp.TAG, "PlayerVM: default quality=${defaultQuality?.description} videoUrl=${videoUrl?.take(80)}")
         } else {
@@ -825,7 +864,9 @@ class PlayerViewModel(
                 _uiState.value = _uiState.value.copy(
                     videoUrl = url,
                     isDash = false,
-                    isLoading = false
+                    isLoading = false,
+                    isPreview = playUrlInfo.isPreview == 1,
+                    previewToast = playUrlInfo.previewToast.orEmpty(),
                 )
             } else {
                 _uiState.value = _uiState.value.copy(
@@ -839,12 +880,19 @@ class PlayerViewModel(
     private fun buildQualityList(
         playUrlInfo: PlayUrlInfo,
         dash: DashData?,
+        isPgc: Boolean,
     ): List<QualityOption> {
         val acceptQuality = playUrlInfo.accept_quality ?: return emptyList()
         val acceptDesc = playUrlInfo.accept_description ?: return emptyList()
 
         val all = acceptQuality.zip(acceptDesc).map { (q, desc) ->
-            QualityOption(quality = q, description = desc)
+            QualityOption(
+                quality = q,
+                description = desc,
+                // UGC keeps 1080P free; 1080P+ and above need大会员. PGC
+                // commonly locks 1080P as well.
+                vipOnly = q >= 112 || (isPgc && q >= 80),
+            )
         }
         // accept_quality 是账号/接口允许的画质，但 DASH 实际返回的 video 轨道
         // 可能更少（未登录、版权或编码不支持）。只保留有轨道的档位，避免

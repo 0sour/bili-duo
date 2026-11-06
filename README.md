@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc30-FB7299">
+  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc31-FB7299">
   <img alt="status" src="https://img.shields.io/badge/status-untested%20RC-orange">
   <img alt="Android" src="https://img.shields.io/badge/Android-24%2B-3DDC84?logo=android&logoColor=white">
   <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-1.9.23-7F52FF?logo=kotlin&logoColor=white">
@@ -23,7 +23,7 @@
 上屏只负责视频画面，下屏用一块 `Presentation` 承载完整 UI；手柄和触摸共用同一棵
 Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，也没有上屏 OSD。
 
-> 当前版本：**0.2.0-rc30**（versionCode 31）
+> 当前版本：**0.2.0-rc31**（versionCode 32）
 > 状态：功能完整的 **未测试 RC**，221 个单元测试通过，已在 MuMu 与 Duo 真机做核心
 > 路径验证，尚未完成全流程回归。
 
@@ -195,6 +195,10 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
   - rc29 移除「一键三连」入口，投币弹窗只保留 1/2 枚选择与确认。
   - rc30 排行子分区：排行 tab 增加「全站/动画/音乐/游戏/知识/生活/影视」chips，
     L2/R2 循环切换并聚焦新 chip，`x/web-interface/ranking/v2?rid=` 请求对应分区。
+  - rc31 会员/试看/充电：`nav` 读取大会员状态，1080P+/PGC 1080P 在非会员时显示
+    「大会员」并阻止切换；PGC `is_preview` 显示「试看」徽标与结束提示；视频
+    `is_upower_exclusive` 显示充电专属说明（UP 卡可进主页）。DASH 缺失的 durl 线路
+    显示「当前线路不支持切换清晰度」。
   - 登录、个人中心、历史/收藏/关注只读浏览；弹幕发送→撤回闭环。
 
 ### 未实现（代码层面）

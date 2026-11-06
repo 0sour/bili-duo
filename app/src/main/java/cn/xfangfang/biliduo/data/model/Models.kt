@@ -123,7 +123,8 @@ data class VideoInfo(
     val videos: Int = 1,
     val pubdate: Long = 0,
     val pages: List<VideoPage>? = null,
-    @SerializedName("ugc_season") val ugcSeason: UgcSeason? = null
+    @SerializedName("ugc_season") val ugcSeason: UgcSeason? = null,
+    @SerializedName("is_upower_exclusive") val isUpowerExclusive: Boolean = false,
 )
 
 data class VideoOwner(
@@ -346,7 +347,9 @@ data class PlayUrlInfo(
     val accept_quality: List<Int>? = null,
     val accept_description: List<String>? = null,
     val durl: List<DurlItem>? = null,
-    val dash: DashData? = null
+    val dash: DashData? = null,
+    @SerializedName("is_preview") val isPreview: Int = 0,
+    @SerializedName("preview_toast") val previewToast: String? = null,
 )
 
 data class DurlItem(
@@ -396,7 +399,9 @@ data class DashFlac(
 
 data class QualityOption(
     val quality: Int,
-    val description: String
+    val description: String,
+    /** 1080P+ / 4K / HDR and PGC 1080P require a大会员 account. */
+    val vipOnly: Boolean = false,
 )
 
 data class DownloadInfo(
@@ -680,7 +685,10 @@ data class NavInfo(
     val mid: Long = 0,
     val uname: String = "",
     val face: String = "",
-    @SerializedName("level_info") val levelInfo: NavLevelInfo? = null
+    @SerializedName("level_info") val levelInfo: NavLevelInfo? = null,
+    val vipStatus: Int = 0,
+    val vipType: Int = 0,
+    val vipDueDate: Long = 0,
 )
 
 data class NavLevelInfo(

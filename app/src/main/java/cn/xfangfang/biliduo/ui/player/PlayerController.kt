@@ -443,6 +443,13 @@ class PlayerController(
         handlingEnded = true
         reportNow()
         val ui = viewModel.uiState.value
+        if (ui.isPreview) {
+            // A preview cut is not a real episode end: stop and let the console
+            // show the membership guide instead of auto-playing the next episode.
+            _state.update { it.copy(ended = true, isPlaying = false) }
+            handlingEnded = false
+            return
+        }
         val index = ui.pages.indexOfFirst { it.cid == ui.currentPage?.cid }
         val next = if (index in 0 until ui.pages.size - 1) ui.pages[index + 1] else null
         if (next != null) {

@@ -1012,6 +1012,34 @@ fun PlayerConsoleScreen(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f),
                     )
+                    if (ui.isPreview) {
+                        Spacer(Modifier.width(6.dp))
+                        Box(
+                            modifier = Modifier
+                                .height(20.dp)
+                                .clip(RoundedCornerShape(5.dp))
+                                .background(DuoPink.copy(alpha = 0.16f))
+                                .border(1.dp, DuoPink.copy(alpha = 0.55f), RoundedCornerShape(5.dp))
+                                .padding(horizontal = 6.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text("试看", color = DuoPink, fontSize = 9.sp, fontWeight = FontWeight.Medium)
+                        }
+                    }
+                }
+
+                if (ui.isPreview) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = if (playback.ended) {
+                            ui.previewToast.ifBlank { "试看结束 · 完整内容需要大会员" }
+                        } else {
+                            "试看片段 · 完整内容需要大会员"
+                        },
+                        color = DuoPink,
+                        fontSize = 9.5.sp,
+                        maxLines = 2,
+                    )
                 }
 
                 Spacer(Modifier.height(5.dp))
@@ -1299,7 +1327,8 @@ fun PlayerConsoleScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     ConsoleChip(
-                        text = ui.currentQuality?.description?.let(::shortQualityLabel) ?: "清晰度",
+                        text = ui.currentQuality?.description?.let(::shortQualityLabel)
+                            ?: if (ui.isLoading) "清晰度" else "默认画质",
                         active = false,
                         modifier = chipDown.then(Modifier.focusRequester(qualityFocus)),
                         onClick = {
@@ -1754,7 +1783,11 @@ fun PlayerConsoleScreen(
             modifier = focusTrap,
         ) {
             if (ui.availableQualities.isEmpty()) {
-                Text("清晰度加载中…", color = DuoTextSecondary, fontSize = 12.sp)
+                Text(
+                    text = if (ui.isLoading) "清晰度加载中…" else "当前线路不支持切换清晰度",
+                    color = DuoTextSecondary,
+                    fontSize = 12.sp,
+                )
             } else {
                 Column(
                     Modifier
@@ -1765,16 +1798,21 @@ fun PlayerConsoleScreen(
                         .padding(horizontal = 8.dp, vertical = 7.dp),
                 ) {
                     ui.availableQualities.forEachIndexed { index, quality ->
+                        val vipLocked = quality.vipOnly && ui.isVip == false
                         OverlayRow(
-                            label = quality.description,
+                            label = if (vipLocked) "${quality.description} · 大会员" else quality.description,
                             selected = quality.quality == ui.currentQuality?.quality,
                             focusRequester = if (index == selectedIndex) qualityRowFocus else null,
                             onFocus = { qualityFocusedRow = index },
                             onClick = {
-                                session.closeOverlay()
-                                if (quality.quality != ui.currentQuality?.quality) {
-                                    controller.reportNow()
-                                    vm.selectQuality(quality)
+                                if (vipLocked) {
+                                    toast("该清晰度需要大会员")
+                                } else {
+                                    session.closeOverlay()
+                                    if (quality.quality != ui.currentQuality?.quality) {
+                                        controller.reportNow()
+                                        vm.selectQuality(quality)
+                                    }
                                 }
                             },
                         )
@@ -2486,6 +2524,14 @@ private fun IntroTab(
                     color = DuoTextSecondary,
                     fontSize = 9.sp,
                 )
+                if (info.isUpowerExclusive) {
+                    Spacer(Modifier.height(3.dp))
+                    Text(
+                        "充电专属视频 · 需为 UP 主充电后观看",
+                        color = DuoPink,
+                        fontSize = 9.5.sp,
+                    )
+                }
             }
         }
 
