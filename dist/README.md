@@ -4,6 +4,22 @@
 `*.apk`），需要时本地 `./gradlew assembleDebug` / `assembleRelease` 生成，或从
 GitHub Releases 下载。
 
+## 0.2.0-rc32（2026-11-06）
+
+- `bili-duo-0.2.0-rc32-release.apk`
+  - R8 minify，正式 release keystore 签名；可覆盖安装同 key 的 rc31。
+  - APK SHA-256：`7b8c73a7a5003cdb4b397b5d07375933011f99526a912b1d4aad56f94e2df7ac`
+- `bili-duo-0.2.0-rc32-debug.apk`
+  - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
+  - SHA-256：`931185cb8148fd8953e96a523bb744661ec7ac53062ef20509a667508d0e7f2a`
+
+rc32 变更（P2 首批）：
+- 个人中心显示「大会员」徽标，上屏个人卡同步。
+- 动态详情/画册/纯文字阅读支持 X 复制链接（不使用系统 chooser，避免 Presentation
+  启动透明且不可操作的 ChooserActivityLauncher）。
+- 直播 SC 从弹幕列表移到评论 tab 顶部横幅，按 `end_time` 过期，删除后回退。
+- 221 单测通过。Duo 验证徽标、动态阅读层入口与直播布局；真实 SC 样本待补测。
+
 ## 0.2.0-rc31（2026-11-06）
 
 - `bili-duo-0.2.0-rc31-release.apk`

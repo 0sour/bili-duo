@@ -807,6 +807,22 @@ private fun LiveChatTab(
     var fieldFocused by remember { mutableStateOf(false) }
     var scrolledUp by remember { mutableStateOf(false) }
     val currentDraft by rememberUpdatedState(draft)
+    val chatMessages = remember(messages) { messages.filterNot { it.isSuperChat } }
+    var nowSec by remember { mutableStateOf(System.currentTimeMillis() / 1000L) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            nowSec = System.currentTimeMillis() / 1000L
+            delay(1_000L)
+        }
+    }
+    val activeSuperChat = messages.asReversed().firstOrNull { message ->
+        if (!message.isSuperChat) return@firstOrNull false
+        when {
+            message.endTimeSec > 0L -> message.endTimeSec > nowSec
+            message.timestampSec > 0L -> nowSec - message.timestampSec < 60L
+            else -> true
+        }
+    }
 
     LaunchedEffect(listState) {
         snapshotFlow { listState.isScrollInProgress }.collect { scrolling ->
@@ -816,10 +832,10 @@ private fun LiveChatTab(
         }
     }
 
-    val lastId = messages.lastOrNull()?.id
+    val lastId = chatMessages.lastOrNull()?.id
     LaunchedEffect(lastId) {
-        if (messages.isNotEmpty() && !scrolledUp) {
-            runCatching { listState.animateScrollToItem(messages.lastIndex) }
+        if (chatMessages.isNotEmpty() && !scrolledUp) {
+            runCatching { listState.animateScrollToItem(chatMessages.lastIndex) }
         }
     }
 
@@ -845,8 +861,14 @@ private fun LiveChatTab(
             showCounter = currentDraft.isNotEmpty(),
         )
 
+        activeSuperChat?.let { sc ->
+            Box(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 4.dp)) {
+                LiveSuperChatCard(sc)
+            }
+        }
+
         Box(Modifier.weight(1f).fillMaxWidth()) {
-            if (messages.isEmpty()) {
+            if (chatMessages.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(
                         text = when (chatState) {
@@ -865,12 +887,8 @@ private fun LiveChatTab(
                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
                     verticalArrangement = Arrangement.spacedBy(5.dp),
                 ) {
-                    items(messages, key = { it.id }) { message ->
-                        if (message.isSuperChat) {
-                            LiveSuperChatCard(message)
-                        } else {
-                            LiveChatLine(message)
-                        }
+                    items(chatMessages, key = { it.id }) { message ->
+                        LiveChatLine(message)
                     }
                 }
             }

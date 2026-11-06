@@ -19,6 +19,7 @@ data class ProfileUiState(
     val uname: String = "",
     val face: String = "",
     val level: Int = 0,
+    val isVip: Boolean = false,
     val isLoading: Boolean = false,
     val error: String? = null,
 )
@@ -68,6 +69,7 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                             uname = nav.uname,
                             face = nav.face.replace("http://", "https://"),
                             level = nav.levelInfo?.currentLevel ?: 0,
+                            isVip = nav.vipStatus == 1,
                         )
                     } else {
                         // Cookie expired or revoked on the server side.

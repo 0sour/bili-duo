@@ -44,6 +44,8 @@ data class LiveChatMessage(
     /** 0xFFRRGGBB, used by SC cards. */
     val background: Long? = null,
     val timestampSec: Long = 0,
+    /** Server end time for SC banners; 0 when the frame did not carry it. */
+    val endTimeSec: Long = 0L,
 )
 
 sealed interface LiveChatEvent {
@@ -129,6 +131,7 @@ object LiveChatParser {
                 face = user?.string("face").orEmpty(),
                 background = background,
                 timestampSec = data.long("ts") ?: data.long("start_time") ?: 0L,
+                endTimeSec = data.long("end_time") ?: 0L,
             )
         )
     }

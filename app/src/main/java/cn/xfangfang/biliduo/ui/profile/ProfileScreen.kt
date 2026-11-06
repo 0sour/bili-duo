@@ -109,6 +109,7 @@ fun ProfileScreen(
         state.face,
         state.mid,
         state.level,
+        state.isVip,
     ) {
         if (state.isLoggedIn) {
             onTopPerson(
@@ -118,13 +119,14 @@ fun ProfileScreen(
                     subtitle = buildString {
                         append("UID ${state.mid}")
                         if (state.level > 0) append(" · Lv${state.level}")
+                        if (state.isVip) append(" · 大会员")
                     },
                     description = if (state.error != null) {
                         "资料刷新失败，稍后重试。"
                     } else {
                         "账号已登录。观看历史、收藏与关注会在下屏同步展示。"
                     },
-                    badge = "已登录",
+                    badge = if (state.isVip) "大会员" else "已登录",
                     avatarUrl = state.face,
                     glyph = TopGlyph.PERSON,
                 )
@@ -358,6 +360,22 @@ private fun ProfileHeader(
                             Text(
                                 text = "Lv${state.level}",
                                 color = ProfilePink,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Medium,
+                            )
+                        }
+                    }
+                    if (state.isVip) {
+                        Spacer(Modifier.width(6.dp))
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(Color(0xFFFFD166).copy(alpha = 0.16f))
+                                .padding(horizontal = 6.dp, vertical = 1.dp),
+                        ) {
+                            Text(
+                                text = "大会员",
+                                color = Color(0xFFFFD166),
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Medium,
                             )

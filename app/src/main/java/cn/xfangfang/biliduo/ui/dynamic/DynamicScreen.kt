@@ -1,6 +1,10 @@
 package cn.xfangfang.biliduo.ui.dynamic
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.os.SystemClock
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -1148,6 +1152,7 @@ private fun DynamicReaderLayer(
     val focus = remember { FocusRequester() }
     val scroll = rememberScrollState()
     val scope = rememberCoroutineScope()
+    val context = androidx.compose.ui.platform.LocalContext.current
     val density = LocalDensity.current
     val imageCount = overlay.card.images.size
     val step = with(density) { 96.dp.toPx() }
@@ -1165,6 +1170,8 @@ private fun DynamicReaderLayer(
         }
         onDispose { session?.setBackInterceptor(null) }
     }
+
+    val shareCurrent = { shareDynamic(context, overlay.card) }
 
     Box(
         modifier = Modifier
@@ -1204,6 +1211,10 @@ private fun DynamicReaderLayer(
                         }
                         true
                     }
+                    Key.X -> {
+                        shareCurrent()
+                        true
+                    }
                     else -> false
                 }
             }
@@ -1220,20 +1231,38 @@ private fun DynamicReaderLayer(
                 scroll = scroll,
                 onBack = onBack,
                 onOpenGallery = onOpenGallery,
+                onShare = shareCurrent,
             )
             is DynamicOverlay.Gallery -> DynamicGalleryOverlay(
                 card = overlay.card,
                 imageIndex = overlay.imageIndex,
                 onBack = onBack,
                 onIndexChange = onIndexChange,
+                onShare = shareCurrent,
             )
             is DynamicOverlay.Text -> DynamicTextOverlay(
                 card = overlay.card,
                 scroll = scroll,
                 onBack = onBack,
+                onShare = shareCurrent,
             )
         }
     }
+}
+
+private fun shareDynamic(context: Context, card: DynamicCardUi) {
+    val url = card.playbackBvid?.let { "https://www.bilibili.com/video/$it" }
+        ?: "https://t.bilibili.com/${card.id}"
+    val headline = card.video?.title?.trim().orEmpty()
+        .ifBlank { card.text.trim().take(60) }
+    val text = if (headline.isBlank()) url else "【$headline】$url"
+    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+    if (clipboard == null) {
+        Toast.makeText(context, "复制失败", Toast.LENGTH_SHORT).show()
+        return
+    }
+    clipboard.setPrimaryClip(ClipData.newPlainText("动态链接", text))
+    Toast.makeText(context, "链接已复制，可粘贴分享", Toast.LENGTH_SHORT).show()
 }
 
 @Composable
@@ -1241,6 +1270,7 @@ private fun ReaderHeader(
     title: String,
     subtitle: String,
     onBack: () -> Unit,
+    onShare: (() -> Unit)? = null,
 ) {
     Row(
         modifier = Modifier
@@ -1277,6 +1307,19 @@ private fun ReaderHeader(
                 )
             }
         }
+        if (onShare != null) {
+            Text(
+                text = "复制链接",
+                color = DuoPalette.Pink,
+                fontSize = 11.sp,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(5.dp))
+                    .background(DuoPalette.Pink.copy(alpha = 0.12f))
+                    .pointerInput(Unit) { detectTapGestures { onShare() } }
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+        }
         Text("B 返回", color = DuoPalette.Tertiary, fontSize = 10.sp)
     }
 }
@@ -1288,12 +1331,14 @@ private fun DynamicDetailOverlay(
     scroll: androidx.compose.foundation.ScrollState,
     onBack: () -> Unit,
     onOpenGallery: (Int) -> Unit,
+    onShare: () -> Unit,
 ) {
     Column(Modifier.fillMaxSize().background(DuoPalette.Bg)) {
         ReaderHeader(
             title = "动态详情",
             subtitle = listOf(card.authorName, card.pubTime).filter { it.isNotBlank() }.joinToString(" · "),
             onBack = onBack,
+            onShare = onShare,
         )
         Column(
             modifier = Modifier
@@ -1375,7 +1420,7 @@ private fun DynamicDetailOverlay(
             DynamicStatsRow(card, showLike = true)
             Spacer(Modifier.height(10.dp))
             Text(
-                text = "方向键滚动 · A 查看大图 · B 返回列表",
+                text = "方向键滚动 · A 查看大图 · X 复制链接 · B 返回列表",
                 color = DuoPalette.Tertiary,
                 fontSize = 10.sp,
             )
@@ -1437,6 +1482,7 @@ private fun DynamicGalleryOverlay(
     imageIndex: Int,
     onBack: () -> Unit,
     onIndexChange: (Int) -> Unit,
+    onShare: () -> Unit,
 ) {
     val count = card.images.size
     Column(Modifier.fillMaxSize().background(DuoPalette.Bg)) {
@@ -1448,6 +1494,7 @@ private fun DynamicGalleryOverlay(
                 "${imageIndex + 1} / 1"
             },
             onBack = onBack,
+            onShare = onShare,
         )
         Row(
             modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 8.dp),
@@ -1568,12 +1615,14 @@ private fun DynamicTextOverlay(
     card: DynamicCardUi,
     scroll: androidx.compose.foundation.ScrollState,
     onBack: () -> Unit,
+    onShare: () -> Unit,
 ) {
     Column(Modifier.fillMaxSize().background(DuoPalette.Bg)) {
         ReaderHeader(
             title = "纯文字动态",
             subtitle = listOf(card.authorName, card.pubTime).filter { it.isNotBlank() }.joinToString(" · "),
             onBack = onBack,
+            onShare = onShare,
         )
         Column(
             modifier = Modifier
@@ -1626,7 +1675,7 @@ private fun DynamicTextOverlay(
             DynamicStatsRow(card, showLike = true)
             Spacer(Modifier.height(10.dp))
             Text(
-                text = "方向键滚动 · B 返回列表",
+                text = "方向键滚动 · X 复制链接 · B 返回列表",
                 color = DuoPalette.Tertiary,
                 fontSize = 10.sp,
             )
