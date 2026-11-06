@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc27-FB7299">
+  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc28-FB7299">
   <img alt="status" src="https://img.shields.io/badge/status-untested%20RC-orange">
   <img alt="Android" src="https://img.shields.io/badge/Android-24%2B-3DDC84?logo=android&logoColor=white">
   <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-1.9.23-7F52FF?logo=kotlin&logoColor=white">
@@ -23,7 +23,7 @@
 上屏只负责视频画面，下屏用一块 `Presentation` 承载完整 UI；手柄和触摸共用同一棵
 Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，也没有上屏 OSD。
 
-> 当前版本：**0.2.0-rc27**（versionCode 28）
+> 当前版本：**0.2.0-rc28**（versionCode 29）
 > 状态：功能完整的 **未测试 RC**，221 个单元测试通过，已在 MuMu 与 Duo 真机做核心
 > 路径验证，尚未完成全流程回归。
 
@@ -190,6 +190,9 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
   - rc27 播放页 P1 首批：右栏顺序改为「简介/评论/分P/推荐」并默认简介；简介页新增
     点赞、投币、收藏、下载四个并排按钮与点赞/硬币/收藏计数；点踩取消时点赞接口用
     `like=2`（`0` 会返回 -400）。
+  - rc28 互动弹窗：投币弹窗选 1/2 枚并确认；收藏弹窗列收藏夹（已收藏的显示勾选，
+    再次选择可取消）；投币弹窗底部「一键三连」按点赞 + 补足硬币 + 默认收藏夹执行。
+    简介页「关注」按上改为回到右栏 tab，不再跳到左栏。
   - 登录、个人中心、历史/收藏/关注只读浏览；弹幕发送→撤回闭环。
 
 ### 未实现（代码层面）

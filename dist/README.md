@@ -4,6 +4,22 @@
 `*.apk`），需要时本地 `./gradlew assembleDebug` / `assembleRelease` 生成，或从
 GitHub Releases 下载。
 
+## 0.2.0-rc28（2026-11-06）
+
+- `bili-duo-0.2.0-rc28-release.apk`
+  - R8 minify，正式 release keystore 签名；可覆盖安装同 key 的 rc27。
+  - APK SHA-256：`a8fbde23f13836be0d32f50e7fd8fbf196b6e4cb69e53d9c24d8c2d13371a1bf`
+- `bili-duo-0.2.0-rc28-debug.apk`
+  - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
+  - SHA-256：`167134ebed158f641cb919fc0112300bceff3cd9f6b7cb5ed8d761645f199fdd`
+
+rc28 变更：
+- 投币弹窗：选择 1 枚或 2 枚（按已投数量限制），确认后才提交；底部「一键三连」。
+- 收藏弹窗：列出收藏夹，已收藏的显示勾选；选择即加入或移出该收藏夹。
+- 一键三连：点赞 → 收藏到默认收藏夹（仅未收藏时）→ 补足 2 枚硬币，任一步失败停止。
+- 简介页关注按钮：Up 回右栏 tab，Left 回 UP 卡；UP 卡 Right 到关注，不再跳左栏。
+- 221 单测通过。Duo 验证弹窗布局/焦点链、关注 Up；投币/收藏/三连确认动作未执行。
+
 ## 0.2.0-rc27（2026-11-06）
 
 - `bili-duo-0.2.0-rc27-release.apk`

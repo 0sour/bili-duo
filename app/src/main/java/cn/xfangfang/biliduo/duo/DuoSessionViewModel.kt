@@ -29,6 +29,8 @@ enum class DuoOverlay {
     COMMENT_SEND,
     COMMENT_DELETE,
     DOWNLOAD,
+    COIN,
+    FAVORITE,
     IMAGE,
 }
 

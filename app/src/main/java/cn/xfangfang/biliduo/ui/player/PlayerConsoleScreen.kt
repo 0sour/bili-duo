@@ -113,6 +113,7 @@ import cn.xfangfang.biliduo.data.api.BilibiliApi
 import cn.xfangfang.biliduo.data.download.DownloadManager
 import cn.xfangfang.biliduo.data.local.AppSettings
 import cn.xfangfang.biliduo.data.model.CommentItem
+import cn.xfangfang.biliduo.data.model.FavFolder
 import cn.xfangfang.biliduo.data.model.CommentPicture
 import cn.xfangfang.biliduo.data.model.QualityOption
 import cn.xfangfang.biliduo.data.model.UserVideoItem
@@ -184,6 +185,11 @@ fun PlayerConsoleScreen(
     val speedFocus = remember { FocusRequester() }
     val settingsFocus = remember { FocusRequester() }
     val danmakuSendFocus = remember { FocusRequester() }
+    val likeFocus = remember { FocusRequester() }
+    val coinFocus = remember { FocusRequester() }
+    val favoriteFocus = remember { FocusRequester() }
+    val uploaderFocus = remember { FocusRequester() }
+    val followFocus = remember { FocusRequester() }
     var playFocused by remember { mutableStateOf(false) }
     var rightPaneFocused by remember { mutableStateOf(false) }
     val rightPaneFocusedState by rememberUpdatedState(rightPaneFocused)
@@ -215,6 +221,11 @@ fun PlayerConsoleScreen(
     var coinsGiven by remember(aid) { mutableStateOf<Int?>(null) }
     var coinBusy by remember(aid) { mutableStateOf(false) }
     var coinDelta by remember(aid) { mutableStateOf(0L) }
+    var coinChoice by remember { mutableIntStateOf(1) }
+    var tripleBusy by remember { mutableStateOf(false) }
+    var favFolders by remember { mutableStateOf<List<FavFolder>>(emptyList()) }
+    var favFoldersLoading by remember { mutableStateOf(false) }
+    var favFoldersError by remember { mutableStateOf<String?>(null) }
 
     var comments by remember(aid) { mutableStateOf<List<CommentItem>>(emptyList()) }
     var commentsLoading by remember(aid) { mutableStateOf(false) }
@@ -735,46 +746,66 @@ fun PlayerConsoleScreen(
         }
     }
 
-    fun toggleFavorite() {
+    fun loadFavFolders() {
+        val info = ui.videoInfo ?: return
+        val uid = parseDedeUserId(BilibiliApi.loginCookies) ?: run {
+            favFoldersError = "登录状态异常"
+            return
+        }
+        favFoldersLoading = true
+        favFoldersError = null
+        scope.launch {
+            repository.getFavFolders(uid, rid = info.aid)
+                .onSuccess { folders ->
+                    favFolders = folders
+                    if (isFavorited == null) isFavorited = folders.any { it.favState == 1 }
+                }
+                .onFailure { favFoldersError = it.message ?: "收藏夹加载失败" }
+            favFoldersLoading = false
+        }
+    }
+
+    fun openFavoriteOverlay() {
         val info = ui.videoInfo ?: return
         if (BilibiliApi.loginCookies.isBlank()) {
             toast("请先登录")
             return
         }
-        if (favBusy || isFavorited == null) return
-        val uid = parseDedeUserId(BilibiliApi.loginCookies)
-        if (uid == null) {
-            toast("登录状态异常")
+        if (favBusy) return
+        if (isFavorited == null) {
+            toast("收藏状态加载中")
             return
         }
-        val current = isFavorited == true
+        pendingOverlayFocus = favoriteFocus
+        favFolders = emptyList()
+        session.openOverlay(DuoOverlay.FAVORITE)
+        loadFavFolders()
+    }
+
+    fun selectFavoriteFolder(folder: FavFolder) {
+        val info = ui.videoInfo ?: return
+        if (favBusy) return
+        val adding = folder.favState != 1
         scope.launch {
             favBusy = true
-            val folders = repository.getFavFolders(uid, rid = info.aid).getOrElse {
-                toast(it.message ?: "收藏夹加载失败")
-                favBusy = false
-                return@launch
-            }
-            val result = if (current) {
-                val ids = favouredFolderIds(folders)
-                if (ids.isEmpty()) {
-                    Result.success(Unit)
-                } else {
-                    repository.dealFavResource(info.aid, "", ids.joinToString(","))
-                }
+            val result = if (adding) {
+                repository.dealFavResource(info.aid, folder.id.toString(), "")
             } else {
-                val folderId = pickDefaultFolderId(folders)
-                if (folderId == null) {
-                    toast("请先在网页端创建收藏夹")
-                    favBusy = false
-                    return@launch
-                }
-                repository.dealFavResource(info.aid, folderId.toString(), "")
+                repository.dealFavResource(info.aid, "", folder.id.toString())
             }
             result.onSuccess {
-                isFavorited = !current
-                favDelta += if (current) -1L else 1L
-                toast(if (current) "已取消收藏" else "已收藏")
+                val wasFavorited = isFavorited == true
+                val stillFavorited = if (adding) {
+                    true
+                } else {
+                    favFolders.any { it.id != folder.id && it.favState == 1 }
+                }
+                isFavorited = stillFavorited
+                if (wasFavorited != stillFavorited) {
+                    favDelta += if (stillFavorited) 1L else -1L
+                }
+                toast(if (adding) "已收藏到「${folder.title}」" else "已取消收藏")
+                session.closeOverlay()
             }.onFailure { toast(it.message ?: "操作失败") }
             favBusy = false
         }
@@ -805,7 +836,7 @@ fun PlayerConsoleScreen(
         }
     }
 
-    fun giveCoin() {
+    fun openCoinOverlay() {
         val info = ui.videoInfo ?: return
         if (BilibiliApi.loginCookies.isBlank()) {
             toast("请先登录")
@@ -820,16 +851,108 @@ fun PlayerConsoleScreen(
             toast("已投过 2 枚硬币")
             return
         }
+        coinChoice = 1
+        pendingOverlayFocus = coinFocus
+        session.openOverlay(DuoOverlay.COIN)
+    }
+
+    fun giveCoin(multiply: Int) {
+        val info = ui.videoInfo ?: return
+        if (BilibiliApi.loginCookies.isBlank()) {
+            toast("请先登录")
+            return
+        }
+        if (coinBusy) return
+        val remaining = 2 - (coinsGiven ?: 0)
+        if (remaining <= 0) {
+            toast("已投过 2 枚硬币")
+            return
+        }
+        val amount = multiply.coerceIn(1, remaining)
         scope.launch {
             coinBusy = true
-            repository.addVideoCoin(info.aid, multiply = 1)
+            repository.addVideoCoin(info.aid, multiply = amount)
                 .onSuccess {
-                    coinsGiven = (coinsGiven ?: 0) + 1
-                    coinDelta += 1L
-                    toast("已投币")
+                    coinsGiven = (coinsGiven ?: 0) + amount
+                    coinDelta += amount.toLong()
+                    toast("已投 $amount 枚硬币")
+                    session.closeOverlay()
                 }
                 .onFailure { toast(it.message ?: "投币失败，请检查硬币余额") }
             coinBusy = false
+        }
+    }
+
+    fun performTriple() {
+        val info = ui.videoInfo ?: return
+        if (BilibiliApi.loginCookies.isBlank()) {
+            toast("请先登录")
+            return
+        }
+        if (tripleBusy || coinBusy || likeBusy || favBusy) return
+        if (isLiked == null || isFavorited == null || coinsGiven == null) {
+            toast("状态加载中")
+            return
+        }
+        val uid = parseDedeUserId(BilibiliApi.loginCookies)
+        if (uid == null) {
+            toast("登录状态异常")
+            return
+        }
+        val needCoins = (2 - (coinsGiven ?: 0)).coerceAtLeast(0)
+        if (isLiked == true && isFavorited == true && needCoins == 0) {
+            toast("已经三连过了")
+            return
+        }
+        scope.launch {
+            tripleBusy = true
+            var defaultFolderId: Long? = null
+            if (isFavorited != true) {
+                val folders = repository.getFavFolders(uid, rid = info.aid).getOrElse {
+                    toast(it.message ?: "收藏夹加载失败")
+                    tripleBusy = false
+                    return@launch
+                }
+                defaultFolderId = pickDefaultFolderId(folders)
+                if (defaultFolderId == null) {
+                    toast("请先在网页端创建收藏夹")
+                    tripleBusy = false
+                    return@launch
+                }
+            }
+            if (isLiked != true) {
+                val liked = repository.likeVideo(info.aid, true)
+                if (liked.isFailure) {
+                    toast(liked.exceptionOrNull()?.message ?: "点赞失败")
+                    tripleBusy = false
+                    return@launch
+                }
+                isLiked = true
+                likeDelta += 1L
+            }
+            if (isFavorited != true && defaultFolderId != null) {
+                val favResult = repository.dealFavResource(info.aid, defaultFolderId.toString(), "")
+                if (favResult.isFailure) {
+                    toast(favResult.exceptionOrNull()?.message ?: "收藏失败")
+                    tripleBusy = false
+                    return@launch
+                }
+                isFavorited = true
+                favDelta += 1L
+            }
+            if (needCoins > 0) {
+                val coinResult = repository.addVideoCoin(info.aid, multiply = needCoins)
+                if (coinResult.isFailure) {
+                    toast(coinResult.exceptionOrNull()?.message ?: "投币失败，请检查硬币余额")
+                    tripleBusy = false
+                    return@launch
+                }
+                coinsGiven = (coinsGiven ?: 0) + needCoins
+                coinDelta += needCoins.toLong()
+            }
+            toast("三连成功")
+            session.closeOverlay()
+            tripleBusy = false
         }
     }
 
@@ -1543,11 +1666,17 @@ fun PlayerConsoleScreen(
                             favCount = (ui.videoInfo?.stat?.favorite ?: 0L) + favDelta,
                             onFollow = { toggleFollow() },
                             onLike = { toggleLike() },
-                            onCoin = { giveCoin() },
-                            onFavorite = { toggleFavorite() },
+                            onCoin = { openCoinOverlay() },
+                            onFavorite = { openFavoriteOverlay() },
+                            likeFocus = likeFocus,
+                            coinFocus = coinFocus,
+                            favoriteFocus = favoriteFocus,
                             onDownload = { startDownload() },
                             onPlay = { controller.togglePlay() },
                             onUploaderClick = { ownerMid?.let(onUploaderClick) },
+                            upFocus = tabFocus[TAB_INTRO],
+                            uploaderFocus = uploaderFocus,
+                            followFocus = followFocus,
                         )
                         TAB_PARTS -> PartsTab(
                             pages = ui.pages,
@@ -1859,6 +1988,129 @@ fun PlayerConsoleScreen(
                         .align(Alignment.CenterHorizontally)
                         .onFocusChanged { downloadStartFocused = it.isFocused },
                 )
+            }
+        }
+    }
+
+    if (overlay == DuoOverlay.COIN) {
+        val firstOptionFocus = remember { FocusRequester() }
+        val secondOptionFocus = remember { FocusRequester() }
+        val confirmFocus = remember { FocusRequester() }
+        val tripleFocus = remember { FocusRequester() }
+        val remaining = (2 - (coinsGiven ?: 0)).coerceAtLeast(1)
+        val amount = coinChoice.coerceIn(1, remaining)
+        LaunchedEffect(focusEpoch) {
+            delay(120L)
+            runCatching { firstOptionFocus.requestFocus() }
+        }
+        OverlayCard(
+            title = "投币",
+            onDismiss = { session.closeOverlay() },
+        ) {
+            Column(Modifier.fillMaxWidth()) {
+                Text(
+                    text = "已投 ${coinsGiven ?: 0}/2 枚 · 本次可投 $remaining 枚",
+                    color = DuoTextSecondary,
+                    fontSize = 10.sp,
+                )
+                Spacer(Modifier.height(6.dp))
+                OverlayRow(
+                    label = "1 枚硬币",
+                    selected = coinChoice == 1,
+                    focusRequester = firstOptionFocus,
+                    onClick = { coinChoice = 1 },
+                )
+                if (remaining >= 2) {
+                    OverlayRow(
+                        label = "2 枚硬币",
+                        selected = coinChoice == 2,
+                        focusRequester = secondOptionFocus,
+                        onClick = { coinChoice = 2 },
+                    )
+                }
+                Spacer(Modifier.height(10.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(36.dp)
+                        .focusRequester(confirmFocus)
+                        .focusProperties { down = tripleFocus }
+                        .duoFocusRing(RoundedCornerShape(7.dp))
+                        .clip(RoundedCornerShape(7.dp))
+                        .background(DuoPink)
+                        .duoClickable(enabled = !coinBusy) { giveCoin(amount) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = if (coinBusy) "投币中…" else "确认投 $amount 枚",
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                    )
+                }
+                Spacer(Modifier.height(12.dp))
+                Text("一键三连", color = DuoTextSecondary, fontSize = 10.sp)
+                Spacer(Modifier.height(4.dp))
+                OverlayRow(
+                    label = if (tripleBusy) "三连处理中…" else "点赞 + 投币 + 收藏到默认收藏夹",
+                    selected = false,
+                    focusRequester = tripleFocus,
+                    onClick = { performTriple() },
+                    modifier = Modifier.focusProperties { down = FocusRequester.Cancel },
+                )
+            }
+        }
+    }
+
+    if (overlay == DuoOverlay.FAVORITE) {
+        val firstFolderFocus = remember { FocusRequester() }
+        val favCloseFocus = remember { FocusRequester() }
+        LaunchedEffect(focusEpoch, favFoldersLoading, favFolders.size) {
+            delay(120L)
+            if (!favFoldersLoading) {
+                runCatching {
+                    if (favFolders.isEmpty()) favCloseFocus.requestFocus() else firstFolderFocus.requestFocus()
+                }
+            }
+        }
+        OverlayCard(
+            title = "选择收藏夹",
+            onDismiss = { session.closeOverlay() },
+            closeFocus = favCloseFocus,
+        ) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 300.dp)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 8.dp, vertical = 7.dp),
+            ) {
+                when {
+                    favFoldersLoading -> Text("收藏夹加载中…", color = DuoTextSecondary, fontSize = 12.sp)
+                    favFoldersError != null -> {
+                        Text(favFoldersError.orEmpty(), color = DuoTextSecondary, fontSize = 11.sp)
+                        Spacer(Modifier.height(6.dp))
+                        OverlayRow(
+                            label = "重试",
+                            selected = false,
+                            focusRequester = firstFolderFocus,
+                            onClick = { loadFavFolders() },
+                        )
+                    }
+                    favFolders.isEmpty() -> Text(
+                        "还没有收藏夹，请先在网页端创建。",
+                        color = DuoTextSecondary,
+                        fontSize = 11.sp,
+                    )
+                    else -> favFolders.forEachIndexed { index, folder ->
+                        OverlayRow(
+                            label = if (folder.favState == 1) "${folder.title} · 已收藏" else folder.title,
+                            selected = folder.favState == 1,
+                            focusRequester = if (index == 0) firstFolderFocus else null,
+                            onClick = { selectFavoriteFolder(folder) },
+                        )
+                    }
+                }
             }
         }
     }
@@ -2247,9 +2499,15 @@ private fun IntroTab(
     onLike: () -> Unit,
     onCoin: () -> Unit,
     onFavorite: () -> Unit,
+    likeFocus: FocusRequester,
+    coinFocus: FocusRequester,
+    favoriteFocus: FocusRequester,
     onDownload: () -> Unit,
     onPlay: () -> Unit,
     onUploaderClick: () -> Unit = {},
+    upFocus: FocusRequester,
+    uploaderFocus: FocusRequester,
+    followFocus: FocusRequester,
 ) {
     val info = uiState.videoInfo
     Column(
@@ -2333,6 +2591,26 @@ private fun IntroTab(
                 Row(
                     modifier = Modifier
                         .weight(1f)
+                        .focusRequester(uploaderFocus)
+                        .focusProperties {
+                            up = upFocus
+                            right = followFocus
+                        }
+                        .onPreviewKeyEvent { event ->
+                            if (event.type != KeyEventType.KeyDown) {
+                                false
+                            } else when (event.key) {
+                                Key.DirectionUp -> {
+                                    runCatching { upFocus.requestFocus() }
+                                    true
+                                }
+                                Key.DirectionRight -> {
+                                    runCatching { followFocus.requestFocus() }
+                                    true
+                                }
+                                else -> false
+                            }
+                        }
                         .duoFocusRing(RoundedCornerShape(6.dp))
                         .clip(RoundedCornerShape(6.dp))
                         .duoClickable(onClick = onUploaderClick)
@@ -2372,6 +2650,27 @@ private fun IntroTab(
                     },
                     active = isFollowed == true,
                     onClick = onFollow,
+                    modifier = Modifier
+                        .focusRequester(followFocus)
+                        .focusProperties {
+                            up = upFocus
+                            left = uploaderFocus
+                        }
+                        .onPreviewKeyEvent { event ->
+                            if (event.type != KeyEventType.KeyDown) {
+                                false
+                            } else when (event.key) {
+                                Key.DirectionUp -> {
+                                    runCatching { upFocus.requestFocus() }
+                                    true
+                                }
+                                Key.DirectionLeft -> {
+                                    runCatching { uploaderFocus.requestFocus() }
+                                    true
+                                }
+                                else -> false
+                            }
+                        },
                 )
             }
 
@@ -2387,6 +2686,7 @@ private fun IntroTab(
                     },
                     active = isLiked == true,
                     onClick = onLike,
+                    focusRequester = likeFocus,
                     modifier = Modifier.focusProperties { down = FocusRequester.Cancel },
                 )
                 ActionPill(
@@ -2398,6 +2698,7 @@ private fun IntroTab(
                     },
                     active = isCoined,
                     onClick = onCoin,
+                    focusRequester = coinFocus,
                     modifier = Modifier.focusProperties { down = FocusRequester.Cancel },
                 )
                 ActionPill(
@@ -2409,6 +2710,7 @@ private fun IntroTab(
                     },
                     active = isFavorited == true,
                     onClick = onFavorite,
+                    focusRequester = favoriteFocus,
                     modifier = Modifier.focusProperties { down = FocusRequester.Cancel },
                 )
                 ActionPill(
@@ -3674,10 +3976,12 @@ private fun OverlayRow(
     selected: Boolean,
     focusRequester: FocusRequester? = null,
     onFocus: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
     Row(
         modifier = Modifier
+            .then(modifier)
             .fillMaxWidth()
             .duoFocusRing(RoundedCornerShape(6.dp))
             .clip(RoundedCornerShape(6.dp))
@@ -3974,10 +4278,14 @@ private fun ActionPill(
     active: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    focusRequester: FocusRequester? = null,
 ) {
     Row(
         modifier = modifier
             .height(28.dp)
+            .then(
+                if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier
+            )
             .duoFocusRing(RoundedCornerShape(50))
             .clip(RoundedCornerShape(50))
             .background(if (active) DuoPink.copy(alpha = 0.16f) else DuoSurfaceHigh)
