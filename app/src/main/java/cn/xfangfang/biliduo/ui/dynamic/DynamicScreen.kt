@@ -1318,6 +1318,9 @@ private fun DynamicCommentsOverlay(
     var error by remember(card.id) { mutableStateOf<String?>(null) }
     var page by remember(card.id) { mutableStateOf(1) }
     var focusedOnce by remember(card.id) { mutableStateOf(false) }
+    var focusedRpid by remember(card.id) { mutableStateOf<Long?>(null) }
+    var likedState by remember(card.id) { mutableStateOf<Map<Long, Boolean>>(emptyMap()) }
+    var likeDelta by remember(card.id) { mutableStateOf<Map<Long, Int>>(emptyMap()) }
     val dynamicId = card.commentOid.takeIf { it > 0L }
 
     suspend fun load(targetPage: Int) {
@@ -1351,6 +1354,21 @@ private fun DynamicCommentsOverlay(
             runCatching { firstFocus.requestFocus() }
         }
     }
+    fun toggleLike(comment: CommentItem) {
+        val oid = dynamicId ?: return
+        if (BilibiliApi.loginCookies.isBlank()) return
+        val current = likedState[comment.rpid] == true
+        likedState = likedState + (comment.rpid to !current)
+        likeDelta = likeDelta + (comment.rpid to ((likeDelta[comment.rpid] ?: 0) + if (current) -1 else 1))
+        scope.launch {
+            repository.likeComment(oid, comment.rpid, !current, type = card.commentType)
+                .onFailure {
+                    likedState = likedState + (comment.rpid to current)
+                    likeDelta = likeDelta + (comment.rpid to ((likeDelta[comment.rpid] ?: 0) + if (current) 1 else -1))
+                }
+        }
+    }
+
     DisposableEffect(session, card.id) {
         session?.setBackInterceptor {
             onClose()
@@ -1366,7 +1384,20 @@ private fun DynamicCommentsOverlay(
         }
     }
 
-    Column(Modifier.fillMaxSize().background(DuoPalette.Bg)) {
+    Column(
+        Modifier
+            .fillMaxSize()
+            .background(DuoPalette.Bg)
+            .onPreviewKeyEvent { event ->
+                if (event.type == KeyEventType.KeyDown && event.key == Key.X) {
+                    val id = focusedRpid ?: return@onPreviewKeyEvent false
+                    comments.firstOrNull { it.rpid == id }?.let { toggleLike(it) }
+                    true
+                } else {
+                    false
+                }
+            },
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth().height(54.dp).padding(horizontal = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -1390,7 +1421,7 @@ private fun DynamicCommentsOverlay(
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
-                    text = "${card.authorName} · ${formatCount(card.commentCount.toLong())} 条",
+                    text = "${card.authorName} · ${formatCount(card.commentCount.toLong())} 条 · X 点赞",
                     color = DuoPalette.Tertiary,
                     fontSize = 10.sp,
                 )
@@ -1433,6 +1464,7 @@ private fun DynamicCommentsOverlay(
                                 if (index == 0) Modifier.focusRequester(firstFocus) else Modifier
                             )
                             .duoFocusRing(RoundedCornerShape(6.dp))
+                            .onFocusChanged { if (it.isFocused) focusedRpid = comment.rpid }
                             .focusable()
                             .padding(4.dp),
                         verticalAlignment = Alignment.Top,
@@ -1459,7 +1491,12 @@ private fun DynamicCommentsOverlay(
                                     maxLines = 1,
                                     modifier = Modifier.weight(1f),
                                 )
-                                Text("赞 ${comment.like}", color = DuoPalette.Tertiary, fontSize = 9.sp)
+                                val liked = likedState[comment.rpid] == true
+                                Text(
+                                    text = "赞 ${(comment.like + (likeDelta[comment.rpid] ?: 0)).coerceAtLeast(0)}",
+                                    color = if (liked) DuoPalette.Pink else DuoPalette.Tertiary,
+                                    fontSize = 9.sp,
+                                )
                             }
                             Spacer(Modifier.height(2.dp))
                             Text(

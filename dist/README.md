@@ -8,13 +8,13 @@ GitHub Releases 下载。
 
 - `bili-duo-0.2.0-rc33-release.apk`
   - R8 minify，正式 release keystore 签名；可覆盖安装同 key 的 rc32。
-  - APK SHA-256：`6c3601e5f9fa06f07194a0d14c19e4b7c86a2d031a62b23f1df913474fae2d5a`
+  - APK SHA-256：`REPLACE_HASH`
 - `bili-duo-0.2.0-rc33-debug.apk`
   - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
   - SHA-256：`2c0521e8d97811708c292d845d5af9424cf6b65f4759760dd211c73a72a526e1`
 
 rc33 变更：
-- 动态详情/纯文字阅读 **LB/RB**（或点评论数）打开动态评论（oid/type 取 basic 字段，只读、分页、重试）。
+- 动态详情/纯文字阅读 **LB/RB**（或点评论数）打开动态评论（oid/type 取 basic 字段，分页/重试）；焦点在评论上按 X 点赞/取消。
 - 评论浮层关闭后恢复阅读层 B interceptor，不会直接退出动态。
 - 直播「回到直播」改为文字按钮，移除 SkipNext 图标歧义。
 - 221 单测通过；Duo 已安装；动态评论已验证可打开（opus 卡 type=11、oid 取 item.basic.comment_id_str）。

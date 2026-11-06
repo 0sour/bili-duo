@@ -929,13 +929,14 @@ class BilibiliRepository(
         }.onFailure { Log.e(BilibiliApp.TAG, "getReplies failed", it) }
     }
 
-    suspend fun likeComment(aid: Long, rpid: Long, like: Boolean): Result<Unit> {
+    suspend fun likeComment(aid: Long, rpid: Long, like: Boolean, type: Int = 1): Result<Unit> {
         if (BuildConfig.DEBUG) Log.d(BilibiliApp.TAG, "likeComment: aid=$aid rpid=$rpid like=$like")
         return runCatching {
             if (BilibiliApi.biliJct.isEmpty()) {
                 throw Exception("请先登录")
             }
             val response = api.likeComment(
+                type = type,
                 oid = aid,
                 rpid = rpid,
                 action = if (like) 1 else 0,
