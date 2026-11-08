@@ -8,10 +8,10 @@ GitHub Releases 下载。
 
 - `bili-duo-0.2.0-rc50-release.apk`
   - R8 minify，正式 release keystore 签名；可覆盖安装同 key 的 rc49。
-  - APK SHA-256：`3956a433f16211e1a0999f39eb2ed664031d7d8e4cf4510fc467e8316ff0b60d`
+  - APK SHA-256：`4e7bbce73f5a694b46e232e5d56c0367edf16cba43613ba96950ef3e1fb49e11`
 - `bili-duo-0.2.0-rc50-debug.apk`
   - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
-  - SHA-256：`7595576b10e2b10eaa558de43dc6c96d7b7d04acb28b022bfab0960b0cddf35b`
+  - SHA-256：`5c2a5329f1afe470afd06d656583c0829a83a048155e38fdc8a9169503a20bf9`
 
 rc50 变更：
 - 左侧 app rail 导航后焦点留在新选中的栏位，不自动跳进页面内容；方向键或触摸
@@ -22,7 +22,9 @@ rc50 变更：
 - rail 聚焦时页面不在焦点树里，新增 `DuoShoulderDispatcher` 转发 L1/R1/L2/R2；
   搜索页肩键改用 `duoTabCycling` 接入。228 单测通过。
 - Duo 已验证：rail 焦点、Right 进首卡、rail 聚焦 R1 切首页 tab/动态筛选并落首卡、
-  首页 tab 点击保焦、搜索 R1 切用户落首行、播放设置 L1 落首行。
+  首页 tab 点击保焦、搜索 R1 切用户落首行、播放设置 L1 落首行。用户已完成本轮
+  真机复测（含物理 X、摇杆/双指、长按/断连），反馈无明显 bug；设置“关于”状态
+  文案改为“测试版 RC”。
 
 ## 0.2.0-rc49（2026-11-08）
 

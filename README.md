@@ -11,7 +11,7 @@
 
 <p align="center">
   <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc50-FB7299">
-  <img alt="status" src="https://img.shields.io/badge/status-untested%20RC-orange">
+  <img alt="status" src="https://img.shields.io/badge/status-test%20build-orange">
   <img alt="Android" src="https://img.shields.io/badge/Android-24%2B-3DDC84?logo=android&logoColor=white">
   <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-1.9.23-7F52FF?logo=kotlin&logoColor=white">
   <img alt="Compose" src="https://img.shields.io/badge/Jetpack%20Compose-2024.04-4285F4?logo=jetpackcompose&logoColor=white">
@@ -24,8 +24,8 @@
 Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，也没有上屏 OSD。
 
 > 当前版本：**0.2.0-rc50**（versionCode 51）
-> 状态：功能完整的 **未测试 RC**，228 个单元测试通过，已在 MuMu 与 Duo 真机做核心
-> 路径验证，尚未完成全流程回归。
+> 状态：功能完整的 **测试版 RC**，228 个单元测试通过；Duo 已完成本轮侧栏焦点、
+> L1/R1 标签、视频默认值、物理输入与图片查看器复测，用户反馈无明显 bug。
 
 ## 界面预览
 

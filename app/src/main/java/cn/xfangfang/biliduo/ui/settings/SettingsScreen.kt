@@ -970,7 +970,7 @@ private fun AboutSettings(
         focusRequester = firstFocus,
         modifier = settingsTopEdge(backFocus),
     )
-    SettingsInfoRow("状态", "未测试 RC")
+    SettingsInfoRow("状态", "测试版 RC")
     SettingsActionRow(
         title = "开源仓库",
         subtitle = "github.com/0sour/bili-duo",
