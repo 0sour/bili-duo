@@ -51,16 +51,23 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cn.xfangfang.biliduo.duo.DuoSessionViewModel
+import cn.xfangfang.biliduo.duo.DuoImeState
 import cn.xfangfang.biliduo.ui.duo.duoClickable
 import cn.xfangfang.biliduo.ui.duo.duoFocusRing
 import cn.xfangfang.biliduo.ui.duo.duoTextFieldNavigation
+import cn.xfangfang.biliduo.ui.duo.showDuoIme
+import kotlinx.coroutines.delay
 
 /** Shared dark palette for secondary pages; mirrors Profile/Home/Console. */
 object DuoPalette {
@@ -146,8 +153,8 @@ fun DuoIconAction(
 }
 
 /**
- * Search field that participates in the bottom-screen focus tree. Center opens
- * the IME; the caller owns show/hide via [onRequestIme].
+ * Search field that participates in the bottom-screen focus tree. Focus alone
+ * only shows the border; A/Enter or a touch tap opens the IME.
  */
 @Composable
 fun DuoSearchField(
@@ -159,89 +166,146 @@ fun DuoSearchField(
     onFocusChanged: (Boolean) -> Unit = {},
     onSubmit: () -> Unit = {},
     onClear: () -> Unit = {},
-    onRequestIme: () -> Unit = {},
 ) {
     var focused by remember { mutableStateOf(false) }
-    BasicTextField(
-        value = value,
-        onValueChange = onValueChange,
-        modifier = modifier
-            .height(38.dp)
-            .focusRequester(focusRequester)
-            .duoTextFieldNavigation()
-            .onFocusChanged {
-                focused = it.isFocused
-                onFocusChanged(it.isFocused)
-            }
-            .onPreviewKeyEvent { event ->
-                if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionCenter) {
-                    onRequestIme()
-                    true
-                } else {
-                    false
-                }
-            }
-            .clip(RoundedCornerShape(19.dp))
-            .background(DuoPalette.Surface)
-            .border(
-                width = 1.dp,
-                color = if (focused) DuoPalette.Pink else DuoPalette.Outline,
-                shape = RoundedCornerShape(19.dp),
-            ),
-        textStyle = TextStyle(color = DuoPalette.Text, fontSize = 13.sp),
-        singleLine = true,
-        cursorBrush = SolidColor(DuoPalette.Pink),
-        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-        keyboardActions = KeyboardActions(onSearch = { onSubmit() }),
-        decorationBox = { inner ->
-            Row(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(start = 12.dp, end = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Search,
-                    contentDescription = null,
-                    tint = DuoPalette.Tertiary,
-                    modifier = Modifier.size(16.dp),
+    var editing by remember { mutableStateOf(false) }
+    var gateFocused by remember { mutableStateOf(false) }
+    var wasFocused by remember { mutableStateOf(false) }
+    val keyboard = LocalSoftwareKeyboardController.current
+    LaunchedEffect(editing) {
+        if (editing) {
+            DuoImeState.onShown()
+            val generation = DuoImeState.generation
+            delay(16L)
+            runCatching { focusRequester.requestFocus() }
+            showDuoIme(keyboard, generation, initialDelayMs = 44L)
+        }
+    }
+    Box(modifier = modifier.height(38.dp)) {
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            enabled = editing,
+            modifier = Modifier
+                .fillMaxSize()
+                .then(
+                    if (editing) {
+                        Modifier
+                            .focusRequester(focusRequester)
+                            .duoTextFieldNavigation()
+                            .pointerInput(Unit) {
+                                awaitPointerEventScope {
+                                    while (true) {
+                                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                                        if (event.type == PointerEventType.Press) {
+                                            DuoImeState.onShown()
+                                        }
+                                    }
+                                }
+                            }
+                    } else {
+                        Modifier
+                    }
                 )
-                Spacer(Modifier.width(6.dp))
-                Box(
-                    modifier = Modifier.weight(1f).fillMaxSize(),
-                    contentAlignment = Alignment.CenterStart,
-                ) {
-                    if (value.isEmpty()) {
-                        Text(
-                            text = placeholder,
-                            color = DuoPalette.Tertiary,
-                            fontSize = 13.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
+                .onFocusChanged {
+                    focused = it.isFocused
+                    onFocusChanged(it.isFocused)
+                    if (it.isFocused) {
+                        wasFocused = true
+                    } else if (wasFocused) {
+                        wasFocused = false
+                        editing = false
                     }
-                    inner()
                 }
-                if (value.isNotEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .size(30.dp)
-                            .duoFocusRing(CircleShape)
-                            .clip(CircleShape)
-                            .duoClickable(onClick = onClear),
-                        contentAlignment = Alignment.Center,
+                .onPreviewKeyEvent { event ->
+                    if (editing && event.type == KeyEventType.KeyDown &&
+                        (event.key == Key.DirectionCenter || event.key == Key.Enter)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "清除",
-                            tint = DuoPalette.Secondary,
-                            modifier = Modifier.size(15.dp),
-                        )
+                        DuoImeState.onShown()
+                        keyboard?.show()
+                        true
+                    } else {
+                        false
                     }
                 }
-            }
-        },
-    )
+                .clip(RoundedCornerShape(19.dp))
+                .background(DuoPalette.Surface)
+                .border(
+                    width = 1.dp,
+                    color = if (focused || gateFocused) DuoPalette.Pink else DuoPalette.Outline,
+                    shape = RoundedCornerShape(19.dp),
+                ),
+            textStyle = TextStyle(color = DuoPalette.Text, fontSize = 13.sp),
+            singleLine = true,
+            cursorBrush = SolidColor(DuoPalette.Pink),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            keyboardActions = KeyboardActions(onSearch = { onSubmit() }),
+            decorationBox = { inner ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(start = 12.dp, end = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = null,
+                        tint = DuoPalette.Tertiary,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Box(
+                        modifier = Modifier.weight(1f).fillMaxSize(),
+                        contentAlignment = Alignment.CenterStart,
+                    ) {
+                        if (value.isEmpty()) {
+                            Text(
+                                text = placeholder,
+                                color = DuoPalette.Tertiary,
+                                fontSize = 13.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        inner()
+                    }
+                    if (value.isNotEmpty() && editing) {
+                        Box(
+                            modifier = Modifier
+                                .size(30.dp)
+                                .duoFocusRing(CircleShape)
+                                .clip(CircleShape)
+                                .duoClickable(onClick = onClear),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "清除",
+                                tint = DuoPalette.Secondary,
+                                modifier = Modifier.size(15.dp),
+                            )
+                        }
+                    }
+                }
+            },
+        )
+        if (!editing) {
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .focusRequester(focusRequester)
+                    .duoTextFieldNavigation()
+                    .onFocusChanged {
+                        gateFocused = it.isFocused
+                        onFocusChanged(it.isFocused)
+                    }
+                    .duoClickable {
+                        editing = true
+                        DuoImeState.onShown()
+                    },
+            )
+        }
+    }
 }
 
 @Composable

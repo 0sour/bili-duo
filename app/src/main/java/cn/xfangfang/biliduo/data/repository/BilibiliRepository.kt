@@ -203,15 +203,20 @@ class BilibiliRepository(
         return runCatching<Pair<List<HomeVideoItem>, Boolean>> {
             when (tab) {
                 HomeTab.RECOMMEND -> {
-                    val response = api.getRecommendFeed()
+                    val response = api.getRecommendFeed(
+                        freshIdx = page,
+                        freshIdx1h = page,
+                    )
                     if (BuildConfig.DEBUG) {
-                        Log.d(BilibiliApp.TAG, "recommend response: code=${response.code} msg=${response.message}")
+                        Log.d(BilibiliApp.TAG, "recommend response: page=$page code=${response.code} msg=${response.message}")
                     }
                     if (response.code != 0) throw Exception(response.message)
                     val items = response.data?.items.orEmpty()
                         .filter { it.bvid.isNotBlank() && (it.goto.isEmpty() || it.goto == "av") }
-                    // The recommend endpoint has no stable page token; refresh instead.
-                    items to false
+                    // fresh_idx has no explicit end marker; stop when a page
+                    // comes back empty. The ViewModel also stops when a page
+                    // adds no new bvid.
+                    items to items.isNotEmpty()
                 }
                 HomeTab.POPULAR -> {
                     val response = api.getPopular(page = page)
@@ -955,25 +960,27 @@ class BilibiliRepository(
         aid: Long,
         message: String,
         root: Long? = null,
-        parent: Long? = null
+        parent: Long? = null,
+        type: Int = 1,
     ): Result<CommentAddData> {
-        if (BuildConfig.DEBUG) {
-            Log.d(BilibiliApp.TAG, "addComment: aid=$aid root=$root parent=$parent")
-        }
+        Log.d(BilibiliApp.TAG, "addComment: oid=$aid type=$type root=$root parent=$parent")
         return runCatching {
             if (BilibiliApi.biliJct.isEmpty()) {
                 throw Exception("请先登录")
             }
             val response = api.addComment(
+                type = type,
                 oid = aid,
                 message = message,
                 root = root,
                 parent = parent,
                 csrf = BilibiliApi.biliJct
             )
-            if (BuildConfig.DEBUG) {
-                Log.d(BilibiliApp.TAG, "addComment response: code=${response.code} msg=${response.message}")
-            }
+            Log.d(
+                BilibiliApp.TAG,
+                "addComment response: code=${response.code} msg=${response.message} " +
+                    "rpid=${response.data?.rpid} toast=${response.data?.successToast}",
+            )
             if (response.code == 0) {
                 response.data ?: CommentAddData()
             } else {
@@ -982,13 +989,14 @@ class BilibiliRepository(
         }.onFailure { Log.e(BilibiliApp.TAG, "addComment failed", it) }
     }
 
-    suspend fun deleteComment(aid: Long, rpid: Long): Result<Unit> {
+    suspend fun deleteComment(aid: Long, rpid: Long, type: Int = 1): Result<Unit> {
         if (BuildConfig.DEBUG) Log.d(BilibiliApp.TAG, "deleteComment: aid=$aid rpid=$rpid")
         return runCatching {
             if (BilibiliApi.biliJct.isEmpty()) {
                 throw Exception("请先登录")
             }
             val response = api.deleteComment(
+                type = type,
                 oid = aid,
                 rpid = rpid,
                 csrf = BilibiliApi.biliJct

@@ -85,7 +85,10 @@ import cn.xfangfang.biliduo.ui.common.DuoPillButton
 import cn.xfangfang.biliduo.ui.common.DuoSearchField
 import cn.xfangfang.biliduo.ui.duo.duoClickable
 import cn.xfangfang.biliduo.ui.duo.duoFocusRing
+import cn.xfangfang.biliduo.ui.duo.DuoTextFieldGate
 import cn.xfangfang.biliduo.ui.duo.duoTextFieldNavigation
+import cn.xfangfang.biliduo.ui.duo.rememberDuoTextFieldState
+import cn.xfangfang.biliduo.duo.DuoImeState
 import cn.xfangfang.biliduo.ui.top.TopAmbientUi
 import cn.xfangfang.biliduo.ui.top.TopGlyph
 import cn.xfangfang.biliduo.ui.top.TopPreviewUi
@@ -112,6 +115,7 @@ fun FavoritesScreen(
     val folderListState = rememberLazyListState()
     val resourceListState = rememberLazyListState()
     val searchFocus = remember { FocusRequester() }
+    val searchCancelFocus = remember { FocusRequester() }
     val firstFolderFocus = remember { FocusRequester() }
     val firstResourceFocus = remember { FocusRequester() }
     val loginFocus = remember { FocusRequester() }
@@ -249,9 +253,9 @@ fun FavoritesScreen(
     }
     LaunchedEffect(searchMode) {
         if (searchMode) {
+            // C: keep the ring on 取消 instead of focusing the input.
             delay(80)
-            runCatching { searchFocus.requestFocus() }
-            keyboard?.show()
+            runCatching { searchCancelFocus.requestFocus() }
         } else {
             keyboard?.hide()
         }
@@ -360,12 +364,14 @@ fun FavoritesScreen(
                             },
                         )
                     }
-                    DuoIconAction(
-                        icon = Icons.Default.Search,
-                        contentDescription = "搜索",
-                        tint = if (searchMode) DuoPalette.Pink else DuoPalette.Text,
-                        onClick = { if (searchMode) exitSearch() else searchMode = true },
-                    )
+                    if (!searchMode) {
+                        DuoIconAction(
+                            icon = Icons.Default.Search,
+                            contentDescription = "搜索",
+                            tint = DuoPalette.Text,
+                            onClick = { searchMode = true },
+                        )
+                    }
                 }
             },
         )
@@ -395,10 +401,9 @@ fun FavoritesScreen(
                         searchText = ""
                         if (inFolder) viewModel.clearFavSearch()
                     },
-                    onRequestIme = { keyboard?.show() },
                 )
                 Spacer(Modifier.width(8.dp))
-                DuoPillButton(text = "取消", onClick = { exitSearch() })
+                DuoPillButton(text = "取消", onClick = { exitSearch() }, focusRequester = searchCancelFocus)
             }
         }
 
@@ -1000,6 +1005,17 @@ private fun FolderFormOverlay(
     onCancel: () -> Unit,
 ) {
     val keyboard = LocalSoftwareKeyboardController.current
+    val titleState = rememberDuoTextFieldState(initiallyEditing = true)
+    val introState = rememberDuoTextFieldState()
+    val introFocus = remember { FocusRequester() }
+    LaunchedEffect(loading) {
+        if (!loading) {
+            runCatching { titleFocus.requestFocus() }
+            delay(60L)
+            DuoImeState.onShown()
+            keyboard?.show()
+        }
+    }
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -1044,44 +1060,51 @@ private fun FolderFormOverlay(
                 }
             } else {
                 Spacer(Modifier.height(10.dp))
-                OutlinedTextField(
-                    value = titleValue,
-                    onValueChange = onTitle,
-                    label = { Text("标题", fontSize = 11.sp) },
-                    textStyle = TextStyle(color = DuoPalette.Text, fontSize = 12.sp),
-                    singleLine = true,
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                        imeAction = ImeAction.Next,
-                    ),
-                    colors = favoritesFieldColors(),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .focusRequester(titleFocus)
-                        .duoTextFieldNavigation()
-                        .onPreviewKeyEvent { event ->
-                            if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionCenter) {
-                                keyboard?.show()
-                                true
-                            } else {
-                                false
-                            }
-                        },
-                )
+                DuoTextFieldGate(
+                    state = titleState,
+                    focusRequester = titleFocus,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { editing, gateFocused, fieldModifier ->
+                    OutlinedTextField(
+                        value = titleValue,
+                        onValueChange = onTitle,
+                        enabled = editing,
+                        label = { Text("标题", fontSize = 11.sp) },
+                        textStyle = TextStyle(color = DuoPalette.Text, fontSize = 12.sp),
+                        singleLine = true,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            imeAction = ImeAction.Next,
+                        ),
+                        colors = favoritesFieldColors(gateFocused),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .then(fieldModifier)
+                            .then(if (editing) Modifier.duoTextFieldNavigation() else Modifier),
+                    )
+                }
                 Spacer(Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = introValue,
-                    onValueChange = onIntro,
-                    label = { Text("简介（选填）", fontSize = 11.sp) },
-                    textStyle = TextStyle(color = DuoPalette.Text, fontSize = 12.sp),
-                    minLines = 1,
-                    maxLines = 2,
-                    colors = favoritesFieldColors(),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .duoTextFieldNavigation(),
-                )
+                DuoTextFieldGate(
+                    state = introState,
+                    focusRequester = introFocus,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { editing, gateFocused, fieldModifier ->
+                    OutlinedTextField(
+                        value = introValue,
+                        onValueChange = onIntro,
+                        enabled = editing,
+                        label = { Text("简介（选填）", fontSize = 11.sp) },
+                        textStyle = TextStyle(color = DuoPalette.Text, fontSize = 12.sp),
+                        minLines = 1,
+                        maxLines = 2,
+                        colors = favoritesFieldColors(gateFocused),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .then(fieldModifier)
+                            .then(if (editing) Modifier.duoTextFieldNavigation() else Modifier),
+                    )
+                }
                 Spacer(Modifier.height(8.dp))
                 var privacyFocused by remember { mutableStateOf(false) }
                 Row(
@@ -1139,15 +1162,19 @@ private fun FolderFormOverlay(
 }
 
 @Composable
-private fun favoritesFieldColors() = OutlinedTextFieldDefaults.colors(
+private fun favoritesFieldColors(gateFocused: Boolean = false) = OutlinedTextFieldDefaults.colors(
     focusedTextColor = DuoPalette.Text,
     unfocusedTextColor = DuoPalette.Text,
+    disabledTextColor = DuoPalette.Text,
     focusedContainerColor = DuoPalette.Surface,
     unfocusedContainerColor = DuoPalette.Surface,
+    disabledContainerColor = DuoPalette.Surface,
     focusedBorderColor = DuoPalette.Pink,
     unfocusedBorderColor = DuoPalette.Outline,
+    disabledBorderColor = if (gateFocused) DuoPalette.Pink else DuoPalette.Outline,
     focusedLabelColor = DuoPalette.Pink,
     unfocusedLabelColor = DuoPalette.Secondary,
+    disabledLabelColor = if (gateFocused) DuoPalette.Pink else DuoPalette.Secondary,
     cursorColor = DuoPalette.Pink,
 )
 

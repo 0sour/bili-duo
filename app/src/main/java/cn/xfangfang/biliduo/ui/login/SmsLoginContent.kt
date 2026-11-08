@@ -69,6 +69,7 @@ fun SmsLoginContent(
 
     LaunchedEffect(Unit) {
         delay(100)
+        // A: focus the phone field, but the read-only gate keeps the IME shut.
         runCatching { phoneFocus.requestFocus() }
     }
 
@@ -81,8 +82,9 @@ fun SmsLoginContent(
 
     LaunchedEffect(smsSent) {
         if (smsSent) {
-            delay(120)
-            runCatching { codeFocus.requestFocus() }
+            // C: do not jump into the code field after sending; close the IME
+            // and leave the focus on the send button.
+            keyboard?.hide()
         }
     }
 

@@ -170,11 +170,9 @@ class DynamicViewModel(
                 .onSuccess { feed ->
                     if (id != requestId) return@onSuccess
                     val allCards = feed.items.orEmpty().mapNotNull { it.toCardUi() }
-                    val cards = if (authorMid != null) {
-                        allCards.filter { it.matchesFilter(filter) }
-                    } else {
-                        allCards
-                    }
+                    // The feed API's type hint can still return mixed cards, so
+                    // always apply the local 全部/视频/图文 predicate.
+                    val cards = allCards.filter { it.matchesFilter(filter) }
                     val nextOffset = feed.offset.orEmpty()
                     _state.value = _state.value.copy(
                         items = cards,
@@ -221,11 +219,7 @@ class DynamicViewModel(
                 .onSuccess { feed ->
                     if (id != requestId) return@onSuccess
                     val allMore = feed.items.orEmpty().mapNotNull { it.toCardUi() }
-                    val more = if (authorMid != null) {
-                        allMore.filter { it.matchesFilter(snapshot.filter) }
-                    } else {
-                        allMore
-                    }
+                    val more = allMore.filter { it.matchesFilter(snapshot.filter) }
                     val nextOffset = feed.offset.orEmpty()
                     _state.value = _state.value.copy(
                         items = (_state.value.items + more).distinctBy { it.id },

@@ -10,21 +10,21 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc34-FB7299">
+  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc50-FB7299">
   <img alt="status" src="https://img.shields.io/badge/status-untested%20RC-orange">
   <img alt="Android" src="https://img.shields.io/badge/Android-24%2B-3DDC84?logo=android&logoColor=white">
   <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-1.9.23-7F52FF?logo=kotlin&logoColor=white">
   <img alt="Compose" src="https://img.shields.io/badge/Jetpack%20Compose-2024.04-4285F4?logo=jetpackcompose&logoColor=white">
   <img alt="Media3" src="https://img.shields.io/badge/Media3-1.4.1-FF6D00">
-  <img alt="tests" src="https://img.shields.io/badge/tests-221%20passing-brightgreen">
+  <img alt="tests" src="https://img.shields.io/badge/tests-228%20passing-brightgreen">
   <img alt="license" src="https://img.shields.io/badge/license-MIT-blue">
 </p>
 
 上屏只负责视频画面，下屏用一块 `Presentation` 承载完整 UI；手柄和触摸共用同一棵
 Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，也没有上屏 OSD。
 
-> 当前版本：**0.2.0-rc34**（versionCode 35）
-> 状态：功能完整的 **未测试 RC**，221 个单元测试通过，已在 MuMu 与 Duo 真机做核心
+> 当前版本：**0.2.0-rc50**（versionCode 51）
+> 状态：功能完整的 **未测试 RC**，228 个单元测试通过，已在 MuMu 与 Duo 真机做核心
 > 路径验证，尚未完成全流程回归。
 
 ## 界面预览
@@ -53,7 +53,7 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
   下屏 `Presentation` 中；`canHostTasks=false` 的设备也能正常显示。
 - **单焦点模型**：`BROWSE / PLAYER / OVERLAY` 三种状态，不再有
   `TOP_PLAYER ↔ BOTTOM_UI` 双模式和 Y 键切换。
-- **键位**：D-pad 移动焦点，A 确认，B 逐级返回，X 弹幕开关，START 清晰度菜单，
+- **键位**：D-pad 移动焦点，A 确认，B 逐级返回，X 弹幕开关，START 弹幕/字幕设置，
   LB/RB 切换右栏 tab；Y 不绑定。进度条可聚焦，左右键 ±10s。
 - **肩键快捷键**：L1/R1 切一级 tab（搜索页切视频/用户），L2/R2 切二级筛选行；
   长按只走一格。
@@ -120,7 +120,7 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
 | 图片 | Coil 2.6（含 GIF）、telephoto-zoomable |
 | 登录 | ZXing 二维码、极验 Geetest WebView |
 | 构建 | Gradle 8.7、AGP 8.4.0、JDK 17、R8 |
-| 测试 | JUnit4，221 个单元测试 |
+| 测试 | JUnit4，228 个单元测试 |
 | 架构 | Activity + Presentation、MVVM + StateFlow、单一 `PlayerController` |
 | 界面语言 | 简体中文（当前未做多语言资源） |
 
@@ -130,12 +130,12 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
 
 ### 已验证
 
-- **单元测试**：221 个用例通过（`./gradlew testDebugUnitTest`）。
+- **单元测试**：228 个用例通过（`./gradlew testDebugUnitTest`）。
 - **MuMu（1280×960 / 320dpi）**：双屏壳层、首页、搜索、播放控制台、直播列表与
   HLS 播放、动态空态/登录态、单屏回退提示、签名包安装与冷启动。
 - **Retroid Pocket Duo 真机**：
   - 双屏冷启动、上屏视频、下屏触摸与系统 IME、后台恢复。
-  - 视频：初始聚焦播放键、A 暂停、进度 ±10s/seek、X 弹幕、START 清晰度、
+  - 视频：初始聚焦播放键、A 暂停、进度 ±10s/seek、X 弹幕、START 弹幕/字幕设置、
     B 从右栏回播放键、再 B 退出。
   - 直播：初始聚焦、LB/RB 切 tab、输入框 B 收键盘、B 层级退出、触摸直点。
   - 首页 L1/R1 切 tab、直播 L2/R2 切分区、动态 L1/R1 切筛选、L2/R2 切 UP 主。
@@ -206,6 +206,37 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
     只读列表/分页/重试）；直播右侧「回到直播」改为文字按钮，去掉 SkipNext 图标歧义。
   - rc34 动态阅读：详情页新增「正文 / 评论」标签页，LB/RB 切换，B 在评论页回正文；
     评论内嵌加载/点赞；取消 Y 评论入口，Y 在动态列表改为回到顶部。
+  - rc35 动态评论发布：评论 tab 内联输入框，发送后显示 UP 主精选提示与「撤回」；
+    自己的评论按 A 可删除；B 先关输入框键盘再回正文；修复「图文」筛选混入视频卡。
+  - rc36 直播上屏弹幕：直播间的 WebSocket 弹幕实时滚动到上屏，X 开关沿用 VOD
+    弹幕设置；SC 以左下角卡片显示，离开直播间自动清理。
+  - rc37 下载自选分P：下载浮层支持当前P/全部/自选三档，自选列表可逐项勾选、
+    全选/清空，开始按钮固定在底部；批量入队只下载勾选项。
+  - rc38 SAF 下载目录：设置→存储可打开系统文件夹选择器，新下载写入所选目录
+    （content:// 全链路），支持从下载页直接播放与删除；可恢复应用私有目录。
+  - rc39 反馈修复：动态评论发送后自动补拉；Y 暂不映射；加载更多保持焦点；
+    上屏 SC 移除、直播控制台增加弹幕开关；下载自选分P对勾与 Up/Down 焦点修正。
+  - rc40 输入框统一：聚焦只显示焦点，A 弹输入法，B 收起键盘且焦点留在输入框；
+    再按 B 才返回。搜索/登录/评论/弹幕发送进入时不再自动弹键盘。
+  - rc41 输入框逐项：C 11 处进入不抢焦点、A 2 处选中待命、B 4 处进入即弹；
+    统一 `DuoTextFieldGate`；去掉搜索页重复提交按钮；修复冷启动首次 IME 不弹。
+  - rc42 图片缩放与推荐流：评论图片/动态画册支持 R2/L2 缩放、左摇杆平移、
+    双指缩放/拖动；主页推荐 `fresh_idx` 无限滚动、顶部刷新按钮，刷新失败保留旧列表。
+  - rc43 修正左摇杆平移方向：推右/上时画面向左/下移动（滚动式），触摸拖动方向不变。
+  - rc44 主页快捷键：X 刷新当前标签页，与右上角刷新按钮共用同一刷新逻辑。
+  - rc45 修正物理手柄 X：手柄 X 实际是 `BUTTON_X`，Home/Dynamic 同时接受
+    `Key.X`/`Key.ButtonX`；按 X 后焦点落到刷新按钮，Down 回首卡。
+  - rc46 全页面按键提示：底栏在“浏览/播放控制 + B/A”同一行按路由显示
+    X/LB/RB/L2/R2/START 等提示；动态阅读器/画册有局部覆盖，菜单打开时隐藏页面提示。
+  - rc47 播放页 START/MENU 改为打开弹幕/字幕设置（原清晰度菜单）；清晰度仍从
+    chips 行进入，提示文案同步。
+  - rc48 播放设置「弹幕/字幕」改为标签页，L1/R1 切换；D-pad 左右仍可切换，
+    屏蔽词编辑态不响应 L1/R1。
+  - rc49 设置 → 播放新增视频默认值：清晰度 / 倍速 / 字幕开关与字号/背景/位置，
+    每次打开视频时应用；播放页修改只影响当前视频。弹幕设置与播放页双向同步。
+  - rc50 焦点规则：左侧栏切页后焦点留在新栏位；L1/R1 切标签后直接聚焦内容，
+    直接点击标签则保留标签焦点；L2/R2 筛选仍停在新 chip。侧栏聚焦时肩键由
+    根节点转发给当前页面。
   - 登录、个人中心、历史/收藏/关注只读浏览；弹幕发送→撤回闭环。
 
 ### 未实现（代码层面）
@@ -266,7 +297,7 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
 | A | 激活焦点：播放/暂停、±10s、清晰度、倍速、弹幕、字幕、音量、tab、评论操作 |
 | B | 关 overlay → 右栏回播放键 → 左栏根退出 |
 | X | 弹幕开/关（直播不绑定） |
-| START / MENU | 打开清晰度菜单 |
+| START / MENU | 打开弹幕/字幕播放设置（清晰度用 chips） |
 | LB / RB | 切换右栏 tab（评论/推荐/简介/分P；直播评论/信息） |
 | Y | 不绑定 |
 | 触摸 | 一次点击直接操作 |

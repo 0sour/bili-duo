@@ -35,6 +35,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
@@ -61,6 +62,7 @@ import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -69,6 +71,8 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -84,8 +88,13 @@ import cn.xfangfang.biliduo.data.model.DynamicVideoUi
 import cn.xfangfang.biliduo.duo.DuoSessionViewModel
 import cn.xfangfang.biliduo.ui.common.DuoEmptyState
 import cn.xfangfang.biliduo.ui.common.DuoPalette
+import cn.xfangfang.biliduo.ui.common.DuoZoomableImage
+import cn.xfangfang.biliduo.ui.common.ImageZoomState
+import cn.xfangfang.biliduo.ui.common.rememberImageZoomState
 import cn.xfangfang.biliduo.ui.common.DuoPillButton
 import cn.xfangfang.biliduo.ui.duo.duoClickable
+import cn.xfangfang.biliduo.ui.duo.DuoTextFieldGate
+import cn.xfangfang.biliduo.ui.duo.rememberDuoTextFieldState
 import cn.xfangfang.biliduo.data.repository.BilibiliRepository
 import cn.xfangfang.biliduo.ui.duo.duoFocusRing
 import cn.xfangfang.biliduo.ui.duo.duoTabCycling
@@ -164,6 +173,7 @@ fun DynamicScreen(
     }
     var pendingFilterFocus by remember { mutableStateOf(false) }
     var pendingAuthorFocus by remember { mutableStateOf(false) }
+    var focusContentOnFilterShortcut by remember { mutableStateOf(false) }
     var lastShortcutAt by remember { mutableStateOf(0L) }
 
     LaunchedEffect(state.filter, pendingFilterFocus) {
@@ -231,15 +241,27 @@ fun DynamicScreen(
         // reachable with Down.
         runCatching { listState.scrollToItem(0) }
     }
-    LaunchedEffect(state.filter, state.authorMid, state.items.size, state.isLoading) {
+    LaunchedEffect(
+        state.filter,
+        state.authorMid,
+        state.items.size,
+        state.isLoading,
+        focusContentOnFilterShortcut,
+    ) {
         // Wait for the new filter's response; while loading we keep the old
         // cards visible, but focusing them would leave focus on a card that
         // is about to be replaced.
-        if (!firstFocused && !state.isLoading && state.items.isNotEmpty()) {
+        val needsContentFocus = !firstFocused || focusContentOnFilterShortcut
+        if (needsContentFocus && !state.isLoading && state.items.isNotEmpty()) {
             delay(120L)
-            if (SystemClock.uptimeMillis() - lastShortcutAt < 600L) return@LaunchedEffect
+            if (!focusContentOnFilterShortcut &&
+                SystemClock.uptimeMillis() - lastShortcutAt < 600L
+            ) {
+                return@LaunchedEffect
+            }
             runCatching { firstFocus.requestFocus() }
             firstFocused = true
+            focusContentOnFilterShortcut = false
         }
     }
     LaunchedEffect(loggedIn, state.filter, state.isLoading, state.items.size, state.error) {
@@ -279,33 +301,28 @@ fun DynamicScreen(
         Modifier
             .fillMaxSize()
             .background(DuoPalette.Bg)
-            .onPreviewKeyEvent { event ->
-                if (event.type == KeyEventType.KeyDown && event.key == Key.Y) {
-                    scope.launch { listState.animateScrollToItem(0) }
-                    true
-                } else {
-                    false
-                }
-            }
             .duoTabCycling(
                 // Without a session the page is a login prompt; switching the
                 // filters there would fire anonymous requests for nothing.
-                onPreviousTab = if (loggedIn) ({
+                // While a reader/gallery is open, leave L1/R1/L2/R2 to it.
+                onPreviousTab = if (loggedIn && overlay == null) ({
                     viewModel.cycleFilter(-1)
-                    pendingFilterFocus = true
+                    pendingFilterFocus = false
+                    focusContentOnFilterShortcut = true
                     lastShortcutAt = SystemClock.uptimeMillis()
                 }) else null,
-                onNextTab = if (loggedIn) ({
+                onNextTab = if (loggedIn && overlay == null) ({
                     viewModel.cycleFilter(1)
-                    pendingFilterFocus = true
+                    pendingFilterFocus = false
+                    focusContentOnFilterShortcut = true
                     lastShortcutAt = SystemClock.uptimeMillis()
                 }) else null,
-                onPreviousSection = if (loggedIn) ({
+                onPreviousSection = if (loggedIn && overlay == null) ({
                     viewModel.cycleAuthor(-1)
                     pendingAuthorFocus = true
                     lastShortcutAt = SystemClock.uptimeMillis()
                 }) else null,
-                onNextSection = if (loggedIn) ({
+                onNextSection = if (loggedIn && overlay == null) ({
                     viewModel.cycleAuthor(1)
                     pendingAuthorFocus = true
                     lastShortcutAt = SystemClock.uptimeMillis()
@@ -690,7 +707,9 @@ private fun DynamicCard(
                 if (it.hasFocus) onFocused(card) else onFocusCleared()
             }
             .onPreviewKeyEvent { event ->
-                if (event.type == KeyEventType.KeyDown && event.key == Key.X) {
+                if (event.type == KeyEventType.KeyDown &&
+                    (event.key == Key.X || event.key == Key.ButtonX)
+                ) {
                     onToggleLike()
                     true
                 } else {
@@ -1175,8 +1194,32 @@ private fun DynamicReaderLayer(
     val imageCount = overlay.card.images.size
     val step = with(density) { 96.dp.toPx() }
     var detailTab by remember(overlay.card.id, overlay.kind) { mutableStateOf(0) }
+    var sentRpid by remember(overlay.card.id, overlay.kind) { mutableStateOf<Long?>(null) }
+    var composerDismiss by remember(overlay.card.id, overlay.kind) {
+        mutableStateOf<(() -> Unit)?>(null)
+    }
+    var sentNotice by remember(overlay.card.id, overlay.kind) { mutableStateOf<String?>(null) }
     val detailBodyFocus = remember { FocusRequester() }
     val detailCommentsFocus = remember { FocusRequester() }
+    val galleryZoom = rememberImageZoomState()
+    LaunchedEffect(overlay.card.id, overlay.kind, overlay.imageIndex) {
+        galleryZoom.reset()
+    }
+    DisposableEffect(session, overlay, detailTab) {
+        session?.setHintOverride(
+            when (overlay) {
+                is DynamicOverlay.Detail -> if (detailTab == 1) {
+                    "LB/RB 正文/评论 · X 点赞 · 方向键滚动"
+                } else {
+                    "LB/RB 正文/评论 · X 复制链接 · 方向键滚动"
+                }
+                is DynamicOverlay.Gallery ->
+                    "R2/L2 缩放 · 左摇杆/拖动移动 · 方向键切换"
+                is DynamicOverlay.Text -> "X 复制链接 · 方向键滚动"
+            },
+        )
+        onDispose { session?.setHintOverride(null) }
+    }
 
     LaunchedEffect(overlay.card.id, overlay.kind) {
         delay(40L)
@@ -1186,10 +1229,14 @@ private fun DynamicReaderLayer(
     // currently shown picture, not the index captured when the gallery opened.
     DisposableEffect(session, overlay.card.id, overlay.kind, overlay.imageIndex, detailTab) {
         session?.setBackInterceptor {
-            if (overlay is DynamicOverlay.Detail && detailTab == 1) {
-                detailTab = 0
-            } else {
-                onBack()
+            val dismissComposer = composerDismiss
+            when {
+                dismissComposer != null -> {
+                    composerDismiss = null
+                    dismissComposer()
+                }
+                overlay is DynamicOverlay.Detail && detailTab == 1 -> detailTab = 0
+                else -> onBack()
             }
             true
         }
@@ -1206,13 +1253,13 @@ private fun DynamicReaderLayer(
             .onPreviewKeyEvent { event ->
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 if (overlay is DynamicOverlay.Detail && detailTab == 1) {
-                    when (event.key) {
+                    return@onPreviewKeyEvent when (event.key) {
                         Key.ButtonL1 -> {
                             detailTab = 0
                             true
                         }
                         Key.ButtonR1 -> true
-                        else -> return@onPreviewKeyEvent false
+                        else -> false
                     }
                 }
                 when (event.key) {
@@ -1262,7 +1309,23 @@ private fun DynamicReaderLayer(
                             false
                         }
                     }
-                    Key.X -> {
+                    Key.ButtonL2 -> {
+                        if (overlay is DynamicOverlay.Gallery) {
+                            galleryZoom.zoomBy(1f / 1.25f)
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                    Key.ButtonR2 -> {
+                        if (overlay is DynamicOverlay.Gallery) {
+                            galleryZoom.zoomBy(1.25f)
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                    Key.X, Key.ButtonX -> {
                         shareCurrent()
                         true
                     }
@@ -1294,12 +1357,19 @@ private fun DynamicReaderLayer(
                         onReaderBack = onBack,
                         onClose = { detailTab = 0 },
                         embedded = true,
+                        tabFocus = detailCommentsFocus,
+                        sentRpid = sentRpid,
+                        onSentRpid = { sentRpid = it },
+                        onComposerDismiss = { composerDismiss = it },
+                        sentNotice = sentNotice,
+                        onSentNotice = { sentNotice = it },
                     )
                 },
             )
             is DynamicOverlay.Gallery -> DynamicGalleryOverlay(
                 card = overlay.card,
                 imageIndex = overlay.imageIndex,
+                zoom = galleryZoom,
                 onBack = onBack,
                 onIndexChange = onIndexChange,
                 onShare = shareCurrent,
@@ -1321,11 +1391,32 @@ private fun DynamicCommentsOverlay(
     onReaderBack: () -> Unit,
     onClose: () -> Unit,
     embedded: Boolean = false,
+    tabFocus: FocusRequester? = null,
+    sentRpid: Long? = null,
+    onSentRpid: (Long?) -> Unit = {},
+    onComposerDismiss: (((() -> Unit)?) -> Unit) = {},
+    sentNotice: String? = null,
+    onSentNotice: (String?) -> Unit = {},
 ) {
     val repository = remember { BilibiliRepository() }
     val scope = rememberCoroutineScope()
     val firstFocus = remember { FocusRequester() }
     val loadMoreFocus = remember { FocusRequester() }
+    val composeFocus = remember { FocusRequester() }
+    val composerState = rememberDuoTextFieldState()
+    val deleteConfirmFocus = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+    var draft by remember(card.id) { mutableStateOf("") }
+    var sending by remember(card.id) { mutableStateOf(false) }
+    var sendError by remember(card.id) { mutableStateOf<String?>(null) }
+    val selfMid = BilibiliApi.parseSelfMid()
+    var deleteTarget by remember(card.id) { mutableStateOf<CommentItem?>(null) }
+    var deleting by remember(card.id) { mutableStateOf(false) }
+    var deleteError by remember(card.id) { mutableStateOf<String?>(null) }
+    var recalling by remember(card.id) { mutableStateOf(false) }
+    var fieldFocused by remember { mutableStateOf(false) }
+    var sendFocused by remember { mutableStateOf(false) }
+    var recallFocused by remember { mutableStateOf(false) }
     var comments by remember(card.id) { mutableStateOf<List<CommentItem>>(emptyList()) }
     var loading by remember(card.id) { mutableStateOf(true) }
     var loadingMore by remember(card.id) { mutableStateOf(false) }
@@ -1369,6 +1460,90 @@ private fun DynamicCommentsOverlay(
             runCatching { firstFocus.requestFocus() }
         }
     }
+    fun submitComment() {
+        val oid = dynamicId ?: return
+        val text = draft.trim()
+        if (text.isEmpty() || sending) return
+        if (text.length > 1000) {
+            sendError = "评论最多 1000 字"
+            return
+        }
+        sending = true
+        sendError = null
+        scope.launch {
+            repository.addComment(oid, text, type = card.commentType)
+                .onSuccess {
+                    draft = ""
+                    onSentRpid(it.rpid.takeIf { rpid -> rpid > 0L })
+                    onSentNotice(it.successToast.ifBlank { "评论已提交" })
+                    load(1)
+                    runCatching { composeFocus.requestFocus() }
+                    // 评论索引有延迟，稍后再拉一次，避免要手动刷新才看到。
+                    delay(700L)
+                    load(1)
+                }
+                .onFailure { sendError = it.message ?: "评论发送失败" }
+            sending = false
+        }
+    }
+
+    fun deleteComment(comment: CommentItem) {
+        val oid = dynamicId ?: return
+        if (deleting) return
+        deleting = true
+        deleteError = null
+        scope.launch {
+            repository.deleteComment(oid, comment.rpid, type = card.commentType)
+                .onSuccess {
+                    deleteTarget = null
+                    deleteError = null
+                    comments = comments.filterNot { it.rpid == comment.rpid }
+                    load(1)
+                    runCatching { firstFocus.requestFocus() }
+                }
+                .onFailure { deleteError = it.message ?: "删除失败" }
+            deleting = false
+        }
+    }
+
+    val composerActive = fieldFocused || sendFocused || recallFocused
+    suspend fun restoreCommentFocus() {
+        delay(60L)
+        runCatching { firstFocus.requestFocus() }
+    }
+    LaunchedEffect(deleteTarget, composerActive) {
+        onComposerDismiss(
+            when {
+                deleteTarget != null -> {
+                    {
+                        deleteTarget = null
+                        deleteError = null
+                        scope.launch { restoreCommentFocus() }
+                    }
+                }
+                composerActive -> {
+                    {
+                        keyboard?.hide()
+                        fieldFocused = false
+                        sendFocused = false
+                        recallFocused = false
+                        tabFocus?.let { runCatching { it.requestFocus() } }
+                    }
+                }
+                else -> null
+            },
+        )
+    }
+    DisposableEffect(Unit) {
+        onDispose { onComposerDismiss(null) }
+    }
+    LaunchedEffect(deleteTarget) {
+        if (deleteTarget != null) {
+            delay(60L)
+            runCatching { deleteConfirmFocus.requestFocus() }
+        }
+    }
+
     fun toggleLike(comment: CommentItem) {
         val oid = dynamicId ?: return
         if (BilibiliApi.loginCookies.isBlank()) return
@@ -1403,7 +1578,9 @@ private fun DynamicCommentsOverlay(
         Modifier
             .then(if (embedded) Modifier.fillMaxSize() else Modifier.fillMaxSize().background(DuoPalette.Bg))
             .onPreviewKeyEvent { event ->
-                if (event.type == KeyEventType.KeyDown && event.key == Key.X) {
+                if (event.type == KeyEventType.KeyDown &&
+                    (event.key == Key.X || event.key == Key.ButtonX)
+                ) {
                     val id = focusedRpid ?: return@onPreviewKeyEvent false
                     comments.firstOrNull { it.rpid == id }?.let { toggleLike(it) }
                     true
@@ -1444,6 +1621,191 @@ private fun DynamicCommentsOverlay(
                 Text("B 返回", color = DuoPalette.Tertiary, fontSize = 10.sp)
             }
         }
+        if (deleteTarget != null) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 6.dp)
+                    .height(38.dp)
+                    .onPreviewKeyEvent { event ->
+                        if (event.type == KeyEventType.KeyDown &&
+                            (event.key == Key.DirectionUp || event.key == Key.DirectionDown)
+                        ) {
+                            true
+                        } else {
+                            false
+                        }
+                    },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    "删除这条评论？",
+                    color = DuoPalette.Text,
+                    fontSize = 11.sp,
+                    modifier = Modifier.weight(1f),
+                )
+                Box(
+                    modifier = Modifier
+                        .width(48.dp)
+                        .height(32.dp)
+                        .clip(RoundedCornerShape(7.dp))
+                        .background(DuoPalette.SurfaceHigh)
+                        .duoClickable {
+                            deleteTarget = null
+                            deleteError = null
+                            scope.launch { restoreCommentFocus() }
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text("取消", color = DuoPalette.Secondary, fontSize = 11.sp)
+                }
+                Spacer(Modifier.width(8.dp))
+                Box(
+                    modifier = Modifier
+                        .width(48.dp)
+                        .height(32.dp)
+                        .focusRequester(deleteConfirmFocus)
+                        .duoFocusRing(RoundedCornerShape(7.dp))
+                        .clip(RoundedCornerShape(7.dp))
+                        .background(DuoPalette.Pink)
+                        .duoClickable(enabled = !deleting) {
+                            deleteTarget?.let(::deleteComment)
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        if (deleting) "删除中" else "删除",
+                        color = Color.White,
+                        fontSize = 11.sp,
+                    )
+                }
+            }
+            deleteError?.let {
+                Text(
+                    it,
+                    color = DuoPalette.Error,
+                    fontSize = 10.sp,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+                )
+            }
+        } else {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 6.dp)
+                .height(38.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            DuoTextFieldGate(
+                state = composerState,
+                focusRequester = composeFocus,
+                modifier = Modifier.weight(1f),
+                downFocus = if (comments.isNotEmpty()) firstFocus else null,
+                onGateFocusChanged = { fieldFocused = it },
+            ) { editing, gateFocused, fieldModifier ->
+                BasicTextField(
+                    value = draft,
+                    onValueChange = {
+                        draft = it
+                        sendError = null
+                    },
+                    enabled = editing,
+                    singleLine = true,
+                    textStyle = TextStyle(color = DuoPalette.Text, fontSize = 12.sp),
+                    cursorBrush = SolidColor(DuoPalette.Pink),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .then(fieldModifier)
+                        .onFocusChanged { fieldFocused = it.isFocused }
+                        .clip(RoundedCornerShape(7.dp))
+                        .background(DuoPalette.SurfaceHigh)
+                        .border(
+                            width = 1.dp,
+                            color = if (fieldFocused || gateFocused) DuoPalette.Pink else Color.Transparent,
+                            shape = RoundedCornerShape(7.dp),
+                        )
+                        .padding(horizontal = 10.dp, vertical = 9.dp),
+                    decorationBox = { inner ->
+                        if (draft.isEmpty()) {
+                            Text(
+                                "写评论…",
+                                color = DuoPalette.Tertiary,
+                                fontSize = 11.sp,
+                            )
+                        }
+                        inner()
+                    },
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+            Box(
+                modifier = Modifier
+                    .width(56.dp)
+                    .height(34.dp)
+                    .duoFocusRing(RoundedCornerShape(7.dp))
+                    .clip(RoundedCornerShape(7.dp))
+                    .background(DuoPalette.Pink.copy(alpha = if (draft.isBlank()) 0.3f else 1f))
+                    .onFocusChanged { sendFocused = it.isFocused }
+                    .duoClickable(enabled = draft.isNotBlank() && !sending) { submitComment() },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    if (sending) "发送中" else "发送",
+                    color = Color.White,
+                    fontSize = 11.sp,
+                )
+            }
+            sentRpid?.let { rpid ->
+                Spacer(Modifier.width(8.dp))
+                Box(
+                    modifier = Modifier
+                        .width(52.dp)
+                        .height(34.dp)
+                        .duoFocusRing(RoundedCornerShape(7.dp))
+                        .clip(RoundedCornerShape(7.dp))
+                        .background(DuoPalette.SurfaceHigh)
+                        .onFocusChanged { recallFocused = it.isFocused }
+                        .duoClickable(enabled = !recalling) {
+                            val oid = dynamicId ?: return@duoClickable
+                            recalling = true
+                            scope.launch {
+                                repository.deleteComment(oid, rpid, type = card.commentType)
+                                    .onSuccess {
+                                        onSentRpid(null)
+                                        onSentNotice(null)
+                                        load(1)
+                                    }
+                                    .onFailure { sendError = it.message ?: "撤回失败" }
+                                recalling = false
+                            }
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        if (recalling) "撤回中" else "撤回",
+                        color = DuoPalette.Secondary,
+                        fontSize = 10.sp,
+                    )
+                }
+            }
+        }
+        }
+        sentNotice?.let {
+            Text(
+                it,
+                color = DuoPalette.Secondary,
+                fontSize = 10.sp,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+            )
+        }
+        sendError?.let {
+            Text(
+                it,
+                color = DuoPalette.Error,
+                fontSize = 10.sp,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+            )
+        }
         when {
             loading -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = DuoPalette.Pink, strokeWidth = 2.dp, modifier = Modifier.size(22.dp))
@@ -1481,6 +1843,18 @@ private fun DynamicCommentsOverlay(
                             )
                             .duoFocusRing(RoundedCornerShape(6.dp))
                             .onFocusChanged { if (it.isFocused) focusedRpid = comment.rpid }
+                            .onPreviewKeyEvent { event ->
+                                if (event.type == KeyEventType.KeyDown &&
+                                    event.key == Key.DirectionCenter &&
+                                    selfMid != null && selfMid > 0L && comment.member.mid == selfMid
+                                ) {
+                                    deleteTarget = comment
+                                    deleteError = null
+                                    true
+                                } else {
+                                    false
+                                }
+                            }
                             .focusable()
                             .padding(4.dp),
                         verticalAlignment = Alignment.Top,
@@ -1524,12 +1898,8 @@ private fun DynamicCommentsOverlay(
                         }
                     }
                 }
-                item {
-                    if (loadingMore) {
-                        Box(Modifier.fillMaxWidth().padding(10.dp), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator(color = DuoPalette.Pink, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
-                        }
-                    } else if (!ended) {
+                item(key = "comments_footer") {
+                    if (!ended) {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -1538,22 +1908,36 @@ private fun DynamicCommentsOverlay(
                                 .clip(RoundedCornerShape(6.dp))
                                 .background(DuoPalette.Surface)
                                 .duoClickable {
-                                    loadingMore = true
-                                    scope.launch { load(page + 1) }
+                                    if (!loadingMore) {
+                                        loadingMore = true
+                                        scope.launch { load(page + 1) }
+                                    }
                                 }
                                 .padding(vertical = 9.dp),
                             contentAlignment = Alignment.Center,
                         ) {
-                            Text("加载更多评论", color = DuoPalette.Pink, fontSize = 10.sp)
+                            if (loadingMore) {
+                                CircularProgressIndicator(
+                                    color = DuoPalette.Pink,
+                                    strokeWidth = 2.dp,
+                                    modifier = Modifier.size(16.dp),
+                                )
+                            } else {
+                                Text("加载更多评论", color = DuoPalette.Pink, fontSize = 10.sp)
+                            }
                         }
                     } else {
-                        Text(
-                            "没有更多评论了",
-                            color = DuoPalette.Tertiary,
-                            fontSize = 10.sp,
-                            modifier = Modifier.fillMaxWidth().padding(10.dp),
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .duoFocusRing(RoundedCornerShape(6.dp))
+                                .clip(RoundedCornerShape(6.dp))
+                                .focusable()
+                                .padding(vertical = 9.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text("没有更多评论了", color = DuoPalette.Tertiary, fontSize = 10.sp)
+                        }
                     }
                 }
             }
@@ -1848,6 +2232,7 @@ private fun DetailImageGrid(
 private fun DynamicGalleryOverlay(
     card: DynamicCardUi,
     imageIndex: Int,
+    zoom: ImageZoomState,
     onBack: () -> Unit,
     onIndexChange: (Int) -> Unit,
     onShare: () -> Unit,
@@ -1892,10 +2277,10 @@ private fun DynamicGalleryOverlay(
                 ) {
                     val url = card.images.getOrNull(imageIndex)
                     if (!url.isNullOrBlank()) {
-                        AsyncImage(
+                        DuoZoomableImage(
                             model = fixPic(url),
                             contentDescription = null,
-                            contentScale = ContentScale.Fit,
+                            state = zoom,
                             modifier = Modifier.fillMaxSize(),
                         )
                     }
@@ -1956,9 +2341,13 @@ private fun DynamicGalleryOverlay(
             }
         }
         Text(
-            text = if (count > 1) "B 返回详情 · 方向键切换图片" else "B 返回详情",
+            text = if (count > 1) {
+                "B 返回详情 · 方向键切换 · R2/L2 缩放 · 左摇杆/拖动移动 · 双指缩放"
+            } else {
+                "B 返回详情 · R2/L2 缩放 · 左摇杆/拖动移动 · 双指缩放"
+            },
             color = DuoPalette.Tertiary,
-            fontSize = 10.sp,
+            fontSize = 9.sp,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
         )
     }

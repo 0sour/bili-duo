@@ -15,7 +15,6 @@ import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.*
 import okhttp3.Request
 import java.io.File
-import java.io.FileOutputStream
 import java.util.concurrent.ConcurrentHashMap
 
 class DownloadManager(private val context: Context) {
@@ -139,16 +138,21 @@ class DownloadManager(private val context: Context) {
         part: String = "",
         aid: Long = 0
     ): DownloadInfo {
-        val downloadsDir = File(context.getExternalFilesDir(null), "downloads")
-        if (!downloadsDir.exists()) downloadsDir.mkdirs()
-
-        val safeTitle = title.replace(Regex("[^\\w\\u4e00-\\u9fff\\-]"), "_").take(50)
-        val pagePrefix = if (part.isNotEmpty()) {
-            "P${page} ${part.replace(Regex("[^\\w\\u4e00-\\u9fff\\-]"), "_").take(30)}_"
+        val fileName = targetFileName(title, page, part, qualityDesc)
+        val filePath: String
+        val fileSize: Long
+        if (DownloadLocation.treeUri.value != null) {
+            // Create the document lazily at transfer start so a deduplicated
+            // queue entry never leaves an empty file in the user's folder.
+            filePath = ""
+            fileSize = 0L
         } else {
-            ""
+            val downloadsDir = File(context.getExternalFilesDir(null), "downloads")
+            if (!downloadsDir.exists()) downloadsDir.mkdirs()
+            val file = File(downloadsDir, fileName)
+            filePath = file.absolutePath
+            fileSize = file.length()
         }
-        val file = File(downloadsDir, "${pagePrefix}${safeTitle}_${qualityDesc}.mp4")
         return DownloadInfo(
             id = "${bvid}_${cid}",
             bvid = bvid,
@@ -157,8 +161,8 @@ class DownloadManager(private val context: Context) {
             cover = cover,
             quality = quality,
             qualityDesc = qualityDesc,
-            filePath = file.absolutePath,
-            fileSize = file.length(),
+            filePath = filePath,
+            fileSize = fileSize,
             totalSize = -1,
             status = DownloadInfo.STATUS_PENDING,
             createTime = System.currentTimeMillis(),
@@ -166,6 +170,38 @@ class DownloadManager(private val context: Context) {
             part = part,
             aid = aid
         )
+    }
+
+    private fun targetFileName(title: String, page: Int, part: String, qualityDesc: String): String {
+        val safeTitle = title.replace(Regex("[^\\w\\u4e00-\\u9fff\\-]"), "_").take(50)
+        val pagePrefix = if (part.isNotEmpty()) {
+            "P${page} ${part.replace(Regex("[^\\w\\u4e00-\\u9fff\\-]"), "_").take(30)}_"
+        } else {
+            ""
+        }
+        return "${pagePrefix}${safeTitle}_${qualityDesc}.mp4"
+    }
+
+    /**
+     * Resolves the final SAF document (or local fallback) right before the
+     * transfer starts. Pending rows persist with an empty filePath so adding a
+     * duplicate never creates an orphan document.
+     */
+    private fun prepareTarget(info: DownloadInfo): DownloadInfo {
+        if (info.filePath.isNotBlank()) return info
+        val name = targetFileName(info.title, info.page, info.part, info.qualityDesc)
+        val safUri = if (DownloadLocation.treeUri.value != null) {
+            DownloadSaf.createVideo(name)
+        } else {
+            null
+        }
+        val path = safUri?.toString() ?: run {
+            val dir = File(context.getExternalFilesDir(null), "downloads")
+            if (!dir.exists()) dir.mkdirs()
+            File(dir, name).absolutePath
+        }
+        updateDownload(info.id) { it.copy(filePath = path) }
+        return getDownload(info.id) ?: info.copy(filePath = path)
     }
 
     data class BatchPageInfo(
@@ -233,8 +269,9 @@ class DownloadManager(private val context: Context) {
         }
         startForegroundService()
         activeJobs[info.id] = scope.launch {
+            val prepared = prepareTarget(current)
             transferGate.run {
-                downloadFile(current, url)
+                downloadFile(prepared, url)
             }
         }
     }
@@ -252,8 +289,7 @@ class DownloadManager(private val context: Context) {
     }
 
     private suspend fun downloadFile(info: DownloadInfo, url: String) {
-        val file = File(info.filePath)
-        val startBytes = pausedBytes.remove(info.id) ?: file.length()
+        val startBytes = pausedBytes.remove(info.id) ?: DownloadSaf.length(info.filePath)
 
         updateDownload(info.id) { it.copy(status = DownloadInfo.STATUS_DOWNLOADING) }
 
@@ -297,11 +333,10 @@ class DownloadManager(private val context: Context) {
                     }
 
                     body.byteStream().use { input ->
-                        val outputStream = if (startBytes > 0) {
-                            FileOutputStream(file, true)
-                        } else {
-                            FileOutputStream(file)
-                        }
+                        val outputStream = DownloadSaf.openOutput(
+                            info.filePath,
+                            append = startBytes > 0,
+                        ) ?: throw Exception("无法打开下载文件")
 
                         outputStream.use { output ->
                             val buffer = ByteArray(8192)
@@ -315,7 +350,7 @@ class DownloadManager(private val context: Context) {
                                 output.write(buffer, 0, bytesRead)
                                 totalRead += bytesRead
 
-                                val currentSize = file.length()
+                                val currentSize = DownloadSaf.length(info.filePath)
                                 val now = System.currentTimeMillis()
                                 val elapsed = now - lastSpeedTime
                                 if (elapsed >= 1000) {
@@ -327,7 +362,7 @@ class DownloadManager(private val context: Context) {
                                 }
                             }
 
-                            updateDownload(info.id) { it.copy(fileSize = file.length(), speed = 0) }
+                            updateDownload(info.id) { it.copy(fileSize = DownloadSaf.length(info.filePath), speed = 0) }
                         }
                     }
                 }
@@ -336,18 +371,18 @@ class DownloadManager(private val context: Context) {
             updateDownload(info.id) {
                 it.copy(
                     status = DownloadInfo.STATUS_COMPLETED,
-                    fileSize = file.length()
+                    fileSize = DownloadSaf.length(info.filePath)
                 )
             }
-            Log.d(TAG, "Download completed: ${info.id} size=${file.length()}")
+            Log.d(TAG, "Download completed: ${info.id} size=${DownloadSaf.length(info.filePath)}")
             DownloadNotificationHelper.showCompleted(context, info.title)
 
-            downloadSubtitles(info, file)
+            downloadSubtitles(info)
 
             checkAllDone()
 
         } catch (e: CancellationException) {
-            val currentSize = file.length()
+            val currentSize = DownloadSaf.length(info.filePath)
             pausedBytes[info.id] = currentSize
             updateDownload(info.id) {
                 it.copy(
@@ -357,7 +392,7 @@ class DownloadManager(private val context: Context) {
             }
             Log.d(TAG, "Download paused: ${info.id} at $currentSize bytes")
         } catch (e: Exception) {
-            val currentSize = file.length()
+            val currentSize = DownloadSaf.length(info.filePath)
             val isWifiOnlyBlocked = AppSettings.wifiOnlyDownload && !AppSettings.isWifiConnected(context)
             updateDownload(info.id) {
                 it.copy(
@@ -369,7 +404,7 @@ class DownloadManager(private val context: Context) {
         }
     }
 
-    private suspend fun downloadSubtitles(info: DownloadInfo, videoFile: File) {
+    private suspend fun downloadSubtitles(info: DownloadInfo) {
         if (info.aid == 0L) {
             Log.d(TAG, "Subtitle skip: aid=0 for ${info.id}")
             return
@@ -381,19 +416,24 @@ class DownloadManager(private val context: Context) {
                 Log.d(TAG, "Subtitle skip: no tracks for ${info.id}")
                 return
             }
-            val baseName = videoFile.nameWithoutExtension
-            val dir = videoFile.parentFile ?: return
+            val dir = File(context.filesDir, "download_subtitles/${info.id}")
+            if (!dir.exists()) dir.mkdirs()
+            val saved = mutableListOf<String>()
             for (track in tracks) {
                 try {
                     val body = repository.getSubtitleContent(track.subtitleUrl).getOrNull() ?: continue
-                    val subFile = File(dir, "${baseName}_${track.lan}.json")
+                    val subFile = File(dir, "${info.id}_${track.lan}.json")
                     withContext(Dispatchers.IO) {
                         subFile.writeText(Gson().toJson(body))
                     }
+                    saved += subFile.absolutePath
                     Log.d(TAG, "Subtitle saved: ${subFile.name} (${body.body.size} cues)")
                 } catch (e: Exception) {
                     Log.w(TAG, "Subtitle download failed for ${track.lan}: ${e.message}")
                 }
+            }
+            if (saved.isNotEmpty()) {
+                updateDownload(info.id) { it.copy(subtitleUris = saved) }
             }
         } catch (e: Exception) {
             Log.w(TAG, "Subtitle tracks fetch failed: ${e.message}")
@@ -402,7 +442,7 @@ class DownloadManager(private val context: Context) {
 
     fun pauseDownload(id: String) {
         activeJobs.remove(id)?.cancel()
-        val currentSize = File(getDownload(id)?.filePath ?: "").length()
+        val currentSize = DownloadSaf.length(getDownload(id)?.filePath.orEmpty())
         if (currentSize > 0) {
             pausedBytes[id] = currentSize
         }
@@ -454,15 +494,16 @@ class DownloadManager(private val context: Context) {
 
         startForegroundService()
         activeJobs[id] = scope.launch {
-            val url = resolveDownloadUrl(download)
+            val prepared = prepareTarget(download)
+            val url = resolveDownloadUrl(prepared)
             if (url.isNullOrEmpty()) {
-                updateDownload(download.id) {
+                updateDownload(prepared.id) {
                     it.copy(status = DownloadInfo.STATUS_FAILED, speed = 0)
                 }
                 return@launch
             }
             transferGate.run {
-                downloadFile(download, url)
+                downloadFile(prepared, url)
             }
         }
     }
@@ -473,8 +514,8 @@ class DownloadManager(private val context: Context) {
         resolvingIds.remove(id)
         val download = store.remove(id)
         if (download != null) {
-            File(download.filePath).delete()
-            deleteSubtitleFiles(download.filePath)
+            DownloadSaf.delete(download.filePath)
+            deleteSubtitleFiles(download)
         }
         onDownloadsChanged?.invoke()
     }
@@ -489,14 +530,17 @@ class DownloadManager(private val context: Context) {
 
     fun clearCompleted() {
         store.removeCompleted().forEach { download ->
-            File(download.filePath).delete()
-            deleteSubtitleFiles(download.filePath)
+            DownloadSaf.delete(download.filePath)
+            deleteSubtitleFiles(download)
         }
         onDownloadsChanged?.invoke()
     }
 
-    private fun deleteSubtitleFiles(videoFilePath: String) {
-        val file = File(videoFilePath)
+    private fun deleteSubtitleFiles(download: DownloadInfo) {
+        download.subtitleUris?.forEach { DownloadSaf.delete(it) }
+        if (DownloadSaf.isContent(download.filePath)) return
+        // Legacy rows kept subtitle JSONs next to the video file.
+        val file = File(download.filePath)
         val dir = file.parentFile ?: return
         val baseName = file.nameWithoutExtension
         dir.listFiles()?.filter {

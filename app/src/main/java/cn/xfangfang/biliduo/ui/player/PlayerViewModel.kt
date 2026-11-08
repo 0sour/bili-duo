@@ -12,13 +12,15 @@ import cn.xfangfang.biliduo.data.local.PendingReportLogic
 import cn.xfangfang.biliduo.data.local.PendingReportManager
 import cn.xfangfang.biliduo.data.local.PlaybackProgressManager
 import cn.xfangfang.biliduo.data.local.QueueAction
-import cn.xfangfang.biliduo.data.local.SubtitlePreference
-import cn.xfangfang.biliduo.data.local.SubtitlePreferenceManager
 import cn.xfangfang.biliduo.data.local.SubtitleStylePreference
+import cn.xfangfang.biliduo.data.local.VideoPreference
+import cn.xfangfang.biliduo.data.local.VideoPreferenceManager
 import cn.xfangfang.biliduo.data.model.*
 import cn.xfangfang.biliduo.data.download.DownloadManager
 import cn.xfangfang.biliduo.data.repository.BilibiliRepository
 import cn.xfangfang.biliduo.data.repository.PlaybackMeta
+import com.google.gson.Gson
+import java.io.File
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -86,7 +88,7 @@ class PlayerViewModel(
     private val playbackProgressManager: PlaybackProgressManager = PlaybackProgressManager(
         BilibiliApp.instance.getSharedPreferences("bili_prefs", Context.MODE_PRIVATE)
     ),
-    private val subtitlePreferenceManager: SubtitlePreferenceManager = SubtitlePreferenceManager(
+    private val videoPreferenceManager: VideoPreferenceManager = VideoPreferenceManager(
         BilibiliApp.instance.getSharedPreferences("bili_prefs", Context.MODE_PRIVATE)
     ),
     private val danmakuPreferenceManager: DanmakuPreferenceManager = DanmakuPreferenceManager(
@@ -99,6 +101,7 @@ class PlayerViewModel(
 
     private val _uiState = MutableStateFlow(PlayerUiState())
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
+    private var videoDefaults = videoPreferenceManager.load()
 
     private var cachedDashData: DashData? = null
     private var vipJob: Job? = null
@@ -112,7 +115,6 @@ class PlayerViewModel(
 
     init {
         val saved = danmakuPreferenceManager.load()
-        val subtitleStyle = subtitlePreferenceManager.loadStyle()
         _uiState.value = _uiState.value.copy(
             danmakuEnabled = saved.enabled,
             danmakuOpacity = saved.opacity,
@@ -121,12 +123,36 @@ class PlayerViewModel(
             danmakuArea = saved.area,
             danmakuBlockedWords = saved.blockedWords,
             danmakuMaxOnScreen = saved.maxOnScreen,
-            subtitleTextSizeSp = subtitleStyle.textSizeSp,
-            subtitleBackgroundAlpha = subtitleStyle.backgroundAlpha,
-            subtitleBottomPaddingDp = subtitleStyle.bottomPaddingDp,
+            subtitleEnabled = videoDefaults.subtitleEnabled,
+            subtitleTextSizeSp = videoDefaults.subtitleTextSizeSp,
+            subtitleBackgroundAlpha = videoDefaults.subtitleBackgroundAlpha,
+            subtitleBottomPaddingDp = videoDefaults.subtitleBottomPaddingDp,
         )
         viewModelScope.launch { repository.flushPendingReports(pendingReportManager) }
     }
+
+    /** Re-read the Settings defaults; called when a new video is opened. */
+    private fun applyVideoDefaults() {
+        videoDefaults = videoPreferenceManager.load()
+        _uiState.value = _uiState.value.copy(
+            subtitleEnabled = videoDefaults.subtitleEnabled,
+            subtitleTextSizeSp = videoDefaults.subtitleTextSizeSp,
+            subtitleBackgroundAlpha = videoDefaults.subtitleBackgroundAlpha,
+            subtitleBottomPaddingDp = videoDefaults.subtitleBottomPaddingDp,
+            currentSubtitle = null,
+            subtitleCues = emptyList(),
+            subtitleOffsetX = 0f,
+            subtitleOffsetY = 0f,
+        )
+    }
+
+    /** A freshly created session state must carry the Settings defaults. */
+    private fun PlayerUiState.withVideoDefaults(): PlayerUiState = copy(
+        subtitleEnabled = videoDefaults.subtitleEnabled,
+        subtitleTextSizeSp = videoDefaults.subtitleTextSizeSp,
+        subtitleBackgroundAlpha = videoDefaults.subtitleBackgroundAlpha,
+        subtitleBottomPaddingDp = videoDefaults.subtitleBottomPaddingDp,
+    )
 
     private fun fetchVipStatus() {
         if (BilibiliApi.loginCookies.isBlank()) {
@@ -156,6 +182,7 @@ class PlayerViewModel(
         liveJob?.cancel()
         cachedDashData = null
         loadJob = viewModelScope.launch {
+            applyVideoDefaults()
             if (source == PlaybackSource.LOCAL) {
                 // 下载会话：只查「已完成」的下载记录，离线可活；不碰网络
                 val completed = DownloadManager.getInstance(BilibiliApp.instance)
@@ -171,57 +198,25 @@ class PlayerViewModel(
                 val currentPage = pages.find { it.cid == current.cid } ?: pages.first()
                 val localFiles = completed.associate { it.cid to it.filePath }
 
-                // Load local subtitles
-                val videoFile = java.io.File(current.filePath)
-                val dir = videoFile.parentFile
-                val baseName = videoFile.nameWithoutExtension
-                val subTracks = mutableListOf<SubtitleTrack>()
-                val subCuesMap = mutableMapOf<String, List<SubtitleCue>>()
-                if (dir != null && dir.exists()) {
-                    dir.listFiles()?.filter {
-                        it.name.startsWith(baseName) && it.name.endsWith(".json") && it.name != "${baseName}.json"
-                    }?.forEach { f ->
-                        try {
-                            val json = f.readText()
-                            val body = com.google.gson.Gson().fromJson(json, SubtitleBody::class.java)
-                            val lang = f.name.removePrefix("${baseName}_").removeSuffix(".json")
-                            val track = SubtitleTrack(
-                                id = lang.hashCode().toLong(),
-                                lan = lang,
-                                lanDoc = lang,
-                                subtitleUrl = f.absolutePath,
-                                type = 0,
-                                aiStatus = 0
-                            )
-                            subTracks.add(track)
-                            subCuesMap[lang] = body.body
-                        } catch (e: Exception) {
-                            Log.w(BilibiliApp.TAG, "Local subtitle parse failed: ${f.name}: ${e.message}")
-                        }
-                    }
-                }
+                // Local subtitles live in private storage for SAF downloads
+                // and next to the mp4 for legacy private-directory downloads.
+                val (subTracks, subCuesMap) = loadLocalSubtitleTracks(
+                    subtitleUris = current.subtitleUris,
+                    videoPath = current.filePath,
+                )
 
                 val aid = current.aid
                 val resumeMs = (playbackProgressManager.load(aid, current.cid) ?: 0L) * 1000L
 
-                val savedSub = subtitlePreferenceManager.load(aid, current.cid)
-                Log.d(BilibiliApp.TAG, "LOCAL load: aid=$aid cid=${current.cid} resumeMs=$resumeMs savedSub=${savedSub?.let { "lan=${it.lan} en=${it.enabled} offX=${it.offsetX} offY=${it.offsetY}" } ?: "null"}")
-                var enabled = false
-                var currentSub: SubtitleTrack? = null
-                var cues = emptyList<SubtitleCue>()
-                if (savedSub != null && savedSub.enabled && savedSub.lan.isNotBlank()) {
-                    val matched = subTracks.find { it.lan == savedSub.lan }
-                    if (matched != null) {
-                        currentSub = matched
-                        enabled = true
-                        cues = subCuesMap[matched.lan] ?: emptyList()
-                    }
-                }
+                val enabled = videoDefaults.subtitleEnabled && subTracks.isNotEmpty()
+                val currentSub = if (enabled) subTracks.firstOrNull() else null
+                val cues = currentSub?.let { subCuesMap[it.lan] } ?: emptyList()
+                Log.d(BilibiliApp.TAG, "LOCAL load: aid=$aid cid=${current.cid} resumeMs=$resumeMs subtitleEnabled=$enabled")
 
                 _uiState.value = withCurrentDanmakuSettings(
                     PlayerUiState(
                         isLoading = false,
-                        videoUrl = "file://${current.filePath}",
+                        videoUrl = localVideoUrl(current.filePath),
                         pages = pages,
                         currentPage = currentPage,
                         title = completed.first().title,
@@ -232,8 +227,11 @@ class PlayerViewModel(
                         currentSubtitle = currentSub,
                         subtitleCues = cues,
                         subtitleEnabled = enabled,
-                        subtitleOffsetX = savedSub?.offsetX ?: 0f,
-                        subtitleOffsetY = savedSub?.offsetY ?: 0f,
+                        subtitleOffsetX = 0f,
+                        subtitleOffsetY = 0f,
+                        subtitleTextSizeSp = videoDefaults.subtitleTextSizeSp,
+                        subtitleBackgroundAlpha = videoDefaults.subtitleBackgroundAlpha,
+                        subtitleBottomPaddingDp = videoDefaults.subtitleBottomPaddingDp,
                         resumePositionMs = resumeMs
                     )
                 )
@@ -246,7 +244,7 @@ class PlayerViewModel(
 
             // 在线会话：纯联网，localFiles 留空（不混本地文件）
             _uiState.value = withCurrentDanmakuSettings(
-                PlayerUiState(isLoading = true)
+                PlayerUiState(isLoading = true).withVideoDefaults()
             )
             fetchVipStatus()
 
@@ -418,8 +416,9 @@ class PlayerViewModel(
         liveJob?.cancel()
         cachedDashData = null
         pgcEpisodeByCid.clear()
+        applyVideoDefaults()
         _uiState.value = withCurrentDanmakuSettings(
-            PlayerUiState(isLoading = true, isPgc = true)
+            PlayerUiState(isLoading = true, isPgc = true).withVideoDefaults()
         )
         fetchVipStatus()
         loadJob = viewModelScope.launch {
@@ -456,7 +455,7 @@ class PlayerViewModel(
                             currentPage = page,
                             title = detail.title.ifBlank { episode.longTitle },
                             resumePositionMs = resumeMs,
-                        )
+                        ).withVideoDefaults()
                     )
                     loadPlaybackMeta(episode.aid, episode.cid, applySubtitles = false)
                     loadPgcPlayUrl(episode)
@@ -532,6 +531,7 @@ class PlayerViewModel(
     fun selectPage(page: VideoPage) {
         if (_uiState.value.isPgc) {
             val episode = pgcEpisodeByCid[page.cid] ?: return
+            applyVideoDefaults()
             val info = _uiState.value.videoInfo
             val resumeMs = (playbackProgressManager.load(episode.aid, page.cid) ?: 0L) * 1000L
             _uiState.value = _uiState.value.copy(
@@ -557,62 +557,24 @@ class PlayerViewModel(
         val localPath = _uiState.value.localFiles[page.cid]
         if (localPath != null) {
             Log.d(BilibiliApp.TAG, "PlayerVM: selectPage local page=${page.page} cid=${page.cid}")
-            // Load subtitles for the new page
-            val videoFile = java.io.File(localPath)
-            val dir = videoFile.parentFile
-            val baseName = videoFile.nameWithoutExtension
-            val subTracks = mutableListOf<SubtitleTrack>()
-            val subCuesMap = mutableMapOf<String, List<SubtitleCue>>()
-            if (dir != null && dir.exists()) {
-                dir.listFiles()?.filter {
-                    it.name.startsWith(baseName) && it.name.endsWith(".json") && it.name != "${baseName}.json"
-                }?.forEach { f ->
-                    try {
-                        val json = f.readText()
-                        val body = com.google.gson.Gson().fromJson(json, SubtitleBody::class.java)
-                        val lang = f.name.removePrefix("${baseName}_").removeSuffix(".json")
-                        val track = SubtitleTrack(
-                            id = lang.hashCode().toLong(),
-                            lan = lang,
-                            lanDoc = lang,
-                            subtitleUrl = f.absolutePath,
-                            type = 0,
-                            aiStatus = 0
-                        )
-                        subTracks.add(track)
-                        subCuesMap[lang] = body.body
-                    } catch (e: Exception) {
-                        Log.w(BilibiliApp.TAG, "Local subtitle parse failed: ${f.name}: ${e.message}")
-                    }
-                }
-            }
-
-            val completed = DownloadManager.getInstance(BilibiliApp.instance)
+            val downloadInfo = DownloadManager.getInstance(BilibiliApp.instance)
                 .getDownloads()
-                .filter { it.bvid == _uiState.value.currentPage?.let { p -> 
-                    DownloadManager.getInstance(BilibiliApp.instance).getDownloads().find { it.cid == p.cid }?.bvid 
-                } && it.status == DownloadInfo.STATUS_COMPLETED }
-            val downloadInfo = completed.find { it.cid == page.cid }
+                .find { it.cid == page.cid && it.status == DownloadInfo.STATUS_COMPLETED }
+            val (subTracks, subCuesMap) = loadLocalSubtitleTracks(
+                subtitleUris = downloadInfo?.subtitleUris,
+                videoPath = localPath,
+            )
             val aid = downloadInfo?.aid ?: _uiState.value.localAid
             val resumeMs = (playbackProgressManager.load(aid, page.cid) ?: 0L) * 1000L
 
-            val savedSub = subtitlePreferenceManager.load(aid, page.cid)
-            Log.d(BilibiliApp.TAG, "selectPage LOCAL: aid=$aid cid=${page.cid} resumeMs=$resumeMs savedSub=${savedSub?.let { "lan=${it.lan} en=${it.enabled} offX=${it.offsetX} offY=${it.offsetY}" } ?: "null"}")
-            var enabled = false
-            var currentSub: SubtitleTrack? = null
-            var cues = emptyList<SubtitleCue>()
-            if (savedSub != null && savedSub.enabled && savedSub.lan.isNotBlank()) {
-                val matched = subTracks.find { it.lan == savedSub.lan }
-                if (matched != null) {
-                    currentSub = matched
-                    enabled = true
-                    cues = subCuesMap[matched.lan] ?: emptyList()
-                }
-            }
+            val enabled = _uiState.value.subtitleEnabled && subTracks.isNotEmpty()
+            val currentSub = if (enabled) subTracks.firstOrNull() else null
+            val cues = currentSub?.let { subCuesMap[it.lan] } ?: emptyList()
+            Log.d(BilibiliApp.TAG, "selectPage LOCAL: aid=$aid cid=${page.cid} resumeMs=$resumeMs subtitleEnabled=$enabled")
 
             _uiState.value = _uiState.value.copy(
                 currentPage = page,
-                videoUrl = "file://$localPath",
+                videoUrl = localVideoUrl(localPath),
                 isDash = false,
                 isLoading = false,
                 resumePositionMs = resumeMs,
@@ -621,8 +583,8 @@ class PlayerViewModel(
                 currentSubtitle = currentSub,
                 subtitleCues = cues,
                 subtitleEnabled = enabled,
-                subtitleOffsetX = savedSub?.offsetX ?: 0f,
-                subtitleOffsetY = savedSub?.offsetY ?: 0f,
+                subtitleOffsetX = 0f,
+                subtitleOffsetY = 0f,
                 danmaku = emptyList()
             )
             Log.d(BilibiliApp.TAG, "selectPage LOCAL result: enabled=$enabled currentSub=${currentSub?.lan} subtitleEnabled=$enabled subTracks=${subTracks.size}")
@@ -665,6 +627,48 @@ class PlayerViewModel(
      * Rebuilding [PlayerUiState] on load/reset must not wipe the user's global
      * danmaku appearance (and enabled) preference.
      */
+    private fun localVideoUrl(path: String): String =
+        if (path.startsWith("content://")) path else "file://$path"
+
+    private fun loadLocalSubtitleTracks(
+        subtitleUris: List<String>?,
+        videoPath: String,
+    ): Pair<List<SubtitleTrack>, Map<String, List<SubtitleCue>>> {
+        val tracks = mutableListOf<SubtitleTrack>()
+        val cues = mutableMapOf<String, List<SubtitleCue>>()
+        val files = mutableListOf<File>()
+        if (!subtitleUris.isNullOrEmpty()) {
+            files += subtitleUris.map { File(it) }
+        } else if (!videoPath.startsWith("content://")) {
+            val videoFile = File(videoPath)
+            val baseName = videoFile.nameWithoutExtension
+            videoFile.parentFile?.listFiles()
+                ?.filter { it.name.startsWith("${baseName}_") && it.name.endsWith(".json") }
+                ?.let { files += it }
+        }
+        for (f in files) {
+            if (!f.exists()) continue
+            try {
+                val body = Gson().fromJson(f.readText(), SubtitleBody::class.java)
+                val name = f.name.removeSuffix(".json")
+                val lang = name.substringAfterLast('_')
+                if (lang.isBlank()) continue
+                tracks += SubtitleTrack(
+                    id = lang.hashCode().toLong(),
+                    lan = lang,
+                    lanDoc = lang,
+                    subtitleUrl = f.absolutePath,
+                    type = 0,
+                    aiStatus = 0,
+                )
+                cues[lang] = body.body
+            } catch (e: Exception) {
+                Log.w(BilibiliApp.TAG, "Local subtitle parse failed: ${f.name}: ${e.message}")
+            }
+        }
+        return tracks to cues
+    }
+
     private fun withCurrentDanmakuSettings(state: PlayerUiState): PlayerUiState {
         val current = _uiState.value
         return state.copy(
@@ -839,7 +843,11 @@ class PlayerViewModel(
             cachedDashData = dash
 
             val qualities = buildQualityList(playUrlInfo, dash, _uiState.value.isPgc)
-            val defaultQuality = qualities.firstOrNull()
+            val preferredQn = videoDefaults.quality
+            val defaultQuality = qualities.firstOrNull {
+                it.quality == preferredQn && (!it.vipOnly || _uiState.value.isVip != false)
+            } ?: qualities.firstOrNull { !it.vipOnly || _uiState.value.isVip != false }
+                ?: qualities.firstOrNull()
 
             val videoStream = defaultQuality?.let { pickVideoStream(dash.video, it.quality) }
             val audioStream = dash.audio?.firstOrNull() ?: dash.flac?.audio
@@ -957,19 +965,13 @@ class PlayerViewModel(
         )
         _uiState.value = _uiState.value.copy(availableSubtitles = sortedTracks)
 
-        val saved = subtitlePreferenceManager.load(aid, cid)
-        Log.d(BilibiliApp.TAG, "loadSubtitles saved pref: aid=$aid cid=$cid saved=${saved?.let { "lan=${it.lan} en=${it.enabled} offX=${it.offsetX} offY=${it.offsetY}" } ?: "null"}")
-        if (saved != null) {
-            _uiState.value = _uiState.value.copy(
-                subtitleOffsetX = saved.offsetX,
-                subtitleOffsetY = saved.offsetY
-            )
-            if (saved.enabled && saved.lan.isNotBlank()) {
-                val matched = sortedTracks.find { it.lan == saved.lan }
-                if (matched != null) {
-                    selectSubtitle(matched)
-                }
-            }
+        // Track/style are current-video only. On a new video the switch was
+        // initialised from Settings; on a page switch keep the user's choice.
+        if (_uiState.value.subtitleEnabled) {
+            val currentLan = _uiState.value.currentSubtitle?.lan
+            val next = sortedTracks.firstOrNull { it.lan == currentLan }
+                ?: sortedTracks.firstOrNull()
+            next?.let { selectSubtitle(it) }
         }
     }
 
@@ -984,14 +986,6 @@ class PlayerViewModel(
                 subtitleCues = emptyList(),
                 subtitleEnabled = false
             )
-            if (aid != 0L) {
-                Log.d(BilibiliApp.TAG, "selectSubtitle DISABLE: aid=$aid cid=$cid")
-                subtitlePreferenceManager.save(aid, cid, SubtitlePreference(
-                    lan = "", enabled = false,
-                    offsetX = _uiState.value.subtitleOffsetX,
-                    offsetY = _uiState.value.subtitleOffsetY
-                ))
-            }
             return
         }
 
@@ -999,14 +993,6 @@ class PlayerViewModel(
             currentSubtitle = track,
             subtitleEnabled = true
         )
-        if (aid != 0L) {
-            Log.d(BilibiliApp.TAG, "selectSubtitle SAVE: aid=$aid cid=$cid lan=${track.lan} enabled=true")
-            subtitlePreferenceManager.save(aid, cid, SubtitlePreference(
-                lan = track.lan, enabled = true,
-                offsetX = _uiState.value.subtitleOffsetX,
-                offsetY = _uiState.value.subtitleOffsetY
-            ))
-        }
 
         viewModelScope.launch {
             try {
@@ -1044,11 +1030,6 @@ class PlayerViewModel(
             val newEnabled = !enabled
             Log.d(BilibiliApp.TAG, "toggleSubtitle: aid=$aid cid=$cid current=${current.lan} enabled=$enabled -> newEnabled=$newEnabled")
             _uiState.value = _uiState.value.copy(subtitleEnabled = newEnabled)
-            subtitlePreferenceManager.save(aid, cid, SubtitlePreference(
-                lan = current.lan, enabled = newEnabled,
-                offsetX = _uiState.value.subtitleOffsetX,
-                offsetY = _uiState.value.subtitleOffsetY
-            ))
         }
     }
 
@@ -1060,40 +1041,17 @@ class PlayerViewModel(
             subtitleOffsetX = offsetX,
             subtitleOffsetY = offsetY
         )
-        if (aid != null && cid != null && aid != 0L) {
-            val current = _uiState.value.currentSubtitle
-            subtitlePreferenceManager.save(aid, cid, SubtitlePreference(
-                lan = current?.lan ?: "",
-                enabled = _uiState.value.subtitleEnabled,
-                offsetX = offsetX,
-                offsetY = offsetY
-            ))
-        }
     }
 
     fun setSubtitleTextSize(textSizeSp: Float) {
         _uiState.value = _uiState.value.copy(subtitleTextSizeSp = textSizeSp)
-        saveSubtitleStyle()
     }
 
     fun setSubtitleBackgroundAlpha(alpha: Float) {
         _uiState.value = _uiState.value.copy(subtitleBackgroundAlpha = alpha)
-        saveSubtitleStyle()
     }
 
     fun setSubtitleBottomPadding(bottomPaddingDp: Int) {
         _uiState.value = _uiState.value.copy(subtitleBottomPaddingDp = bottomPaddingDp)
-        saveSubtitleStyle()
-    }
-
-    private fun saveSubtitleStyle() {
-        val state = _uiState.value
-        subtitlePreferenceManager.saveStyle(
-            SubtitleStylePreference(
-                textSizeSp = state.subtitleTextSizeSp,
-                backgroundAlpha = state.subtitleBackgroundAlpha,
-                bottomPaddingDp = state.subtitleBottomPaddingDp,
-            )
-        )
     }
 }

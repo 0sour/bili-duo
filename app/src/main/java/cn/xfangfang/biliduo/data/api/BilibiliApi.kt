@@ -71,6 +71,8 @@ interface BilibiliApi {
     suspend fun getRecommendFeed(
         @Query("ps") pageSize: Int = 20,
         @Query("fresh_type") freshType: Int = 3,
+        @Query("fresh_idx") freshIdx: Int = 1,
+        @Query("fresh_idx_1h") freshIdx1h: Int = 1,
         @Query("feed_version") feedVersion: String = "V8",
         @Query("homepage_ver") homepageVer: Int = 1
     ): ApiResponse<HomeFeedData>

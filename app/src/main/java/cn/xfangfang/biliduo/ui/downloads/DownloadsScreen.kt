@@ -96,6 +96,7 @@ fun DownloadsScreen(
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
     val searchFocus = remember { FocusRequester() }
+    val searchCancelFocus = remember { FocusRequester() }
     val firstItemFocus = remember { FocusRequester() }
     val emptyActionFocus = remember { FocusRequester() }
     val backFocus = remember { FocusRequester() }
@@ -109,6 +110,7 @@ fun DownloadsScreen(
     var confirmClearCompleted by remember { mutableStateOf(false) }
     var pendingActionFocus by remember { mutableStateOf<FocusRequester?>(null) }
     var lastFilterShortcutAt by remember { mutableStateOf(0L) }
+    var focusContentOnFilterShortcut by remember { mutableStateOf(false) }
     val expandedMap = remember { mutableStateMapOf<String, Boolean>() }
 
     val displayItems = remember(items, searchQuery, filter) {
@@ -190,19 +192,29 @@ fun DownloadsScreen(
             }
         }
     }
-    LaunchedEffect(displayItems.size, searchMode, filter) {
+    LaunchedEffect(
+        displayItems.size,
+        searchMode,
+        filter,
+        focusContentOnFilterShortcut,
+    ) {
         if (!searchMode) {
             delay(80)
-            if (SystemClock.uptimeMillis() - lastFilterShortcutAt < 600L) return@LaunchedEffect
+            if (!focusContentOnFilterShortcut &&
+                SystemClock.uptimeMillis() - lastFilterShortcutAt < 600L
+            ) {
+                return@LaunchedEffect
+            }
             val target = if (displayItems.isNotEmpty()) firstItemFocus else emptyActionFocus
             runCatching { target.requestFocus() }
+            focusContentOnFilterShortcut = false
         }
     }
     LaunchedEffect(searchMode) {
         if (searchMode) {
+            // C: the input is not focused on entry; keep the ring on 取消.
             delay(80)
-            runCatching { searchFocus.requestFocus() }
-            keyboard?.show()
+            runCatching { searchCancelFocus.requestFocus() }
         } else {
             keyboard?.hide()
         }
@@ -312,7 +324,8 @@ fun DownloadsScreen(
         val index = filters.indexOf(filter)
         if (index < 0) return
         filter = filters[(index + step + filters.size) % filters.size]
-        pendingFilterFocus = true
+        pendingFilterFocus = false
+        focusContentOnFilterShortcut = true
         lastFilterShortcutAt = SystemClock.uptimeMillis()
     }
 
@@ -368,15 +381,15 @@ fun DownloadsScreen(
                         modifier = headerDown,
                     )
                 }
-                DuoIconAction(
-                    icon = Icons.Default.Search,
-                    contentDescription = "搜索下载",
-                    tint = if (searchMode) DuoPalette.Pink else DuoPalette.Text,
-                    onClick = {
-                        if (searchMode) exitSearch() else searchMode = true
-                    },
-                    modifier = headerDown,
-                )
+                if (!searchMode) {
+                    DuoIconAction(
+                        icon = Icons.Default.Search,
+                        contentDescription = "搜索下载",
+                        tint = DuoPalette.Text,
+                        onClick = { searchMode = true },
+                        modifier = headerDown,
+                    )
+                }
             },
         )
 
@@ -396,10 +409,9 @@ fun DownloadsScreen(
                     modifier = Modifier.weight(1f),
                     onSubmit = { keyboard?.hide() },
                     onClear = { searchQuery = "" },
-                    onRequestIme = { keyboard?.show() },
                 )
                 Spacer(Modifier.width(8.dp))
-                DuoPillButton(text = "取消", onClick = { exitSearch() })
+                DuoPillButton(text = "取消", onClick = { exitSearch() }, focusRequester = searchCancelFocus)
             }
         }
 

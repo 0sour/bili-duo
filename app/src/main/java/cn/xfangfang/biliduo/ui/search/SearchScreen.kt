@@ -50,11 +50,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.key.type
+import cn.xfangfang.biliduo.ui.duo.duoTabCycling
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -69,7 +65,9 @@ import coil.compose.AsyncImage
 import cn.xfangfang.biliduo.data.model.SearchUserItem
 import cn.xfangfang.biliduo.data.model.SearchVideoItem
 import cn.xfangfang.biliduo.ui.duo.duoClickable
+import cn.xfangfang.biliduo.ui.duo.DuoTextFieldGate
 import cn.xfangfang.biliduo.ui.duo.duoTextFieldNavigation
+import cn.xfangfang.biliduo.ui.duo.rememberDuoTextFieldState
 import cn.xfangfang.biliduo.ui.duo.duoFocusRing
 import cn.xfangfang.biliduo.ui.top.TopAmbientUi
 import cn.xfangfang.biliduo.ui.top.TopGlyph
@@ -101,6 +99,7 @@ fun SearchScreen(
     val state by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
     val searchFocus = remember { FocusRequester() }
+    val backFocus = remember { FocusRequester() }
     val firstResultFocus = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
@@ -158,46 +157,43 @@ fun SearchScreen(
         }
     }
 
+    var focusContentOnTypeShortcut by remember { mutableStateOf(false) }
     LaunchedEffect(
         state.hasSearched,
         state.searchType,
+        state.isLoading,
         state.results.firstOrNull()?.bvid,
         state.users.firstOrNull()?.mid,
     ) {
+        if (state.isLoading) return@LaunchedEffect
         delay(120L)
-        // L1/R1 and L2/R2 move focus to the chip they switched; do not steal
-        // it back to the first result in the same gesture window.
-        if (SystemClock.uptimeMillis() - lastShortcutAt < 600L) return@LaunchedEffect
-        // A chip owns focus after L1/R1 or L2/R2; never pull it back to the
-        // first result when a reload finishes.
-        if (chipFocusCount > 0) return@LaunchedEffect
+        if (state.isLoading) return@LaunchedEffect
+        // L1/R1: after switching type, focus the result list (or the search
+        // field when empty) instead of leaving the ring on the type chip.
+        // L2/R2 sort and direct chip activation keep the chip.
+        if (!focusContentOnTypeShortcut) {
+            if (SystemClock.uptimeMillis() - lastShortcutAt < 600L) return@LaunchedEffect
+            if (chipFocusCount > 0) return@LaunchedEffect
+        }
         val hasItems = if (state.searchType == SearchType.USER) {
             state.users.isNotEmpty()
         } else {
             state.results.isNotEmpty()
         }
-        val target = if (state.hasSearched && hasItems) {
-            firstResultFocus
-        } else {
-            searchFocus
+        val target = when {
+            state.hasSearched && hasItems -> firstResultFocus
+            focusContentOnTypeShortcut -> searchFocus
+            // C: entering the page focuses the back button, not the input.
+            else -> backFocus
         }
         runCatching { target.requestFocus() }
+        focusContentOnTypeShortcut = false
     }
 
     val typeFocusers = remember { List(SearchType.values().size) { FocusRequester() } }
     val sortFocusers = remember { List(SearchSort.options.size) { FocusRequester() } }
-    var pendingTypeFocus by remember { mutableStateOf(false) }
     var pendingSortFocus by remember { mutableStateOf(false) }
 
-    LaunchedEffect(state.searchType, pendingTypeFocus) {
-        if (pendingTypeFocus) {
-            delay(80L)
-            runCatching {
-                typeFocusers[SearchType.values().indexOf(state.searchType)].requestFocus()
-            }
-            pendingTypeFocus = false
-        }
-    }
     LaunchedEffect(state.sortBy, pendingSortFocus) {
         if (pendingSortFocus) {
             delay(80L)
@@ -217,46 +213,38 @@ fun SearchScreen(
     }
 
     val sortKeyModifier = if (!searchFocused && state.hasSearched) {
-        Modifier.onPreviewKeyEvent { event ->
-            if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-            val types = SearchType.values()
-            val typeIndex = types.indexOf(state.searchType)
-            when (event.key) {
-                Key.ButtonR1 -> {
-                    viewModel.setSearchType(types[(typeIndex + 1) % types.size])
+        val types = SearchType.values()
+        val typeIndex = types.indexOf(state.searchType)
+        Modifier.duoTabCycling(
+            onPreviousTab = {
+                viewModel.setSearchType(types[(typeIndex - 1 + types.size) % types.size])
+                lastShortcutAt = SystemClock.uptimeMillis()
+                focusContentOnTypeShortcut = true
+            },
+            onNextTab = {
+                viewModel.setSearchType(types[(typeIndex + 1) % types.size])
+                lastShortcutAt = SystemClock.uptimeMillis()
+                focusContentOnTypeShortcut = true
+            },
+            onPreviousSection = if (state.searchType == SearchType.VIDEO) {
+                {
+                    viewModel.prevSort()
                     lastShortcutAt = SystemClock.uptimeMillis()
-                    pendingTypeFocus = true
-                    true
+                    pendingSortFocus = true
                 }
-                Key.ButtonL1 -> {
-                    viewModel.setSearchType(types[(typeIndex - 1 + types.size) % types.size])
+            } else {
+                null
+            },
+            onNextSection = if (state.searchType == SearchType.VIDEO) {
+                {
+                    viewModel.nextSort()
                     lastShortcutAt = SystemClock.uptimeMillis()
-                    pendingTypeFocus = true
-                    true
+                    pendingSortFocus = true
                 }
-                Key.Y, Key.ButtonR2 -> {
-                    if (state.searchType == SearchType.VIDEO) {
-                        viewModel.nextSort()
-                    lastShortcutAt = SystemClock.uptimeMillis()
-                        pendingSortFocus = true
-                        true
-                    } else {
-                        false
-                    }
-                }
-                Key.ButtonL2 -> {
-                    if (state.searchType == SearchType.VIDEO) {
-                        viewModel.prevSort()
-                    lastShortcutAt = SystemClock.uptimeMillis()
-                        pendingSortFocus = true
-                        true
-                    } else {
-                        false
-                    }
-                }
-                else -> false
-            }
-        }
+            } else {
+                null
+            },
+        )
     } else {
         Modifier
     }
@@ -278,11 +266,8 @@ fun SearchScreen(
             onSubmit = submitSearch,
             onBack = onBack,
             searchFocus = searchFocus,
+            backFocus = backFocus,
             onFocusChanged = { searchFocused = it },
-            onRequestIme = {
-                keyboard?.show()
-                Unit
-            },
         )
 
         if (showSuggestions) {
@@ -441,10 +426,11 @@ private fun SearchHeader(
     onSubmit: () -> Unit,
     onBack: () -> Unit,
     searchFocus: FocusRequester,
+    backFocus: FocusRequester,
     onFocusChanged: (Boolean) -> Unit,
-    onRequestIme: () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
+    val fieldState = rememberDuoTextFieldState()
 
     Row(
         modifier = Modifier
@@ -456,6 +442,7 @@ private fun SearchHeader(
         Box(
             modifier = Modifier
                 .size(36.dp)
+                .focusRequester(backFocus)
                 .duoFocusRing(CircleShape)
                 .clip(CircleShape)
                 .duoClickable(onClick = onBack),
@@ -464,33 +451,31 @@ private fun SearchHeader(
             Text("‹", color = SearchText, fontSize = 28.sp, lineHeight = 28.sp)
         }
         Spacer(Modifier.width(6.dp))
-        BasicTextField(
-            value = query,
-            onValueChange = onQueryChange,
-            modifier = Modifier
-                .weight(1f)
-                .height(44.dp)
-                .focusRequester(searchFocus)
-                .duoTextFieldNavigation()
-                .onFocusChanged {
-                    focused = it.isFocused
-                    onFocusChanged(it.hasFocus)
-                }
-                .onPreviewKeyEvent { event ->
-                    if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionCenter) {
-                        onRequestIme()
-                        true
-                    } else {
-                        false
+        DuoTextFieldGate(
+            state = fieldState,
+            focusRequester = searchFocus,
+            modifier = Modifier.weight(1f).height(44.dp),
+            onGateFocusChanged = { onFocusChanged(it) },
+        ) { editing, gateFocused, fieldModifier ->
+            BasicTextField(
+                value = query,
+                onValueChange = onQueryChange,
+                enabled = editing,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(fieldModifier)
+                    .then(if (editing) Modifier.duoTextFieldNavigation() else Modifier)
+                    .onFocusChanged {
+                        focused = it.isFocused
+                        onFocusChanged(it.isFocused || gateFocused)
                     }
-                }
-                .clip(RoundedCornerShape(22.dp))
-                .background(SearchFieldBg)
-                .border(
-                    width = 1.dp,
-                    color = if (focused) SearchPink else Color.Transparent,
-                    shape = RoundedCornerShape(22.dp),
-                ),
+                    .clip(RoundedCornerShape(22.dp))
+                    .background(SearchFieldBg)
+                    .border(
+                        width = 1.dp,
+                        color = if (focused || gateFocused) SearchPink else Color.Transparent,
+                        shape = RoundedCornerShape(22.dp),
+                    ),
             textStyle = TextStyle(color = SearchText, fontSize = 14.sp),
             singleLine = true,
             cursorBrush = SolidColor(SearchPink),
@@ -520,7 +505,7 @@ private fun SearchHeader(
                         }
                         innerTextField()
                     }
-                    if (query.isNotEmpty()) {
+                    if (query.isNotEmpty() && editing) {
                         Box(
                             modifier = Modifier
                                 .size(32.dp)
@@ -537,24 +522,10 @@ private fun SearchHeader(
                             )
                         }
                     }
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .duoFocusRing(CircleShape)
-                            .clip(CircleShape)
-                            .duoClickable(onClick = onSubmit),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = "搜索",
-                            tint = SearchPink,
-                            modifier = Modifier.size(19.dp),
-                        )
-                    }
                 }
             },
-        )
+            )
+        }
     }
 }
 

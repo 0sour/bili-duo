@@ -50,8 +50,11 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.Player
 import coil.compose.AsyncImage
 import cn.xfangfang.biliduo.data.model.DanmakuItem
+import cn.xfangfang.biliduo.data.model.LiveChatMessage
 import cn.xfangfang.biliduo.data.model.SubtitleCue
 import cn.xfangfang.biliduo.ui.common.DuoLogo
+import cn.xfangfang.biliduo.ui.live.LiveChatStore
+import cn.xfangfang.biliduo.ui.live.LiveDanmakuView
 import cn.xfangfang.biliduo.ui.player.DanmakuView
 import cn.xfangfang.biliduo.ui.player.PlayerController
 import cn.xfangfang.biliduo.ui.player.PlayerViewModel
@@ -87,7 +90,7 @@ fun TopScreenHost(
     val playback by controller.state.collectAsState()
     val topState by viewModel.state.collectAsState()
     val playerUi by playerViewModel.uiState.collectAsState()
-
+    val liveChat by LiveChatStore.snapshot.collectAsState()
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         TopPlayerSurface(controller, Modifier.fillMaxSize())
@@ -98,6 +101,19 @@ fun TopScreenHost(
             DanmakuOverlay(
                 player = controller.player,
                 items = playerUi.danmaku,
+                opacity = playerUi.danmakuOpacity,
+                speed = playerUi.danmakuSpeed,
+                textSizeSp = playerUi.danmakuTextSize,
+                area = playerUi.danmakuArea,
+                blockedWords = playerUi.danmakuBlockedWords,
+                maxOnScreen = playerUi.danmakuMaxOnScreen,
+            )
+        }
+        if (playback.hasRenderedFrame && playerUi.isLive) {
+            LiveDanmakuOverlay(
+                roomId = playerUi.liveRoomId,
+                messages = liveChat.messages,
+                enabled = playerUi.danmakuEnabled,
                 opacity = playerUi.danmakuOpacity,
                 speed = playerUi.danmakuSpeed,
                 textSizeSp = playerUi.danmakuTextSize,
@@ -181,6 +197,37 @@ private fun DanmakuOverlay(
             view.bind(
                 player = player,
                 items = items,
+                opacity = opacity,
+                speed = speed,
+                textSizeSp = textSizeSp,
+                area = area,
+                blockedWords = blockedWords,
+                maxOnScreen = maxOnScreen,
+            )
+        },
+        modifier = Modifier.fillMaxSize(),
+    )
+}
+
+@Composable
+private fun LiveDanmakuOverlay(
+    roomId: Long,
+    messages: List<LiveChatMessage>,
+    enabled: Boolean,
+    opacity: Float,
+    speed: Float,
+    textSizeSp: Float,
+    area: Float,
+    blockedWords: Set<String>,
+    maxOnScreen: Int,
+) {
+    AndroidView(
+        factory = { context -> LiveDanmakuView(context) },
+        update = { view ->
+            view.bind(
+                roomId = roomId,
+                messages = messages,
+                enabled = enabled,
                 opacity = opacity,
                 speed = speed,
                 textSizeSp = textSizeSp,

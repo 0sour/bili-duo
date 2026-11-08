@@ -96,6 +96,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
+import cn.xfangfang.biliduo.duo.DuoImeState
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -103,6 +104,8 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
 import cn.xfangfang.biliduo.ui.common.DuoPillButton
+import cn.xfangfang.biliduo.ui.common.DuoZoomableImage
+import cn.xfangfang.biliduo.ui.common.rememberImageZoomState
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -110,6 +113,7 @@ import coil.compose.AsyncImage
 import cn.xfangfang.biliduo.BilibiliApp
 import cn.xfangfang.biliduo.BuildConfig
 import cn.xfangfang.biliduo.data.api.BilibiliApi
+import cn.xfangfang.biliduo.data.local.VideoPreferenceManager
 import cn.xfangfang.biliduo.data.download.DownloadManager
 import cn.xfangfang.biliduo.data.local.AppSettings
 import cn.xfangfang.biliduo.data.model.CommentItem
@@ -125,7 +129,9 @@ import cn.xfangfang.biliduo.duo.DuoSessionViewModel
 import cn.xfangfang.biliduo.ui.detail.parseDedeUserId
 import cn.xfangfang.biliduo.ui.duo.duoClickable
 import cn.xfangfang.biliduo.ui.duo.duoFocusRing
+import cn.xfangfang.biliduo.ui.duo.DuoTextFieldGate
 import cn.xfangfang.biliduo.ui.duo.duoTextFieldNavigation
+import cn.xfangfang.biliduo.ui.duo.rememberDuoTextFieldState
 import cn.xfangfang.biliduo.util.fixPic
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -171,6 +177,11 @@ fun PlayerConsoleScreen(
     val scope = rememberCoroutineScope()
     val repository = remember { BilibiliRepository() }
     val keyboard = LocalSoftwareKeyboardController.current
+    val videoPreferenceManager = remember {
+        VideoPreferenceManager(
+            context.getSharedPreferences("bili_prefs", android.content.Context.MODE_PRIVATE)
+        )
+    }
 
     var selectedTab by remember { mutableIntStateOf(TAB_INTRO) }
     var seekDrag by remember { mutableStateOf<Float?>(null) }
@@ -203,7 +214,8 @@ fun PlayerConsoleScreen(
     var danmakuColor by remember { mutableStateOf(0xFFFFFFL) }
     var recallingDanmaku by remember { mutableStateOf(false) }
     var downloadQuality by remember { mutableStateOf<QualityOption?>(null) }
-    var downloadAllPages by remember { mutableStateOf(false) }
+    var downloadRange by remember { mutableIntStateOf(0) }
+    var downloadPicked by remember { mutableStateOf<Set<Long>>(emptySet()) }
 
     val aid = ui.videoInfo?.aid
     val videoBvid = ui.videoInfo?.bvid
@@ -381,6 +393,14 @@ fun PlayerConsoleScreen(
         when {
             pgcSeasonId != null -> vm.loadPgc(pgcSeasonId, startCid)
             bvid.isNotBlank() -> vm.load(bvid, startCid, source)
+        }
+    }
+
+    // Settings defaults apply when a video/page is opened; changing speed in
+    // the console only affects this video and is not written back.
+    LaunchedEffect(ui.videoInfo?.bvid, ui.currentPage?.cid, source) {
+        if (ui.currentPage != null) {
+            controller.setSpeed(videoPreferenceManager.load().speed)
         }
     }
 
@@ -891,7 +911,8 @@ fun PlayerConsoleScreen(
             return
         }
         downloadQuality = ui.currentQuality ?: ui.availableQualities.firstOrNull()
-        downloadAllPages = false
+        downloadRange = 0
+        downloadPicked = emptySet()
         pendingOverlayFocus = null
         session.openOverlay(DuoOverlay.DOWNLOAD)
     }
@@ -901,7 +922,30 @@ fun PlayerConsoleScreen(
         val page = ui.currentPage ?: return
         val quality = downloadQuality ?: ui.currentQuality ?: return
         val manager = DownloadManager.getInstance(context)
-        if (downloadAllPages && ui.pages.size > 1) {
+        if (downloadRange == 2) {
+            val picked = ui.pages.filter { it.cid in downloadPicked }
+            if (picked.isEmpty()) {
+                toast("请选择要下载的分P")
+                return
+            }
+            val queued = manager.startBatchDownload(
+                bvid = info.bvid,
+                videoTitle = info.title,
+                cover = info.pic,
+                pages = picked.map {
+                    DownloadManager.BatchPageInfo(
+                        cid = it.cid,
+                        page = it.page,
+                        part = it.part,
+                        aid = info.aid,
+                    )
+                },
+                quality = quality.quality,
+                qualityDesc = quality.description,
+            )
+            toast(if (queued > 0) "已加入 $queued 个分P" else "没有可加入的分P")
+            session.closeOverlay()
+        } else if (downloadRange == 1 && ui.pages.size > 1) {
             val queued = manager.startBatchDownload(
                 bvid = info.bvid,
                 videoTitle = info.title,
@@ -1486,9 +1530,9 @@ fun PlayerConsoleScreen(
                 Text(
                     text = "方向键选择 · A 确认 · B 返回\n" +
                         if (selectedTab == TAB_COMMENTS) {
-                            "LB/RB 切 tab · L2/R2 评论排序 · X 弹幕 · START 菜单"
+                            "LB/RB 切 tab · L2/R2 评论排序 · X 弹幕 · START 弹幕/字幕"
                         } else {
-                            "LB/RB 切换 tab · X 弹幕 · START 菜单"
+                            "LB/RB 切换 tab · X 弹幕 · START 弹幕/字幕"
                         },
                     color = DuoTextTertiary,
                     fontSize = 9.5.sp,
@@ -1690,7 +1734,7 @@ fun PlayerConsoleScreen(
                         }
                         android.view.KeyEvent.KEYCODE_BUTTON_START,
                         android.view.KeyEvent.KEYCODE_MENU -> {
-                            session.openOverlay(DuoOverlay.QUALITY)
+                            session.openOverlay(DuoOverlay.SETTINGS)
                             true
                         }
                         else -> false
@@ -1865,6 +1909,8 @@ fun PlayerConsoleScreen(
         val selectedQuality = downloadQuality ?: ui.currentQuality
         val qualityFocus = remember { FocusRequester() }
         val startFocus = remember { FocusRequester() }
+        val selectAllFocus = remember { FocusRequester() }
+        val firstPartFocus = remember { FocusRequester() }
         var downloadStartFocused by remember { mutableStateOf(false) }
         LaunchedEffect(focusEpoch) {
             delay(120L)
@@ -1886,10 +1932,11 @@ fun PlayerConsoleScreen(
                     event.key == Key.DirectionDown && downloadStartFocused
             },
         ) {
+            Column(Modifier.fillMaxWidth()) {
             Column(
                 Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 320.dp)
+                    .heightIn(max = 300.dp)
                     .verticalScroll(rememberScrollState())
                     // Keep chip focus rings clear of the scroll viewport.
                     .padding(horizontal = 8.dp, vertical = 7.dp),
@@ -1924,32 +1971,147 @@ fun PlayerConsoleScreen(
                     Spacer(Modifier.height(4.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         DownloadQualityChip(
-                            label = "当前分P · P${ui.currentPage?.page ?: 1}",
-                            selected = !downloadAllPages,
+                            label = "当前P${ui.currentPage?.page ?: 1}",
+                            selected = downloadRange == 0,
                             focusRequester = null,
-                            onClick = { downloadAllPages = false },
+                            onClick = { downloadRange = 0 },
                             modifier = Modifier.weight(1f),
                         )
                         DownloadQualityChip(
-                            label = "全部分P · ${ui.pages.size} 个",
-                            selected = downloadAllPages,
+                            label = "全部 ${ui.pages.size}",
+                            selected = downloadRange == 1,
                             focusRequester = null,
-                            onClick = { downloadAllPages = true },
+                            onClick = { downloadRange = 1 },
+                            modifier = Modifier.weight(1f),
+                        )
+                        DownloadQualityChip(
+                            label = "自选",
+                            selected = downloadRange == 2,
+                            focusRequester = null,
+                            onClick = {
+                                downloadRange = 2
+                                if (downloadPicked.isEmpty()) {
+                                    ui.currentPage?.let { downloadPicked = setOf(it.cid) }
+                                }
+                            },
                             modifier = Modifier.weight(1f),
                         )
                     }
+                    if (downloadRange == 2) {
+                        Spacer(Modifier.height(6.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                "已选 ${downloadPicked.size} 个分P",
+                                color = DuoTextSecondary,
+                                fontSize = 10.sp,
+                                modifier = Modifier.weight(1f),
+                            )
+                            val allPicked = ui.pages.isNotEmpty() &&
+                                ui.pages.all { it.cid in downloadPicked }
+                            Box(
+                                modifier = Modifier
+                                    .width(54.dp)
+                                    .height(26.dp)
+                                    .focusRequester(selectAllFocus)
+                                    .focusProperties { down = firstPartFocus }
+                                    .duoFocusRing(RoundedCornerShape(6.dp))
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(DuoSurfaceHigh)
+                                    .duoClickable {
+                                        downloadPicked = if (allPicked) {
+                                            emptySet()
+                                        } else {
+                                            ui.pages.map { it.cid }.toSet()
+                                        }
+                                    },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    if (allPicked) "清空" else "全选",
+                                    color = DuoTextSecondary,
+                                    fontSize = 9.sp,
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        ui.pages.forEachIndexed { index, page ->
+                            val checked = page.cid in downloadPicked
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(30.dp)
+                                    .then(
+                                        if (index == 0) {
+                                            Modifier.focusRequester(firstPartFocus)
+                                        } else {
+                                            Modifier
+                                        }
+                                    )
+                                    .focusProperties { up = selectAllFocus }
+                                    .duoFocusRing(RoundedCornerShape(5.dp))
+                                    .clip(RoundedCornerShape(5.dp))
+                                    .background(
+                                        if (checked) DuoPink.copy(alpha = 0.14f)
+                                        else Color.Transparent
+                                    )
+                                    .duoClickable {
+                                        downloadPicked = if (checked) {
+                                            downloadPicked - page.cid
+                                        } else {
+                                            downloadPicked + page.cid
+                                        }
+                                    }
+                                    .padding(horizontal = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(14.dp)
+                                        .border(
+                                            1.dp,
+                                            if (checked) DuoPink else DuoTextSecondary.copy(alpha = 0.5f),
+                                            RoundedCornerShape(3.dp),
+                                        ),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    if (checked) {
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = null,
+                                            tint = DuoPink,
+                                            modifier = Modifier.size(10.dp),
+                                        )
+                                    }
+                                }
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    text = "P${page.page}  ${page.part.ifBlank { "分P ${page.page}" }}",
+                                    color = if (checked) Color.White else DuoTextSecondary,
+                                    fontSize = 11.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                            Spacer(Modifier.height(4.dp))
+                        }
+                    }
                 }
-                Spacer(Modifier.height(10.dp))
-                DuoPillButton(
-                    text = "开始下载",
-                    primary = true,
-                    enabled = selectedQuality != null,
-                    focusRequester = startFocus,
-                    onClick = { enqueueDownload() },
-                    modifier = Modifier
-                        .align(Alignment.CenterHorizontally)
-                        .onFocusChanged { downloadStartFocused = it.isFocused },
-                )
+            }
+            Spacer(Modifier.height(10.dp))
+            DuoPillButton(
+                text = if (downloadRange == 2) "下载已选 ${downloadPicked.size} 个" else "开始下载",
+                primary = true,
+                enabled = selectedQuality != null &&
+                    (downloadRange != 2 || downloadPicked.isNotEmpty()),
+                focusRequester = startFocus,
+                onClick = { enqueueDownload() },
+                modifier = Modifier
+                    .align(Alignment.CenterHorizontally)
+                    .onFocusChanged { downloadStartFocused = it.isFocused },
+            )
             }
         }
     }
@@ -2100,6 +2262,9 @@ fun PlayerConsoleScreen(
 
         fun handleSectionKey(event: androidx.compose.ui.input.key.KeyEvent, current: Int): Boolean {
             if (event.type != KeyEventType.KeyDown) return false
+            // Overlay mode does not get InputRouter's shoulder repeat guard;
+            // consume held Left/Right without toggling again.
+            if (event.nativeKeyEvent.repeatCount > 0) return true
             return when (event.key) {
                 Key.DirectionLeft -> {
                     if (current != 0) selectSection(0, focusContent = false)
@@ -2129,8 +2294,13 @@ fun PlayerConsoleScreen(
 
         LaunchedEffect(focusEpoch, editingBlocked) {
             delay(120L)
-            runCatching {
-                if (editingBlocked) blockedFieldFocus.requestFocus() else danmakuFirstFocus.requestFocus()
+            if (editingBlocked) {
+                runCatching { blockedFieldFocus.requestFocus() }
+                delay(60L)
+                DuoImeState.onShown()
+                keyboard?.show()
+            } else {
+                runCatching { danmakuFirstFocus.requestFocus() }
             }
         }
         LaunchedEffect(editingBlocked) {
@@ -2167,34 +2337,46 @@ fun PlayerConsoleScreen(
         ) {
             if (editingBlocked) {
                 Column(Modifier.fillMaxWidth()) {
-                    OutlinedTextField(
-                        value = blockedDraft,
-                        onValueChange = { blockedDraft = it },
-                        label = { Text("用逗号或空格分隔", fontSize = 11.sp) },
-                        singleLine = true,
-                        textStyle = androidx.compose.ui.text.TextStyle(
-                            color = Color.White,
-                            fontSize = 12.sp,
-                        ),
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                        keyboardActions = KeyboardActions(onDone = { applyBlockedWords() }),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
-                            focusedContainerColor = DuoSurfaceHigh,
-                            unfocusedContainerColor = DuoSurfaceHigh,
-                            focusedBorderColor = DuoPink,
-                            unfocusedBorderColor = DuoDivider,
-                            focusedLabelColor = DuoPink,
-                            unfocusedLabelColor = DuoTextSecondary,
-                            cursorColor = DuoPink,
-                        ),
-                        shape = RoundedCornerShape(6.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .focusRequester(blockedFieldFocus)
-                            .duoTextFieldNavigation(),
-                    )
+                    val blockedFieldState = rememberDuoTextFieldState(initiallyEditing = true)
+                    DuoTextFieldGate(
+                        state = blockedFieldState,
+                        focusRequester = blockedFieldFocus,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { editing, gateFocused, fieldModifier ->
+                        OutlinedTextField(
+                            value = blockedDraft,
+                            onValueChange = { blockedDraft = it },
+                            enabled = editing,
+                            label = { Text("用逗号或空格分隔", fontSize = 11.sp) },
+                            singleLine = true,
+                            textStyle = androidx.compose.ui.text.TextStyle(
+                                color = Color.White,
+                                fontSize = 12.sp,
+                            ),
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                            keyboardActions = KeyboardActions(onDone = { applyBlockedWords() }),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                disabledTextColor = Color.White,
+                                focusedContainerColor = DuoSurfaceHigh,
+                                unfocusedContainerColor = DuoSurfaceHigh,
+                                disabledContainerColor = DuoSurfaceHigh,
+                                focusedBorderColor = DuoPink,
+                                unfocusedBorderColor = DuoDivider,
+                                disabledBorderColor = if (gateFocused) DuoPink else DuoDivider,
+                                focusedLabelColor = DuoPink,
+                                unfocusedLabelColor = DuoTextSecondary,
+                                disabledLabelColor = if (gateFocused) DuoPink else DuoTextSecondary,
+                                cursorColor = DuoPink,
+                            ),
+                            shape = RoundedCornerShape(6.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .then(fieldModifier)
+                                .then(if (editing) Modifier.duoTextFieldNavigation() else Modifier),
+                        )
+                    }
                     Spacer(Modifier.height(8.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OverlayActionButton(
@@ -2221,38 +2403,69 @@ fun PlayerConsoleScreen(
                     )
                 }
             } else {
-                Column(Modifier.fillMaxWidth()) {
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .onPreviewKeyEvent { event ->
+                            if (event.type != KeyEventType.KeyDown) {
+                                return@onPreviewKeyEvent false
+                            }
+                            when (event.key) {
+                                Key.ButtonL1 -> {
+                                    if (event.nativeKeyEvent.repeatCount == 0) {
+                                        selectSection(
+                                            (settingsSection - 1 + 2) % 2,
+                                            focusContent = true,
+                                        )
+                                    }
+                                    true
+                                }
+                                Key.ButtonR1 -> {
+                                    if (event.nativeKeyEvent.repeatCount == 0) {
+                                        selectSection(
+                                            (settingsSection + 1) % 2,
+                                            focusContent = true,
+                                        )
+                                    }
+                                    true
+                                }
+                                else -> false
+                            }
+                        },
+                ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalAlignment = Alignment.Bottom,
                     ) {
-                        ConsoleChip(
+                        SettingsSectionTab(
                             text = "弹幕",
-                            active = settingsSection == 0,
-                            modifier = Modifier
-                                .focusRequester(sectionTabFocus[0])
-                                .focusProperties { down = danmakuFirstFocus }
-                                .onPreviewKeyEvent { event -> handleSectionKey(event, 0) },
+                            selected = settingsSection == 0,
+                            focusRequester = sectionTabFocus[0],
+                            downFocus = danmakuFirstFocus,
                             onClick = { selectSection(0, focusContent = true) },
+                            onKeyEvent = { event -> handleSectionKey(event, 0) },
                         )
-                        ConsoleChip(
+                        SettingsSectionTab(
                             text = "字幕",
-                            active = settingsSection == 1,
-                            modifier = Modifier
-                                .focusRequester(sectionTabFocus[1])
-                                .focusProperties {
-                                    down = if (hasSubtitles) {
-                                        subtitleFirstFocus
-                                    } else {
-                                        FocusRequester.Cancel
-                                    }
-                                }
-                                .onPreviewKeyEvent { event -> handleSectionKey(event, 1) },
+                            selected = settingsSection == 1,
+                            focusRequester = sectionTabFocus[1],
+                            downFocus = if (hasSubtitles) {
+                                subtitleFirstFocus
+                            } else {
+                                FocusRequester.Cancel
+                            },
                             onClick = { selectSection(1, focusContent = true) },
+                            onKeyEvent = { event -> handleSectionKey(event, 1) },
                         )
                     }
-                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "L1/R1 切标签 · 方向键选择 · B 关闭",
+                        color = DuoTextTertiary,
+                        fontSize = 9.sp,
+                        modifier = Modifier.padding(top = 2.dp, bottom = 2.dp),
+                    )
+                    Spacer(Modifier.height(2.dp))
                     if (settingsSection == 0) {
                         DanmakuSettingRow(
                             label = "显示弹幕",
@@ -3464,6 +3677,8 @@ private fun CommentImageViewerOverlay(
     var index by remember(pictures) {
         mutableIntStateOf(initialIndex.coerceIn(0, pictures.lastIndex.coerceAtLeast(0)))
     }
+    val zoom = rememberImageZoomState()
+    LaunchedEffect(index) { zoom.reset() }
     val focus = remember { FocusRequester() }
     LaunchedEffect(pictures) {
         delay(80L)
@@ -3491,6 +3706,14 @@ private fun CommentImageViewerOverlay(
                             step(1)
                             true
                         }
+                        Key.ButtonL2 -> {
+                            zoom.zoomBy(1f / 1.25f)
+                            true
+                        }
+                        Key.ButtonR2 -> {
+                            zoom.zoomBy(1.25f)
+                            true
+                        }
                         // The viewer is modal: keep D-pad focus from leaking
                         // onto the console controls behind it.
                         Key.DirectionUp, Key.DirectionDown, Key.DirectionCenter -> true
@@ -3499,10 +3722,10 @@ private fun CommentImageViewerOverlay(
                 }
             },
     ) {
-        AsyncImage(
+        DuoZoomableImage(
             model = fullCommentImage(pictures.getOrNull(index)?.imgSrc.orEmpty()),
             contentDescription = null,
-            contentScale = ContentScale.Fit,
+            state = zoom,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(start = 40.dp, end = 40.dp, top = 44.dp, bottom = 44.dp),
@@ -3551,7 +3774,7 @@ private fun CommentImageViewerOverlay(
             )
         }
         Text(
-            text = "方向键切换 · B 关闭",
+            text = "方向键切换 · R2/L2 缩放 · 左摇杆/拖动移动 · 双指缩放 · B 关闭",
             color = DuoTextTertiary,
             fontSize = 9.sp,
             modifier = Modifier
@@ -3572,55 +3795,60 @@ private fun DanmakuInputField(
     onIme: () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
+    val fieldState = rememberDuoTextFieldState(initiallyEditing = true)
     val focusManager = LocalFocusManager.current
-    BasicTextField(
-        value = value,
-        onValueChange = onValueChange,
-        singleLine = true,
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(46.dp)
-            .focusRequester(focusRequester)
-            .onFocusChanged { focused = it.isFocused }
-            .onPreviewKeyEvent { event ->
-                if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                when (event.key) {
-                    Key.DirectionDown -> {
-                        focusManager.moveFocus(FocusDirection.Down)
-                        true
+    DuoTextFieldGate(
+        state = fieldState,
+        focusRequester = focusRequester,
+        modifier = Modifier.fillMaxWidth(),
+    ) { editing, gateFocused, fieldModifier ->
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            enabled = editing,
+            singleLine = true,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(46.dp)
+                .then(fieldModifier)
+                .then(if (editing) Modifier.duoTextFieldNavigation() else Modifier)
+                .onFocusChanged { focused = it.isFocused }
+                .onPreviewKeyEvent { event ->
+                    if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                    when (event.key) {
+                        Key.DirectionDown -> {
+                            focusManager.moveFocus(FocusDirection.Down)
+                            true
+                        }
+                        Key.DirectionUp -> {
+                            focusManager.moveFocus(FocusDirection.Up)
+                            true
+                        }
+                        else -> false
                     }
-                    Key.DirectionUp -> {
-                        focusManager.moveFocus(FocusDirection.Up)
-                        true
-                    }
-                    Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
-                        onIme()
-                        true
-                    }
-                    else -> false
                 }
-            }
-            .clip(RoundedCornerShape(8.dp))
-            .background(DuoSurfaceHigh)
-            .border(
-                width = 1.dp,
-                color = if (focused) DuoPink else DuoDivider,
-                shape = RoundedCornerShape(8.dp),
-            )
-            .padding(horizontal = 10.dp, vertical = 10.dp),
-        textStyle = TextStyle(color = Color.White, fontSize = 12.sp),
-        cursorBrush = SolidColor(DuoPink),
-        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-        keyboardActions = KeyboardActions(onSend = { onIme() }),
-        decorationBox = { inner ->
-            Box(Modifier.fillMaxWidth()) {
-                if (value.isEmpty()) {
-                    Text("发一条友善的弹幕…", color = DuoTextTertiary, fontSize = 12.sp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(DuoSurfaceHigh)
+                .border(
+                    width = 1.dp,
+                    color = if (focused || gateFocused) DuoPink else DuoDivider,
+                    shape = RoundedCornerShape(8.dp),
+                )
+                .padding(horizontal = 10.dp, vertical = 10.dp),
+            textStyle = TextStyle(color = Color.White, fontSize = 12.sp),
+            cursorBrush = SolidColor(DuoPink),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+            keyboardActions = KeyboardActions(onSend = { onIme() }),
+            decorationBox = { inner ->
+                Box(Modifier.fillMaxWidth()) {
+                    if (value.isEmpty()) {
+                        Text("发一条友善的弹幕…", color = DuoTextTertiary, fontSize = 12.sp)
+                    }
+                    inner()
                 }
-                inner()
-            }
-        },
-    )
+            },
+        )
+    }
 }
 
 @Composable
@@ -3635,9 +3863,12 @@ private fun CommentSendOverlay(
     onCancel: () -> Unit,
 ) {
     val fieldFocus = remember { FocusRequester() }
+    val fieldState = rememberDuoTextFieldState(initiallyEditing = true)
     val keyboard = LocalSoftwareKeyboardController.current
     LaunchedEffect(Unit) {
         runCatching { fieldFocus.requestFocus() }
+        delay(80L)
+        DuoImeState.onShown()
         keyboard?.show()
     }
     val length = text.trim().length
@@ -3650,28 +3881,37 @@ private fun CommentSendOverlay(
                 fontSize = 9.sp,
             )
             Spacer(Modifier.height(8.dp))
-            OutlinedTextField(
-                value = text,
-                onValueChange = onText,
-                textStyle = TextStyle(color = Color.White, fontSize = 12.sp),
-                minLines = 3,
-                maxLines = 5,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = DuoSurfaceHigh,
-                    unfocusedContainerColor = DuoSurfaceHigh,
-                    focusedBorderColor = DuoPink,
-                    unfocusedBorderColor = DuoDivider,
-                    cursorColor = DuoPink,
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
-                ),
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 92.dp)
-                    .focusRequester(fieldFocus)
-                    .duoTextFieldNavigation(),
-            )
+            DuoTextFieldGate(
+                state = fieldState,
+                focusRequester = fieldFocus,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 92.dp),
+            ) { editing, gateFocused, fieldModifier ->
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = onText,
+                    enabled = editing,
+                    textStyle = TextStyle(color = Color.White, fontSize = 12.sp),
+                    minLines = 3,
+                    maxLines = 5,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = DuoSurfaceHigh,
+                        unfocusedContainerColor = DuoSurfaceHigh,
+                        disabledContainerColor = DuoSurfaceHigh,
+                        focusedBorderColor = DuoPink,
+                        unfocusedBorderColor = DuoDivider,
+                        disabledBorderColor = if (gateFocused) DuoPink else DuoDivider,
+                        cursorColor = DuoPink,
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        disabledTextColor = Color.White,
+                    ),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .then(fieldModifier)
+                        .then(if (editing) Modifier.duoTextFieldNavigation() else Modifier),
+                )
+            }
             Spacer(Modifier.height(4.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -3779,6 +4019,9 @@ private fun DanmakuSendOverlay(
     val keyboard = LocalSoftwareKeyboardController.current
     LaunchedEffect(Unit) {
         runCatching { fieldFocus.requestFocus() }
+        delay(80L)
+        DuoImeState.onShown()
+        keyboard?.show()
     }
     val length = danmakuLength(text.trim())
     OverlayCard(title = "发送弹幕", onDismiss = onCancel) {
@@ -3985,6 +4228,44 @@ private fun TransportButton(
             contentDescription = description,
             tint = if (enabled) Color.White else Color(0xFF5A5A60),
             modifier = Modifier.size(22.dp),
+        )
+    }
+}
+
+@Composable
+private fun SettingsSectionTab(
+    text: String,
+    selected: Boolean,
+    focusRequester: FocusRequester,
+    downFocus: FocusRequester,
+    onClick: () -> Unit,
+    onKeyEvent: (androidx.compose.ui.input.key.KeyEvent) -> Boolean,
+) {
+    Column(
+        modifier = Modifier
+            .focusRequester(focusRequester)
+            .focusProperties { down = downFocus }
+            .onPreviewKeyEvent(onKeyEvent)
+            .duoFocusRing(RoundedCornerShape(4.dp))
+            .duoClickable(onClick = onClick)
+            .padding(horizontal = 4.dp, vertical = 3.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text = text,
+            color = if (selected) DuoPink else DuoTextSecondary,
+            fontSize = 13.sp,
+            fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
+        )
+        Spacer(Modifier.height(3.dp))
+        Box(
+            Modifier
+                .width(20.dp)
+                .height(2.dp)
+                .background(
+                    if (selected) DuoPink else Color.Transparent,
+                    RoundedCornerShape(1.dp),
+                ),
         )
     }
 }

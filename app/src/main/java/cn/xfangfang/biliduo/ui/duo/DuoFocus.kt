@@ -1,5 +1,7 @@
 package cn.xfangfang.biliduo.ui.duo
 
+
+
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -17,10 +19,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,10 +47,23 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.SoftwareKeyboardController
+import androidx.compose.ui.text.style.TextOverflow
+import cn.xfangfang.biliduo.duo.DuoImeState
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cn.xfangfang.biliduo.duo.DuoSessionViewModel
+
+import androidx.compose.runtime.Stable
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusProperties
+import kotlinx.coroutines.delay
 
 private val BarBg = Color(0xFF141418)
 private val BarText = Color(0xFFF5F5F7)
@@ -161,6 +179,129 @@ fun Modifier.duoClickable(
         .clickable(enabled = enabled, onClick = onClick)
 }
 
+@Stable
+class DuoTextFieldState(initiallyEditing: Boolean = false) {
+    var editing by mutableStateOf(initiallyEditing)
+}
+
+@Composable
+fun rememberDuoTextFieldState(initiallyEditing: Boolean = false): DuoTextFieldState =
+    remember { DuoTextFieldState(initiallyEditing) }
+
+/**
+ * Shows the IME after a gate field has focus. The first show right after a cold
+ * start can be rejected while the Presentation updates its IME visibility, so
+ * retry twice. B increments [DuoImeState.generation] and cancels the retries.
+ */
+internal suspend fun showDuoIme(
+    keyboard: SoftwareKeyboardController?,
+    generation: Int,
+    initialDelayMs: Long = 60L,
+) {
+    delay(initialDelayMs)
+    if (!DuoImeState.shown || generation != DuoImeState.generation) return
+    keyboard?.show()
+    for (wait in longArrayOf(300L, 600L)) {
+        delay(wait)
+        if (!DuoImeState.shown || generation != DuoImeState.generation) return
+        keyboard?.show()
+    }
+}
+
+/**
+ * Wraps a text field with a focus-only overlay. The field is disabled while
+ * the overlay owns focus; A/Enter or a tap swaps in the real editable field,
+ * which starts a fresh input session. This avoids both the focus-time IME
+ * flash and the "show() does nothing after hide()" session problem.
+ *
+ * [content] receives the current editing state, whether the gate currently
+ * owns focus, and the modifier to apply to the real text field.
+ */
+@Composable
+fun DuoTextFieldGate(
+    state: DuoTextFieldState,
+    focusRequester: FocusRequester,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    downFocus: FocusRequester? = null,
+    onGateFocusChanged: (Boolean) -> Unit = {},
+    content: @Composable (editing: Boolean, gateFocused: Boolean, fieldModifier: Modifier) -> Unit,
+) {
+    var gateFocused by remember { mutableStateOf(false) }
+    val keyboard = LocalSoftwareKeyboardController.current
+    LaunchedEffect(state.editing) {
+        if (state.editing && enabled) {
+            DuoImeState.onShown()
+            val generation = DuoImeState.generation
+            delay(16L)
+            runCatching { focusRequester.requestFocus() }
+            showDuoIme(keyboard, generation, initialDelayMs = 44L)
+        }
+    }
+    var fieldWasFocused by remember { mutableStateOf(false) }
+    val fieldModifier = Modifier
+        .then(if (state.editing) Modifier.focusRequester(focusRequester) else Modifier)
+        .then(
+            if (state.editing) {
+                Modifier.pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent(PointerEventPass.Initial)
+                            if (event.type == PointerEventType.Press) DuoImeState.onShown()
+                        }
+                    }
+                }
+            } else {
+                Modifier
+            }
+        )
+        .onFocusChanged {
+            if (it.isFocused) {
+                fieldWasFocused = true
+            } else if (fieldWasFocused) {
+                fieldWasFocused = false
+                state.editing = false
+            }
+        }
+        .onPreviewKeyEvent { event ->
+            if (state.editing && event.type == KeyEventType.KeyDown &&
+                (event.key == Key.DirectionCenter || event.key == Key.Enter || event.key == Key.NumPadEnter)
+            ) {
+                DuoImeState.onShown()
+                keyboard?.show()
+                true
+            } else {
+                false
+            }
+        }
+    Box(modifier = modifier) {
+        content(state.editing, gateFocused, fieldModifier)
+        if (!state.editing && enabled) {
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .focusRequester(focusRequester)
+                    .duoTextFieldNavigation()
+                    .then(
+                        if (downFocus != null) {
+                            Modifier.focusProperties { down = downFocus }
+                        } else {
+                            Modifier
+                        }
+                    )
+                    .onFocusChanged {
+                        gateFocused = it.isFocused
+                        onGateFocusChanged(it.isFocused)
+                    }
+                    .duoClickable {
+                        state.editing = true
+                        DuoImeState.onShown()
+                    },
+            )
+        }
+    }
+}
+
 /**
  * Lets a single-line text field release Up/Down so the D-pad can leave it.
  * BasicTextField otherwise consumes these keys for cursor movement and traps
@@ -193,25 +334,83 @@ fun Modifier.duoTextFieldNavigation(): Modifier = composed {
  * `InputRouter` swallows auto-repeat for these keys, so holding a shoulder
  * button advances exactly one step.
  */
+internal fun interface DuoShoulderEntry {
+    fun handle(key: Key): Boolean
+}
+
+private class DuoShoulderActions(
+    val onPreviousTab: (() -> Unit)?,
+    val onNextTab: (() -> Unit)?,
+    val onPreviousSection: (() -> Unit)?,
+    val onNextSection: (() -> Unit)?,
+) {
+    fun handle(key: Key): Boolean {
+        val action: (() -> Unit)? = when (key) {
+            Key.ButtonL1 -> onPreviousTab
+            Key.ButtonR1 -> onNextTab
+            Key.ButtonL2 -> onPreviousSection
+            Key.ButtonR2 -> onNextSection
+            else -> null
+        }
+        if (action == null) return false
+        action()
+        return true
+    }
+}
+
+/**
+ * The page root normally receives L1/R1 through its focus tree. When the app
+ * rail owns focus the page is outside that tree, so MainScreen forwards the
+ * shoulder keys to the most recently composed page.
+ */
+internal object DuoShoulderDispatcher {
+    private val entries = mutableListOf<DuoShoulderEntry>()
+
+    fun push(entry: DuoShoulderEntry) {
+        entries.add(entry)
+    }
+
+    fun remove(entry: DuoShoulderEntry) {
+        entries.remove(entry)
+    }
+
+    fun dispatch(key: Key): Boolean = entries.lastOrNull()?.handle(key) ?: false
+}
+
 fun Modifier.duoTabCycling(
     onPreviousTab: (() -> Unit)? = null,
     onNextTab: (() -> Unit)? = null,
     onPreviousSection: (() -> Unit)? = null,
     onNextSection: (() -> Unit)? = null,
-): Modifier = onPreviewKeyEvent { event ->
-    if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-    val action: (() -> Unit)? = when (event.key) {
-        Key.ButtonL1 -> onPreviousTab
-        Key.ButtonR1 -> onNextTab
-        Key.ButtonL2 -> onPreviousSection
-        Key.ButtonR2 -> onNextSection
-        else -> null
+): Modifier = composed {
+    val latest = rememberUpdatedState(
+        DuoShoulderActions(
+            onPreviousTab = onPreviousTab,
+            onNextTab = onNextTab,
+            onPreviousSection = onPreviousSection,
+            onNextSection = onNextSection,
+        )
+    )
+    DisposableEffect(Unit) {
+        val entry = DuoShoulderEntry { key -> latest.value.handle(key) }
+        DuoShoulderDispatcher.push(entry)
+        onDispose { DuoShoulderDispatcher.remove(entry) }
     }
-    if (action == null) {
-        false
-    } else {
-        action()
-        true
+    this.onPreviewKeyEvent { event ->
+        if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+        val action: (() -> Unit)? = when (event.key) {
+            Key.ButtonL1 -> onPreviousTab
+            Key.ButtonR1 -> onNextTab
+            Key.ButtonL2 -> onPreviousSection
+            Key.ButtonR2 -> onNextSection
+            else -> null
+        }
+        if (action == null) {
+            false
+        } else {
+            action()
+            true
+        }
     }
 }
 
@@ -245,8 +444,10 @@ private fun isActivationKey(key: Key): Boolean =
 fun DuoModeBar(
     session: DuoSessionViewModel,
     enabled: Boolean,
+    pageHint: String? = null,
 ) {
     val overlay by session.overlay.collectAsState()
+    val hintOverride by session.hintOverride.collectAsState()
     val playerActive by session.playerActive.collectAsState()
     val gamepadConnected by session.gamepadConnected.collectAsState()
 
@@ -254,8 +455,8 @@ fun DuoModeBar(
         !enabled -> "单屏模式 · 触摸操作"
         !gamepadConnected -> "手柄未连接 · 触屏操作"
         overlay != null -> "菜单"
-        !playerActive -> "浏览 · 手柄/触屏"
-        else -> "播放控制 · 手柄/触屏"
+        !playerActive -> "浏览"
+        else -> "播放控制"
     }
     val middle = when {
         !enabled || !gamepadConnected -> null
@@ -267,13 +468,20 @@ fun DuoModeBar(
         !enabled || !gamepadConnected -> null
         overlay != null -> "A 确认"
         !playerActive -> "A 确认"
-        else -> "A 确认 · START 菜单"
+        else -> "A 确认"
     }
     val dotColor = when {
         !enabled || !gamepadConnected -> Muted
         overlay != null -> Color(0xFFFFC65C)
         !playerActive -> Color(0xFF6FB7FF)
         else -> Accent
+    }
+    val contextHint = when {
+        !enabled || !gamepadConnected -> null
+        // The modal itself already prints its own B/A and direction hints;
+        // don't show a stale page hint behind it.
+        overlay != null -> null
+        else -> (hintOverride ?: pageHint)?.takeIf { it.isNotBlank() }
     }
 
     Row(
@@ -292,12 +500,25 @@ fun DuoModeBar(
             fontSize = 10.sp,
             maxLines = 1,
         )
-        Spacer(Modifier.weight(1f))
+        Spacer(Modifier.width(8.dp))
+        if (contextHint != null) {
+            Text(
+                text = contextHint,
+                color = Muted,
+                fontSize = 9.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+        } else {
+            Spacer(Modifier.weight(1f))
+        }
         if (middle != null) {
+            Spacer(Modifier.width(10.dp))
             Text(text = middle, color = Muted, fontSize = 10.sp, maxLines = 1)
         }
         if (right != null) {
-            Spacer(Modifier.width(18.dp))
+            Spacer(Modifier.width(12.dp))
             Text(text = right, color = Muted, fontSize = 10.sp, maxLines = 1)
         }
     }

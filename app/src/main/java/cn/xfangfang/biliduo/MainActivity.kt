@@ -10,11 +10,15 @@ import android.os.SystemClock
 import android.hardware.input.InputManager
 import android.view.InputDevice
 import android.view.KeyEvent
+import android.view.MotionEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.width
@@ -24,6 +28,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
@@ -46,6 +58,8 @@ import androidx.navigation.navArgument
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import cn.xfangfang.biliduo.data.download.DownloadLocation
+import cn.xfangfang.biliduo.duo.DuoImeState
 import cn.xfangfang.biliduo.data.local.PendingReportManager
 import cn.xfangfang.biliduo.data.repository.BilibiliRepository
 import cn.xfangfang.biliduo.duo.BottomUiBridge
@@ -59,6 +73,8 @@ import cn.xfangfang.biliduo.ui.downloads.DownloadsScreen
 import cn.xfangfang.biliduo.ui.dynamic.DynamicScreen
 import cn.xfangfang.biliduo.ui.duo.DuoModeBar
 import cn.xfangfang.biliduo.ui.duo.DuoRail
+import cn.xfangfang.biliduo.ui.duo.DuoShoulderDispatcher
+import cn.xfangfang.biliduo.ui.duo.rememberDuoRailFocusState
 import cn.xfangfang.biliduo.ui.favorites.FavoritesScreen
 import cn.xfangfang.biliduo.ui.following.FollowingListScreen
 import cn.xfangfang.biliduo.ui.history.HistoryScreen
@@ -71,6 +87,7 @@ import cn.xfangfang.biliduo.ui.player.PlayerConsoleScreen
 import cn.xfangfang.biliduo.ui.player.PlayerController
 import cn.xfangfang.biliduo.BuildConfig
 import cn.xfangfang.biliduo.ui.common.DuoEmptyState
+import cn.xfangfang.biliduo.ui.common.ImageZoomMotion
 import cn.xfangfang.biliduo.ui.player.PlayerScreen
 import cn.xfangfang.biliduo.ui.player.PlayerViewModel
 import cn.xfangfang.biliduo.ui.player.PlaybackSource
@@ -90,6 +107,11 @@ class MainActivity : ComponentActivity() {
 
     private val notificationPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
+
+    private val downloadDirLauncher =
+        registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+            if (uri != null) DownloadLocation.setTreeUri(this, uri)
+        }
 
     private val openDownloadsRequest = MutableStateFlow(0)
 
@@ -124,6 +146,9 @@ class MainActivity : ComponentActivity() {
             viewModel = playerViewModel,
             scope = lifecycleScope,
         )
+        lifecycleScope.launch {
+            DownloadLocation.pickRequests.collect { downloadDirLauncher.launch(null) }
+        }
         if (BuildConfig.DEBUG && intent?.getBooleanExtra("disable_progress_report", false) == true) {
             playerController.setProgressReportingEnabled(false)
         }
@@ -243,6 +268,34 @@ class MainActivity : ComponentActivity() {
         return super.dispatchKeyEvent(event)
     }
 
+    /**
+     * The active bottom-screen image viewer consumes the left stick here. This
+     * is deliberately scoped to an open viewer and ignores HAT axes, so the
+     * D-pad is never swallowed (the rc20 regression was Activity-wide generic
+     * motion interception).
+     */
+    override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
+        if (ImageZoomMotion.active != null) {
+            if (event.actionMasked == MotionEvent.ACTION_CANCEL) {
+                ImageZoomMotion.reset()
+            } else if (event.actionMasked == MotionEvent.ACTION_MOVE &&
+                (event.isFromSource(InputDevice.SOURCE_JOYSTICK) ||
+                    event.isFromSource(InputDevice.SOURCE_GAMEPAD))
+            ) {
+                val hatX = event.getAxisValue(MotionEvent.AXIS_HAT_X)
+                val hatY = event.getAxisValue(MotionEvent.AXIS_HAT_Y)
+                if (hatX == 0f && hatY == 0f) {
+                    ImageZoomMotion.onStick(
+                        event.getAxisValue(MotionEvent.AXIS_X),
+                        event.getAxisValue(MotionEvent.AXIS_Y),
+                    )
+                    return true
+                }
+            }
+        }
+        return super.dispatchGenericMotionEvent(event)
+    }
+
     private fun handleOpenDownloadsIntent(intent: Intent?) {
         if (intent?.getBooleanExtra(EXTRA_OPEN_DOWNLOADS, false) == true) {
             openDownloadsRequest.value++
@@ -263,7 +316,30 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+private fun duoPageHint(route: String?): String? = when (route) {
+    Screen.Home.route ->
+        "X 刷新 · LB/RB 切标签 · L2/R2 直播/排行分区"
+    Screen.Search.route ->
+        "LB/RB 视频/用户 · L2/R2 排序 · A 输入/播放"
+    Screen.Dynamic.route ->
+        "LB/RB 全部/视频/图文 · L2/R2 UP 筛选 · X 点赞/复制"
+    Screen.Profile.route -> "A 进入"
+    Routes.HISTORY -> "A 播放"
+    Routes.FAVORITES -> "A 打开/播放"
+    Routes.FOLLOWING -> "A 进入 UP 主空间"
+    Routes.DOWNLOADS -> "LB/RB 切筛选 · A 播放/展开"
+    Routes.SETTINGS ->
+        "↑/↓ 分类 · → 进入 · ← 回分类 · LB/RB 切分类"
+    Routes.LOGIN -> "A 输入/刷新二维码 · B 收键盘"
+    Routes.CHANNEL -> "LB/RB 视频/合集 · A 播放/进入"
+    Routes.PLAYER, Routes.PLAYER_CID, Routes.DOWNLOAD_PLAY, Routes.PGC_PLAYER ->
+        "LB/RB 切 tab · L2/R2 评论排序 · X 弹幕 · START 弹幕/字幕"
+    Routes.LIVE_PLAYER -> "方向键/A 切换评论与信息"
+    Routes.DETAIL, Routes.NOTE -> "方向键移动 · A 播放/进入"
+    else -> null
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun MainScreen(
     openDownloadsRequest: StateFlow<Int> = MutableStateFlow(0),
@@ -282,6 +358,21 @@ fun MainScreen(
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
+    val railFocusState = rememberDuoRailFocusState()
+
+    val keyboard = LocalSoftwareKeyboardController.current
+    val imeVisible = WindowInsets.isImeVisible
+    val imeVisibleState by rememberUpdatedState(imeVisible)
+    LaunchedEffect(imeVisible) {
+        if (!imeVisible) DuoImeState.shown = false
+    }
+    DisposableEffect(duoSession) {
+        duoSession.setImeBackHandler(
+            isVisible = { imeVisibleState },
+            hide = { keyboard?.hide() },
+        )
+        onDispose { duoSession.setImeBackHandler(null, null) }
+    }
 
 
     LaunchedEffect(currentDestination?.route) {
@@ -343,13 +434,37 @@ fun MainScreen(
 
     Scaffold(
         bottomBar = {
-            DuoModeBar(session = duoSession, enabled = dualScreen)
+            DuoModeBar(
+                    session = duoSession,
+                    enabled = dualScreen,
+                    pageHint = duoPageHint(currentDestination?.route),
+                )
         }
     ) { innerPadding ->
         Row(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                // Any deliberate key or touch means the user is done with the
+                // rail; release the focus lock before the event is handled.
+                .onPreviewKeyEvent { event ->
+                    if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                    val railOwnsFocus = railFocusState.railHasFocus
+                    railFocusState.release()
+                    // While the rail owns focus the page root is outside the
+                    // focus tree, so forward shoulder shortcuts to it.
+                    railOwnsFocus && DuoShoulderDispatcher.dispatch(event.key)
+                }
+                .pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent(PointerEventPass.Initial)
+                            if (event.type == PointerEventType.Press) {
+                                railFocusState.release()
+                            }
+                        }
+                    }
+                }
         ) {
             Box(
                 modifier = Modifier
@@ -360,6 +475,7 @@ fun MainScreen(
                 if (railWidth > 0.dp) {
                     DuoRail(
                         currentRoute = currentDestination?.route,
+                        focusState = railFocusState,
                         onNavigate = { screen ->
                             navController.navigate(screen.route) {
                                 popUpTo(navController.graph.findStartDestination().id) {

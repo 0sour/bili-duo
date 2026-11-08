@@ -90,10 +90,13 @@ fun ChannelScreen(
     var showUnfollowConfirm by remember { mutableStateOf(false) }
     var profileFocused by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
+    val searchActionFocus = remember { FocusRequester() }
     val followFocus = remember { FocusRequester() }
     val firstVideoFocus = remember { FocusRequester() }
+    val firstSeasonFocus = remember { FocusRequester() }
     val modeFocusers = remember { List(2) { FocusRequester() } }
     var pendingModeFocus by remember { mutableStateOf(false) }
+    var focusContentOnModeShortcut by remember { mutableStateOf(false) }
     var lastModeShortcutAt by remember { mutableStateOf(0L) }
     LaunchedEffect(uiState.viewMode, pendingModeFocus) {
         if (pendingModeFocus) {
@@ -165,9 +168,9 @@ fun ChannelScreen(
     LaunchedEffect(isSearching) {
         if (isSearching) {
             searchQuery = ""
+            // C: keep focus on the header search icon, not the input.
             delay(200)
-            focusRequester.requestFocus()
-            keyboardController?.show()
+            runCatching { searchActionFocus.requestFocus() }
         }
     }
 
@@ -175,10 +178,33 @@ fun ChannelScreen(
         onDispose { onFocusCleared() }
     }
 
-    // Focus the first video only on the initial load. Switching 视频/合集 with
-    // L1/R1 keeps focus on the selected chip; Down reaches the list.
+    // Initial load focuses the first video. L1/R1 tab switches move into the
+    // list of the selected tab; direct chip activation keeps the chip ring.
     var initialVideoFocusDone by remember { mutableStateOf(false) }
-    LaunchedEffect(uiState.viewMode, uiState.isLoading) {
+    LaunchedEffect(
+        uiState.viewMode,
+        uiState.isLoading,
+        uiState.isLoadingSeasons,
+        uiState.videos.size,
+        uiState.seasons.size,
+        focusContentOnModeShortcut,
+    ) {
+        if (focusContentOnModeShortcut) {
+            if (uiState.isLoading || uiState.isLoadingSeasons) return@LaunchedEffect
+            delay(120)
+            val target = when (uiState.viewMode) {
+                ChannelViewMode.VIDEOS -> {
+                    if (uiState.videos.isNotEmpty()) firstVideoFocus else modeFocusers[0]
+                }
+                ChannelViewMode.SEASONS -> {
+                    if (uiState.seasons.isNotEmpty()) firstSeasonFocus else modeFocusers[1]
+                }
+                else -> return@LaunchedEffect
+            }
+            runCatching { target.requestFocus() }
+            focusContentOnModeShortcut = false
+            return@LaunchedEffect
+        }
         if (!initialVideoFocusDone && uiState.viewMode == ChannelViewMode.VIDEOS &&
             !uiState.isLoading && uiState.videos.isNotEmpty()
         ) {
@@ -226,12 +252,14 @@ fun ChannelScreen(
         Modifier.duoTabCycling(
             onPreviousTab = {
                 viewModel.switchMode(other)
-                pendingModeFocus = true
+                pendingModeFocus = false
+                focusContentOnModeShortcut = true
                 lastModeShortcutAt = SystemClock.uptimeMillis()
             },
             onNextTab = {
                 viewModel.switchMode(other)
-                pendingModeFocus = true
+                pendingModeFocus = false
+                focusContentOnModeShortcut = true
                 lastModeShortcutAt = SystemClock.uptimeMillis()
             },
         )
@@ -267,6 +295,7 @@ fun ChannelScreen(
                         icon = if (isSearching) Icons.Default.Close else Icons.Default.Search,
                         contentDescription = if (isSearching) "取消搜索" else "搜索",
                         tint = if (isSearching) DuoPalette.Pink else DuoPalette.Text,
+                        modifier = Modifier.focusRequester(searchActionFocus),
                         onClick = {
                             if (isSearching) {
                                 isSearching = false
@@ -344,6 +373,7 @@ fun ChannelScreen(
                 },
                 followFocus = followFocus,
                 firstVideoFocus = firstVideoFocus,
+                firstSeasonFocus = firstSeasonFocus,
                 modeFocusRequesters = modeFocusers,
                 listState = listState,
                 modifier = Modifier.fillMaxSize()
@@ -382,6 +412,7 @@ internal fun ChannelBody(
     onToggleFollow: () -> Unit,
     followFocus: FocusRequester? = null,
     firstVideoFocus: FocusRequester? = null,
+    firstSeasonFocus: FocusRequester? = null,
     modeFocusRequesters: List<FocusRequester> = emptyList(),
     listState: LazyListState,
     modifier: Modifier = Modifier
@@ -567,12 +598,19 @@ internal fun ChannelBody(
                     item(key = "sheader") {
                         ChannelSectionHeader(title = "合集", meta = "共 ${uiState.seasons.size} 个")
                     }
-                    items(uiState.seasons, key = { it.meta?.seasonId ?: it.hashCode() }) { season ->
-                        SeasonCard(season = season, onClick = {
-                            season.meta?.seasonId?.let { id ->
-                                onSeasonClick(id, season.archives?.firstOrNull()?.bvid)
-                            }
-                        })
+                    itemsIndexed(
+                        items = uiState.seasons,
+                        key = { _, season -> season.meta?.seasonId ?: season.hashCode() },
+                    ) { index, season ->
+                        SeasonCard(
+                            season = season,
+                            focusRequester = if (index == 0) firstSeasonFocus else null,
+                            onClick = {
+                                season.meta?.seasonId?.let { id ->
+                                    onSeasonClick(id, season.archives?.firstOrNull()?.bvid)
+                                }
+                            },
+                        )
                     }
                 }
             }
@@ -927,11 +965,16 @@ private fun ProfileStat(value: String, label: String) {
 }
 
 @Composable
-internal fun SeasonCard(season: SeasonSummary, onClick: () -> Unit) {
+internal fun SeasonCard(
+    season: SeasonSummary,
+    focusRequester: FocusRequester? = null,
+    onClick: () -> Unit,
+) {
     val meta = season.meta
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
             .duoFocusRing(RoundedCornerShape(10.dp))
             .clip(RoundedCornerShape(10.dp))
             .duoClickable(onClick = onClick)

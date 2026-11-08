@@ -208,10 +208,11 @@ class HomeViewModel(
                     }
                     .onFailure { error ->
                         if (id != requestId) return@onFailure
-                        _state.value = _state.value.copy(
-                            liveItems = emptyList(),
+                        val current = _state.value
+                        _state.value = current.copy(
+                            liveItems = current.liveItems,
                             isLoading = false,
-                            hasMore = false,
+                            hasMore = if (current.liveItems.isEmpty()) false else current.hasMore,
                             error = error.message ?: "直播加载失败",
                         )
                     }
@@ -233,8 +234,9 @@ class HomeViewModel(
                     }
                     .onFailure { error ->
                         if (id != requestId) return@onFailure
-                        _state.value = _state.value.copy(
-                            pgcItems = emptyList(),
+                        val current = _state.value
+                        _state.value = current.copy(
+                            pgcItems = current.pgcItems,
                             isLoading = false,
                             hasMore = false,
                             error = error.message ?: "${tab.label}加载失败",
@@ -255,10 +257,11 @@ class HomeViewModel(
                 }
                 .onFailure { error ->
                     if (id != requestId) return@onFailure
-                    _state.value = _state.value.copy(
-                        items = emptyList(),
+                    val current = _state.value
+                    _state.value = current.copy(
+                        items = current.items,
                         isLoading = false,
-                        hasMore = false,
+                        hasMore = if (current.items.isEmpty()) false else current.hasMore,
                         error = error.message ?: "首页加载失败",
                     )
                 }
@@ -268,7 +271,12 @@ class HomeViewModel(
     fun loadMore() {
         val snapshot = _state.value
         if (snapshot.isLoading || snapshot.isLoadingMore || !snapshot.hasMore) return
-        if (snapshot.tab != HomeTab.POPULAR && !snapshot.tab.isLive) return
+        if (snapshot.tab != HomeTab.POPULAR &&
+            snapshot.tab != HomeTab.RECOMMEND &&
+            !snapshot.tab.isLive
+        ) {
+            return
+        }
         requestJob?.cancel()
         val id = ++requestId
         val nextPage = snapshot.page + 1
@@ -303,11 +311,14 @@ class HomeViewModel(
             repository.getHomeFeed(snapshot.tab, page = nextPage, rankingRid = snapshot.rankingRid)
                 .onSuccess { (items, hasMore) ->
                     if (id != requestId) return@onSuccess
-                    val merged = (_state.value.items + items).distinctBy { it.bvid }
+                    val current = _state.value.items
+                    val merged = (current + items).distinctBy { it.bvid }
                     _state.value = _state.value.copy(
                         items = merged,
                         isLoadingMore = false,
-                        hasMore = hasMore,
+                        // If fresh_idx returns only duplicates, stop rather
+                        // than firing the same page forever.
+                        hasMore = hasMore && merged.size > current.size,
                         page = nextPage,
                     )
                 }

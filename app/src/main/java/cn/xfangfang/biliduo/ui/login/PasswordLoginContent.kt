@@ -54,6 +54,7 @@ fun PasswordLoginContent(
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     val usernameFocus = remember { FocusRequester() }
+    val passwordFocus = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
 
     LaunchedEffect(showCaptcha) {
@@ -62,6 +63,7 @@ fun PasswordLoginContent(
 
     LaunchedEffect(Unit) {
         delay(100)
+        // A: focus the account field, but the read-only gate keeps the IME shut.
         runCatching { usernameFocus.requestFocus() }
     }
 
@@ -128,6 +130,7 @@ fun PasswordLoginContent(
             label = "密码",
             keyboardType = KeyboardType.Password,
             visualTransformation = PasswordVisualTransformation(),
+            focusRequester = passwordFocus,
             modifier = Modifier.fillMaxWidth(),
         )
 

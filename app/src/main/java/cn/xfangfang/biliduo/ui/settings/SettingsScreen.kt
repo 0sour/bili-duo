@@ -69,9 +69,22 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cn.xfangfang.biliduo.BuildConfig
+import cn.xfangfang.biliduo.data.download.DownloadLocation
 import cn.xfangfang.biliduo.data.download.DownloadManager
 import cn.xfangfang.biliduo.data.local.AppSettings
 import cn.xfangfang.biliduo.data.local.SearchHistoryManager
+import cn.xfangfang.biliduo.data.local.VideoPreference
+import cn.xfangfang.biliduo.data.local.VideoPreferenceManager
+import cn.xfangfang.biliduo.data.local.videoQualityLabel
+import cn.xfangfang.biliduo.data.local.videoQualityOptions
+import cn.xfangfang.biliduo.data.local.videoSpeedLabel
+import cn.xfangfang.biliduo.data.local.videoSpeedOptions
+import cn.xfangfang.biliduo.data.local.videoSubtitleBackgroundLabel
+import cn.xfangfang.biliduo.data.local.videoSubtitleBackgroundOptions
+import cn.xfangfang.biliduo.data.local.videoSubtitleBottomOptions
+import cn.xfangfang.biliduo.data.local.videoSubtitlePositionLabel
+import cn.xfangfang.biliduo.data.local.videoSubtitleSizeLabel
+import cn.xfangfang.biliduo.data.local.videoSubtitleSizeOptions
 import cn.xfangfang.biliduo.data.model.DownloadInfo
 import cn.xfangfang.biliduo.duo.DuoSessionViewModel
 import cn.xfangfang.biliduo.ui.common.DuoConfirmOverlay
@@ -128,6 +141,16 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val videoPreferenceManager = remember {
+        VideoPreferenceManager(
+            context.getSharedPreferences("bili_prefs", android.content.Context.MODE_PRIVATE)
+        )
+    }
+    var videoPreference by remember { mutableStateOf(videoPreferenceManager.load()) }
+    fun updateVideoPreference(next: VideoPreference) {
+        videoPreference = next
+        videoPreferenceManager.save(next)
+    }
     var category by remember { mutableIntStateOf(0) }
     var wifiOnlyPlayback by remember { mutableStateOf(AppSettings.wifiOnlyPlayback) }
     var wifiOnlyDownload by remember { mutableStateOf(AppSettings.wifiOnlyDownload) }
@@ -162,12 +185,16 @@ fun SettingsScreen(
             context.getSharedPreferences("bili_prefs", android.content.Context.MODE_PRIVATE)
         ).load()
     }
-    val downloadDir = "应用私有目录 / downloads"
+    val downloadTree by DownloadLocation.treeUri.collectAsState()
+    val downloadDir = downloadTree?.let {
+        "系统目录 · ${DownloadLocation.displayName(it) ?: "已选择"}"
+    } ?: "应用私有目录 / downloads"
 
     LaunchedEffect(
         category,
         wifiOnlyPlayback,
         wifiOnlyDownload,
+        videoPreference,
         playerUi?.danmakuEnabled,
         playerUi?.danmakuOpacity,
         playerUi?.danmakuSpeed,
@@ -184,7 +211,9 @@ fun SettingsScreen(
         }
         val wifi = AppSettings.isWifiConnected(context)
         val detail = when (category) {
-            0 -> "仅 WiFi 播放：${if (wifiOnlyPlayback) "开" else "关"}"
+            0 -> "默认 ${videoQualityLabel(videoPreference.quality)} · " +
+                "${videoSpeedLabel(videoPreference.speed)} · " +
+                "字幕${if (videoPreference.subtitleEnabled) "开" else "关"}"
             1 -> "仅 WiFi 下载：${if (wifiOnlyDownload) "开" else "关"} · 当前 ${if (wifi) "WiFi" else "移动网络"}"
             2 -> "深色主题 · 固定"
             3 -> if (playerUi == null) {
@@ -378,6 +407,8 @@ fun SettingsScreen(
             ) {
                 when (category) {
                     0 -> PlaySettings(
+                        preference = videoPreference,
+                        onPreference = { updateVideoPreference(it) },
                         wifiOnlyPlayback = wifiOnlyPlayback,
                         onWifiOnlyPlayback = {
                             wifiOnlyPlayback = it
@@ -420,6 +451,7 @@ fun SettingsScreen(
                         bytes = storageBytes,
                         searchHistoryCount = searchHistory.size,
                         downloadDir = downloadDir,
+                        hasCustomDir = downloadTree != null,
                         firstFocus = firstRowFocus,
                         backFocus = backFocus,
                         bottomModifier = bottomEdgeModifier,
@@ -437,6 +469,8 @@ fun SettingsScreen(
                         onClearImageCache = {
                             confirmClearImageCache = true
                         },
+                        onPickDownloadDir = { DownloadLocation.requestPicker() },
+                        onResetDownloadDir = { DownloadLocation.clear() },
                     )
                     else -> AboutSettings(
                         firstFocus = firstRowFocus,
@@ -625,25 +659,101 @@ private fun CategoryRail(
 
 @Composable
 private fun PlaySettings(
+    preference: VideoPreference,
+    onPreference: (VideoPreference) -> Unit,
     wifiOnlyPlayback: Boolean,
     onWifiOnlyPlayback: (Boolean) -> Unit,
     firstFocus: FocusRequester,
     backFocus: FocusRequester,
     bottomModifier: Modifier,
 ) {
-    SettingsSection("播放")
+    val subtitleFocus = remember { FocusRequester() }
+
+    SettingsSection("视频设置 · 每次打开视频时应用")
+    SettingsValueRow(
+        title = "默认清晰度",
+        value = videoQualityLabel(preference.quality),
+        focusRequester = firstFocus,
+        modifier = settingsTopEdge(backFocus),
+        onClick = {
+            val index = videoQualityOptions.indexOfFirst { it.qn == preference.quality }
+            val next = videoQualityOptions[
+                (if (index >= 0) index + 1 else 0) % videoQualityOptions.size
+            ]
+            onPreference(preference.copy(quality = next.qn))
+        },
+    )
+    SettingsValueRow(
+        title = "默认倍速",
+        value = videoSpeedLabel(preference.speed),
+        onClick = {
+            onPreference(preference.copy(speed = nextValue(preference.speed, videoSpeedOptions)))
+        },
+    )
+    SettingsSwitchRow(
+        title = "默认开启字幕",
+        subtitle = "打开视频时自动载入第一条字幕轨",
+        checked = preference.subtitleEnabled,
+        focusRequester = subtitleFocus,
+        onToggle = {
+            onPreference(preference.copy(subtitleEnabled = !preference.subtitleEnabled))
+        },
+    )
+    SettingsValueRow(
+        title = "字幕字号",
+        value = videoSubtitleSizeLabel(preference.subtitleTextSizeSp),
+        onClick = {
+            onPreference(
+                preference.copy(
+                    subtitleTextSizeSp = nextValue(
+                        preference.subtitleTextSizeSp,
+                        videoSubtitleSizeOptions,
+                    ),
+                )
+            )
+        },
+    )
+    SettingsValueRow(
+        title = "字幕背景",
+        value = videoSubtitleBackgroundLabel(preference.subtitleBackgroundAlpha),
+        onClick = {
+            onPreference(
+                preference.copy(
+                    subtitleBackgroundAlpha = nextValue(
+                        preference.subtitleBackgroundAlpha,
+                        videoSubtitleBackgroundOptions,
+                    ),
+                )
+            )
+        },
+    )
+    SettingsValueRow(
+        title = "字幕位置",
+        value = videoSubtitlePositionLabel(preference.subtitleBottomPaddingDp),
+        onClick = {
+            val index = videoSubtitleBottomOptions.indexOf(preference.subtitleBottomPaddingDp)
+            val next = videoSubtitleBottomOptions[
+                (if (index >= 0) index + 1 else 0) % videoSubtitleBottomOptions.size
+            ]
+            onPreference(preference.copy(subtitleBottomPaddingDp = next))
+        },
+    )
+    Text(
+        text = "播放控制台里修改清晰度 / 倍速 / 字幕只影响当前视频；" +
+            "弹幕设置与「弹幕」分类双向同步。",
+        color = DuoPalette.Tertiary,
+        fontSize = 10.sp,
+        lineHeight = 14.sp,
+        modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+    )
+    Spacer(Modifier.height(6.dp))
+    SettingsSection("播放行为")
     SettingsSwitchRow(
         title = "仅 WiFi 播放视频",
         subtitle = "移动网络下不开始播放，避免消耗流量",
         checked = wifiOnlyPlayback,
-        focusRequester = firstFocus,
-        modifier = settingsTopEdge(backFocus),
         onToggle = { onWifiOnlyPlayback(!wifiOnlyPlayback) },
     )
-    Spacer(Modifier.height(10.dp))
-    SettingsSection("播放器")
-    SettingsInfoRow("清晰度 / 倍速", "在播放控制台内调整")
-    SettingsInfoRow("弹幕外观", "在「弹幕」分类调整默认值")
     SettingsInfoRow(
         title = "后台行为",
         value = "离开 App 会暂停并保留进度",
@@ -780,6 +890,7 @@ private fun StorageSettings(
     bytes: Long,
     searchHistoryCount: Int,
     downloadDir: String,
+    hasCustomDir: Boolean,
     firstFocus: FocusRequester,
     backFocus: FocusRequester,
     bottomModifier: Modifier,
@@ -789,6 +900,8 @@ private fun StorageSettings(
     onClearAll: () -> Unit,
     onClearSearchHistory: () -> Unit,
     onClearImageCache: () -> Unit,
+    onPickDownloadDir: () -> Unit,
+    onResetDownloadDir: () -> Unit,
 ) {
     SettingsSection("下载")
     SettingsInfoRow(
@@ -798,7 +911,18 @@ private fun StorageSettings(
         modifier = settingsTopEdge(backFocus),
     )
     SettingsInfoRow("占用空间", formatBytes(bytes))
-    SettingsInfoRow("下载目录", downloadDir)
+    SettingsActionRow(
+        title = "下载目录",
+        subtitle = downloadDir,
+        onClick = onPickDownloadDir,
+    )
+    if (hasCustomDir) {
+        SettingsActionRow(
+            title = "恢复默认下载目录",
+            subtitle = "新的下载保存到应用私有目录",
+            onClick = onResetDownloadDir,
+        )
+    }
     Spacer(Modifier.height(10.dp))
     SettingsSection("清理")
     SettingsActionRow(
@@ -889,7 +1013,7 @@ private fun SettingsSwitchRow(
     title: String,
     subtitle: String,
     checked: Boolean,
-    focusRequester: FocusRequester,
+    focusRequester: FocusRequester? = null,
     modifier: Modifier = Modifier,
     onToggle: () -> Unit,
 ) {
@@ -898,7 +1022,7 @@ private fun SettingsSwitchRow(
         modifier = modifier
             .fillMaxWidth()
             .height(52.dp)
-            .focusRequester(focusRequester)
+            .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
             .duoFocusRing(RoundedCornerShape(8.dp))
             .clip(RoundedCornerShape(8.dp))
             .background(if (focused) DuoPalette.SurfaceHigh else DuoPalette.Surface)
@@ -925,6 +1049,7 @@ private fun SettingsSwitchRow(
 private fun SettingsValueRow(
     title: String,
     value: String,
+    focusRequester: FocusRequester? = null,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
@@ -933,6 +1058,7 @@ private fun SettingsValueRow(
         modifier = modifier
             .fillMaxWidth()
             .height(46.dp)
+            .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
             .duoFocusRing(RoundedCornerShape(8.dp))
             .clip(RoundedCornerShape(8.dp))
             .background(if (focused) DuoPalette.SurfaceHigh else DuoPalette.Surface)

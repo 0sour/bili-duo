@@ -104,6 +104,8 @@ import cn.xfangfang.biliduo.duo.DuoOverlay
 import cn.xfangfang.biliduo.duo.DuoSessionViewModel
 import cn.xfangfang.biliduo.ui.duo.duoClickable
 import cn.xfangfang.biliduo.ui.duo.duoFocusRing
+import cn.xfangfang.biliduo.ui.duo.DuoTextFieldGate
+import cn.xfangfang.biliduo.ui.duo.rememberDuoTextFieldState
 import cn.xfangfang.biliduo.ui.player.PlayerController
 import cn.xfangfang.biliduo.ui.player.PlayerUiState
 import cn.xfangfang.biliduo.ui.player.PlayerViewModel
@@ -193,20 +195,31 @@ fun LiveConsoleScreen(
             onEvent = { event ->
                 when (event) {
                     is LiveChatEvent.Message -> {
-                        messages = (messages + event.message).takeLast(MAX_CHAT_MESSAGES)
+                        val next = (messages + event.message).takeLast(MAX_CHAT_MESSAGES)
+                        messages = next
+                        LiveChatStore.publish(roomId, next)
                         if (currentTab != CHAT_TAB) {
                             unread = (unread + 1).coerceAtMost(99)
                         }
                     }
                     is LiveChatEvent.DeleteSuperChat -> {
-                        messages = messages.filterNot {
+                        val next = messages.filterNot {
                             it.isSuperChat && it.superChatId == event.id
                         }
+                        messages = next
+                        LiveChatStore.publish(roomId, next)
                     }
                 }
             },
             onState = { chatState = it },
         )
+    }
+
+    LaunchedEffect(roomId) {
+        LiveChatStore.publish(roomId, messages)
+    }
+    DisposableEffect(roomId) {
+        onDispose { LiveChatStore.clear(roomId) }
     }
 
     fun leave() {
@@ -381,6 +394,10 @@ fun LiveConsoleScreen(
                         switchTab(1)
                         true
                     }
+                    android.view.KeyEvent.KEYCODE_BUTTON_X -> {
+                        vm.toggleDanmaku()
+                        true
+                    }
                     android.view.KeyEvent.KEYCODE_BUTTON_START,
                     android.view.KeyEvent.KEYCODE_MENU -> {
                         qualityOpener = null
@@ -424,6 +441,7 @@ fun LiveConsoleScreen(
                         else (playback.volume + 0.25f).coerceAtMost(1f)
                     )
                 },
+                onToggleDanmaku = { vm.toggleDanmaku() },
                 onRetry = { vm.refreshLive() },
             )
 
@@ -499,6 +517,7 @@ private fun LiveLeftPane(
     onSeekLive: () -> Unit,
     onQuality: () -> Unit,
     onVolume: () -> Unit,
+    onToggleDanmaku: () -> Unit,
     onRetry: () -> Unit,
 ) {
     val detail = ui.liveDetail
@@ -641,6 +660,11 @@ private fun LiveLeftPane(
                 modifier = chipDown.then(Modifier.focusRequester(volumeFocus)),
                 onClick = onVolume,
             )
+            LiveChip(
+                text = if (ui.danmakuEnabled) "弹幕 开" else "弹幕 关",
+                modifier = chipDown,
+                onClick = onToggleDanmaku,
+            )
             Spacer(Modifier.width(10.dp))
         }
 
@@ -694,6 +718,13 @@ private fun LiveLeftPane(
                 fontSize = 9.sp,
             )
         }
+
+        Spacer(Modifier.height(10.dp))
+        Text(
+            text = "X 或弹幕 chip 开关 · START 菜单",
+            color = LiveTextTertiary,
+            fontSize = 8.sp,
+        )
     }
 }
 
@@ -1067,52 +1098,50 @@ private fun LiveChatInput(
     modifier: Modifier = Modifier,
 ) {
     var focused by remember { mutableStateOf(false) }
-    val keyboard = LocalSoftwareKeyboardController.current
+    val fieldState = rememberDuoTextFieldState()
     val focusManager = LocalFocusManager.current
-    LaunchedEffect(focused) {
-        if (focused && enabled) {
-            delay(80L)
-            keyboard?.show()
-        }
-    }
-    BasicTextField(
-        value = value,
-        onValueChange = onValueChange,
+    DuoTextFieldGate(
+        state = fieldState,
+        focusRequester = focusRequester,
+        modifier = modifier.height(38.dp),
         enabled = enabled,
-        singleLine = true,
-        modifier = modifier
-            .height(38.dp)
-            .focusRequester(focusRequester)
-            .onFocusChanged {
-                focused = it.isFocused
-                onFocusChanged(it.isFocused)
-            }
-            .onPreviewKeyEvent { event ->
-                if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                when (event.key) {
-                    Key.DirectionUp -> {
-                        focusManager.moveFocus(FocusDirection.Up)
-                        true
-                    }
-                    Key.DirectionDown -> {
-                        focusManager.moveFocus(FocusDirection.Down)
-                        true
-                    }
-                    Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
-                        keyboard?.show()
-                        true
-                    }
-                    else -> false
+        onGateFocusChanged = onFocusChanged,
+    ) { editing, gateFocused, fieldModifier ->
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            enabled = editing && enabled,
+            singleLine = true,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(38.dp)
+                .then(fieldModifier)
+                .onFocusChanged {
+                    focused = it.isFocused
+                    onFocusChanged(it.isFocused)
                 }
-            }
-            .clip(RoundedCornerShape(7.dp))
-            .background(LiveSurfaceHigh)
-            .border(
-                width = 1.dp,
-                color = if (focused) LivePink else LiveDivider,
-                shape = RoundedCornerShape(7.dp),
-            )
-            .padding(horizontal = 10.dp, vertical = 8.dp),
+                .onPreviewKeyEvent { event ->
+                    if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                    when (event.key) {
+                        Key.DirectionUp -> {
+                            focusManager.moveFocus(FocusDirection.Up)
+                            true
+                        }
+                        Key.DirectionDown -> {
+                            focusManager.moveFocus(FocusDirection.Down)
+                            true
+                        }
+                        else -> false
+                    }
+                }
+                .clip(RoundedCornerShape(7.dp))
+                .background(LiveSurfaceHigh)
+                .border(
+                    width = 1.dp,
+                    color = if (focused || gateFocused) LivePink else LiveDivider,
+                    shape = RoundedCornerShape(7.dp),
+                )
+                .padding(horizontal = 10.dp, vertical = 8.dp),
         textStyle = TextStyle(color = Color.White, fontSize = 11.sp),
         cursorBrush = SolidColor(LivePink),
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
@@ -1129,6 +1158,7 @@ private fun LiveChatInput(
             }
         },
     )
+    }
 }
 
 @Composable

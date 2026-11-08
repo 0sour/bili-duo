@@ -90,6 +90,7 @@ fun HistoryScreen(
     val keyboard = LocalSoftwareKeyboardController.current
     val scope = rememberCoroutineScope()
     val searchFocus = remember { FocusRequester() }
+    val searchCancelFocus = remember { FocusRequester() }
     val retryFocus = remember { FocusRequester() }
     val firstItemFocus = remember { FocusRequester() }
     var searchMode by remember { mutableStateOf(false) }
@@ -160,9 +161,9 @@ fun HistoryScreen(
 
     LaunchedEffect(searchMode) {
         if (searchMode) {
+            // C: keep the ring on 取消 instead of focusing the input.
             delay(80)
-            runCatching { searchFocus.requestFocus() }
-            keyboard?.show()
+            runCatching { searchCancelFocus.requestFocus() }
         } else {
             keyboard?.hide()
             viewModel.setSearchQuery("")
@@ -216,12 +217,12 @@ fun HistoryScreen(
                 }
             },
             actions = {
-                if (loggedIn) {
+                if (loggedIn && !searchMode) {
                     DuoIconAction(
                         icon = Icons.Default.Search,
-                        contentDescription = if (searchMode) "关闭搜索" else "搜索历史",
-                        tint = if (searchMode) DuoPalette.Pink else DuoPalette.Text,
-                        onClick = { searchMode = !searchMode },
+                        contentDescription = "搜索历史",
+                        tint = DuoPalette.Text,
+                        onClick = { searchMode = true },
                     )
                 }
             },
@@ -243,12 +244,12 @@ fun HistoryScreen(
                     modifier = Modifier.weight(1f),
                     onSubmit = { keyboard?.hide() },
                     onClear = { viewModel.setSearchQuery("") },
-                    onRequestIme = { keyboard?.show() },
                 )
                 Spacer(Modifier.width(8.dp))
                 DuoPillButton(
                     text = "取消",
                     onClick = { searchMode = false },
+                    focusRequester = searchCancelFocus,
                 )
             }
         }

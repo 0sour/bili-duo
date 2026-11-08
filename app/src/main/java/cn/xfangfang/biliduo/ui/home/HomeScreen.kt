@@ -33,7 +33,10 @@ import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -53,6 +56,11 @@ import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -88,6 +96,9 @@ private val HomePink = Color(0xFFFB7299)
 // aligns the card itself to the viewport edge and clips the ring.
 private val CardFocusClearance = 7.dp
 
+/** Direct tab activation keeps the tab ring; L1/R1 moves into the content. */
+private enum class TabFocusTarget { TAB, CONTENT }
+
 @Composable
 fun HomeScreen(
     onVideoClick: (String) -> Unit,
@@ -101,6 +112,8 @@ fun HomeScreen(
     val state by viewModel.state.collectAsState()
     val gridState = rememberLazyGridState()
     val firstFocus = remember { FocusRequester() }
+    val tabFocuses = remember { List(HomeTab.entries.size) { FocusRequester() } }
+    val refreshFocus = remember { FocusRequester() }
     val areaFocus = remember { FocusRequester() }
     val followedFocus = remember { FocusRequester() }
     val subAreaFocus = remember { FocusRequester() }
@@ -139,7 +152,7 @@ fun HomeScreen(
             pendingAreaFocus = false
         }
     }
-    var focusedTab by remember { mutableStateOf<HomeTab?>(null) }
+    var tabFocusTarget by remember { mutableStateOf<TabFocusTarget?>(TabFocusTarget.CONTENT) }
     val isPgc = state.tab.isPgc
     val isLive = state.tab.isLive
     val itemsEmpty = when {
@@ -163,11 +176,18 @@ fun HomeScreen(
         }
     }
 
-    LaunchedEffect(state.tab, firstKey) {
-        if (!itemsEmpty && focusedTab != state.tab) {
-            delay(80L)
-            runCatching { firstFocus.requestFocus() }
-            focusedTab = state.tab
+    LaunchedEffect(state.tab, firstKey, itemsEmpty, tabFocusTarget) {
+        if (itemsEmpty || tabFocusTarget != TabFocusTarget.CONTENT) return@LaunchedEffect
+        delay(80L)
+        runCatching { firstFocus.requestFocus() }
+        tabFocusTarget = null
+    }
+    LaunchedEffect(state.tab, tabFocusTarget) {
+        // A directly activated tab owns focus. Keep it through the async feed
+        // load, then drop the marker so a later load does not re-focus content.
+        if (tabFocusTarget == TabFocusTarget.TAB) {
+            delay(220L)
+            if (tabFocusTarget == TabFocusTarget.TAB) tabFocusTarget = null
         }
     }
 
@@ -228,15 +248,46 @@ fun HomeScreen(
             .fillMaxSize()
             .background(HomeBg)
             .duoTabCycling(
-                onPreviousTab = { viewModel.cycleTab(-1) },
-                onNextTab = { viewModel.cycleTab(1) },
+                onPreviousTab = {
+                    tabFocusTarget = TabFocusTarget.CONTENT
+                    viewModel.cycleTab(-1)
+                },
+                onNextTab = {
+                    tabFocusTarget = TabFocusTarget.CONTENT
+                    viewModel.cycleTab(1)
+                },
                 onPreviousSection = cyclePreviousArea,
                 onNextSection = cycleNextArea,
-            ),
+            )
+            .onPreviewKeyEvent { event ->
+                if (event.type == KeyEventType.KeyDown &&
+                    (event.key == Key.X || event.key == Key.ButtonX)
+                ) {
+                    // Keep a stable focus target: the old card disappears when
+                    // the new feed replaces the grid. Down from the refresh
+                    // button goes to the first card.
+                    runCatching { refreshFocus.requestFocus() }
+                    viewModel.refresh()
+                    true
+                } else {
+                    false
+                }
+            },
     ) {
         HomeHeader(
             selected = state.tab,
-            onSelect = viewModel::selectTab,
+            onSelect = { tab ->
+                // A/click on the tab itself leaves the indicator on that tab.
+                tabFocusTarget = TabFocusTarget.TAB
+                tabFocuses.getOrNull(HomeTab.entries.indexOf(tab))
+                    ?.let { runCatching { it.requestFocus() } }
+                viewModel.selectTab(tab)
+            },
+            tabFocusRequesters = tabFocuses,
+            onRefresh = viewModel::refresh,
+            isRefreshing = state.isLoading,
+            refreshFocus = refreshFocus,
+            downFocus = if (itemsEmpty) null else firstFocus,
         )
 
         if (state.tab == HomeTab.RANKING) {
@@ -413,6 +464,11 @@ private fun RankingAreaRow(
 private fun HomeHeader(
     selected: HomeTab,
     onSelect: (HomeTab) -> Unit,
+    tabFocusRequesters: List<FocusRequester>,
+    onRefresh: () -> Unit,
+    isRefreshing: Boolean,
+    refreshFocus: FocusRequester,
+    downFocus: FocusRequester?,
 ) {
     Row(
         modifier = Modifier
@@ -421,15 +477,47 @@ private fun HomeHeader(
             .padding(start = 16.dp, top = 6.dp, end = 10.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        HomeTab.entries.forEach { tab ->
+        HomeTab.entries.forEachIndexed { index, tab ->
             HomeTabItem(
                 text = tab.label,
                 selected = tab == selected,
+                focusRequester = tabFocusRequesters.getOrNull(index),
                 onClick = { onSelect(tab) },
             )
             Spacer(Modifier.width(16.dp))
         }
         Spacer(Modifier.weight(1f))
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .focusRequester(refreshFocus)
+                .duoFocusRing(CircleShape)
+                .then(
+                    if (downFocus != null) {
+                        Modifier.focusProperties { down = downFocus }
+                    } else {
+                        Modifier
+                    }
+                )
+                .clip(CircleShape)
+                .duoClickable(onClick = onRefresh),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (isRefreshing) {
+                CircularProgressIndicator(
+                    color = HomePink,
+                    strokeWidth = 2.dp,
+                    modifier = Modifier.size(16.dp),
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Default.Refresh,
+                    contentDescription = "刷新",
+                    tint = HomeSecondary,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+        }
     }
 }
 
@@ -437,11 +525,13 @@ private fun HomeHeader(
 private fun HomeTabItem(
     text: String,
     selected: Boolean,
+    focusRequester: FocusRequester?,
     onClick: () -> Unit,
 ) {
     Column(
         modifier = Modifier
             .height(42.dp)
+            .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
             .duoFocusRing(RoundedCornerShape(4.dp))
             .duoClickable(onClick = onClick)
             .padding(horizontal = 2.dp),

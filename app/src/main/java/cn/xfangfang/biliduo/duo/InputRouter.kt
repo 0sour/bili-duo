@@ -60,6 +60,7 @@ class InputRouter(
             // B closes the modal; the screen may first consume it (e.g. leave an
             // inline editor inside the danmaku settings sheet).
             if (isBack(code)) {
+                if (session.handleImeBack()) return consume(code)
                 if (!session.handleOverlayBack()) session.closeOverlay()
                 return consume(code)
             }
@@ -87,7 +88,8 @@ class InputRouter(
         // the first press is still delivered below.
         if (repeating && (
                 isBack(code) || isNavigationKey(code) || isShoulderKey(code) ||
-                    code == KeyEvent.KEYCODE_X || code == KeyEvent.KEYCODE_Y
+                    code == KeyEvent.KEYCODE_X || code == KeyEvent.KEYCODE_Y ||
+                    code == KeyEvent.KEYCODE_BUTTON_X || code == KeyEvent.KEYCODE_BUTTON_Y
                 )
         ) {
             return true

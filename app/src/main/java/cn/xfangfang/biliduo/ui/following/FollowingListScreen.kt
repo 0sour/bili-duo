@@ -86,6 +86,7 @@ fun FollowingListScreen(
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
     val searchFocus = remember { FocusRequester() }
+    val searchCancelFocus = remember { FocusRequester() }
     val firstItemFocus = remember { FocusRequester() }
     val retryFocus = remember { FocusRequester() }
     val loginFocus = remember { FocusRequester() }
@@ -168,9 +169,9 @@ fun FollowingListScreen(
     LaunchedEffect(searchMode) {
         if (searchMode) {
             searchText = uiState.searchQuery.orEmpty()
+            // C: keep the ring on 取消 instead of focusing the input.
             delay(80)
-            runCatching { searchFocus.requestFocus() }
-            keyboard?.show()
+            runCatching { searchCancelFocus.requestFocus() }
         } else {
             keyboard?.hide()
         }
@@ -218,12 +219,12 @@ fun FollowingListScreen(
             title = "我的关注",
             onBack = { if (searchMode) exitSearch() else onBack() },
             actions = {
-                if (loggedIn) {
+                if (loggedIn && !searchMode) {
                     DuoIconAction(
                         icon = Icons.Default.Search,
                         contentDescription = "搜索关注",
-                        tint = if (searchMode) DuoPalette.Pink else DuoPalette.Text,
-                        onClick = { if (searchMode) exitSearch() else searchMode = true },
+                        tint = DuoPalette.Text,
+                        onClick = { searchMode = true },
                     )
                 }
             },
@@ -251,10 +252,9 @@ fun FollowingListScreen(
                         searchText = ""
                         viewModel.clearSearch()
                     },
-                    onRequestIme = { keyboard?.show() },
                 )
                 Spacer(Modifier.width(8.dp))
-                DuoPillButton(text = "取消", onClick = { exitSearch() })
+                DuoPillButton(text = "取消", onClick = { exitSearch() }, focusRequester = searchCancelFocus)
             }
         }
 

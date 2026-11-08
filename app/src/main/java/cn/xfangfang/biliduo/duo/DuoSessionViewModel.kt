@@ -47,6 +47,14 @@ class DuoSessionViewModel : ViewModel() {
     private val _overlay = MutableStateFlow<DuoOverlay?>(null)
     val overlay: StateFlow<DuoOverlay?> = _overlay.asStateFlow()
 
+    /** Page-local hint override (e.g. dynamic reader/gallery). */
+    private val _hintOverride = MutableStateFlow<String?>(null)
+    val hintOverride: StateFlow<String?> = _hintOverride.asStateFlow()
+
+    fun setHintOverride(hint: String?) {
+        _hintOverride.value = hint
+    }
+
     private val _playerActive = MutableStateFlow(false)
     val playerActive: StateFlow<Boolean> = _playerActive.asStateFlow()
 
@@ -134,9 +142,39 @@ class DuoSessionViewModel : ViewModel() {
         focusBackInterceptor = interceptor
     }
 
+    private var imeVisible: (() -> Boolean)? = null
+    private var hideIme: (() -> Unit)? = null
+    private var imeHiddenByBack = false
+
+    /**
+     * B must first dismiss the soft keyboard and keep focus on the field. The
+     * root composable installs this from `WindowInsets.isImeVisible`; it runs
+     * before overlay/back interceptors so the first B never closes a sheet.
+     */
+    fun setImeBackHandler(isVisible: (() -> Boolean)?, hide: (() -> Unit)?) {
+        imeVisible = isVisible
+        hideIme = hide
+    }
+
+    fun handleImeBack(): Boolean {
+        // After our own hide the Presentation may keep reporting IME insets as
+        // visible; don't consume B again until a field asks for the IME.
+        if (imeHiddenByBack) {
+            if (!DuoImeState.shown) return false
+            imeHiddenByBack = false
+        }
+        val visible = DuoImeState.shown || imeVisible?.invoke() == true
+        if (!visible) return false
+        hideIme?.invoke()
+        DuoImeState.onHiddenByBack()
+        imeHiddenByBack = true
+        return true
+    }
+
     /** Ask the bottom NavHost to pop one destination (B in player/browse). */
     fun requestBack() {
         log("requestBack")
+        if (handleImeBack()) return
         if (backInterceptor?.invoke() == true) return
         if (focusBackInterceptor?.invoke() == true) return
         _backRequests.tryEmit(Unit)

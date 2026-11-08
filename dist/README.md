@@ -4,6 +4,275 @@
 `*.apk`），需要时本地 `./gradlew assembleDebug` / `assembleRelease` 生成，或从
 GitHub Releases 下载。
 
+## 0.2.0-rc50（2026-11-08）
+
+- `bili-duo-0.2.0-rc50-release.apk`
+  - R8 minify，正式 release keystore 签名；可覆盖安装同 key 的 rc49。
+  - APK SHA-256：`3956a433f16211e1a0999f39eb2ed664031d7d8e4cf4510fc467e8316ff0b60d`
+- `bili-duo-0.2.0-rc50-debug.apk`
+  - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
+  - SHA-256：`7595576b10e2b10eaa558de43dc6c96d7b7d04acb28b022bfab0960b0cddf35b`
+
+rc50 变更：
+- 左侧 app rail 导航后焦点留在新选中的栏位，不自动跳进页面内容；方向键或触摸
+  才释放。
+- L1/R1 切标签后直接聚焦内容：首页 top tabs、动态类型、搜索视频/用户、下载筛选、
+  UP 空间视频/合集、设置分类、播放设置弹幕/字幕。直接 A/点击标签则保留标签焦点；
+  L2/R2 筛选仍停在新 chip。
+- rail 聚焦时页面不在焦点树里，新增 `DuoShoulderDispatcher` 转发 L1/R1/L2/R2；
+  搜索页肩键改用 `duoTabCycling` 接入。228 单测通过。
+- Duo 已验证：rail 焦点、Right 进首卡、rail 聚焦 R1 切首页 tab/动态筛选并落首卡、
+  首页 tab 点击保焦、搜索 R1 切用户落首行、播放设置 L1 落首行。
+
+## 0.2.0-rc49（2026-11-08）
+
+- `bili-duo-0.2.0-rc49-release.apk`
+  - R8 minify，正式 release keystore 签名；可覆盖安装同 key 的 rc48。
+  - APK SHA-256：`dd21af5c82dd5d55397c24bb4181b6e76744fe9dfe487f06d968910d49b33684`
+- `bili-duo-0.2.0-rc49-debug.apk`
+  - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
+  - SHA-256：`c0282144a27b6a87bd3dcc1890922a0b479d97c3b99718c9c3ee1a583ffc0c3e`
+
+rc49 变更：
+- 设置 → 播放新增「视频设置 · 每次打开视频时应用」：默认清晰度、默认倍速、
+  默认字幕开关与字号/背景/位置；旧 rc48 字幕全局样式自动迁移为默认值。
+- 播放控制台的清晰度/倍速/字幕只影响当前视频，不回写设置；弹幕设置仍与
+  设置「弹幕」分类双向同步。
+- 修复在线/PGC 加载时 `PlayerUiState(isLoading=true)` 覆盖默认字幕开关的问题
+  （新状态统一 `withVideoDefaults()`）。228 单测通过。
+- Duo 已验证：默认 720P/1.25x/字幕开启在连续两个视频生效，AI 字幕上屏显示；
+  播放页改 1080P/1.5x/特大/无背景/靠上后设置默认值不变。测试后已恢复
+  自动/1x/字幕关/标准。
+
+## 0.2.0-rc48（2026-11-08）
+
+- `bili-duo-0.2.0-rc48-release.apk`
+  - R8 minify，正式 release keystore 签名；可覆盖安装同 key 的 rc47。
+  - APK SHA-256：`640eb4f332b05052f293074d97cb23a33ea6143ab6624e0e5273e74aebb66cca`
+- `bili-duo-0.2.0-rc48-debug.apk`
+  - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
+  - SHA-256：`eca8ec3907b431bfab6c1cc769791073d5fd4a60d6d2c8774826dd189708139e`
+
+rc48 变更：
+- 播放设置「弹幕 / 字幕」改为标签页（文字 + 下划线），L1/R1 切换并聚焦新标签；
+  D-pad Left/Right 仍可切换；屏蔽词编辑态不响应 L1/R1。
+- 标签下方增加 L1/R1 提示；225 单测通过。尚未在真机播放视频复测。
+
+## 0.2.0-rc47（2026-11-08）
+
+- `bili-duo-0.2.0-rc47-release.apk`
+  - R8 minify，正式 release keystore 签名；可覆盖安装同 key 的 rc46。
+  - APK SHA-256：`2cb4e523e298d2d6ad862abaddd632190c11ea0b7d63a99ee7d0498bc4279f94`
+- `bili-duo-0.2.0-rc47-debug.apk`
+  - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
+  - SHA-256：`24dce0958b11c34018d4b554de6844c9c8a1a714981e864de07c91926411ebbf`
+
+rc47 变更：
+- 播放页 START/MENU 打开 `DuoOverlay.SETTINGS`（弹幕/字幕分栏，默认弹幕），
+  不再打开清晰度菜单；清晰度仍从 chips 行进入。
+- 播放器页脚、路由底栏提示改为“START 弹幕/字幕”；225 单测通过。
+  尚未在真机播放视频复测。
+
+## 0.2.0-rc46（2026-11-08）
+
+- `bili-duo-0.2.0-rc46-release.apk`
+  - R8 minify，正式 release keystore 签名；可覆盖安装同 key 的 rc45。
+  - APK SHA-256：`c67726f725338aa00980db92ed142a371dd309ff2a1f649a4789ce64c21eb6ed`
+- `bili-duo-0.2.0-rc46-debug.apk`
+  - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
+  - SHA-256：`722333acb628aea995391c27dc1196793f6658c4a1722665a9068c6915345958`
+
+rc46 变更：
+- 底栏合为单行：`● 浏览/播放控制 + 页面按键提示 + B + A`，按路由显示
+  X/LB/RB/L2/R2/START 等；标签缩短，给提示留空间。
+- 动态阅读器/画册通过 `hintOverride` 显示专属提示；全局菜单打开时隐藏页面提示。
+- 无手柄/单屏只显示状态文案；225 单测通过；Duo 已验证首页/搜索/动态底栏。
+
+## 0.2.0-rc45（2026-11-08）
+
+- `bili-duo-0.2.0-rc45-release.apk`
+  - R8 minify，正式 release keystore 签名；可覆盖安装同 key 的 rc44。
+  - APK SHA-256：`0898140078775980ebb2900a54b80d6ea364d759a3cbc777b1e9b419eb57e4fa`
+- `bili-duo-0.2.0-rc45-debug.apk`
+  - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
+  - SHA-256：`d7ed9a4b3cf06fcbcb249b472c9bb23401218641fa22b1172a762d2f008b3250`
+
+rc45 变更（修正 rc44 的 X 无反应）：
+- 物理手柄 X 是 `KEYCODE_BUTTON_X`，不是 `KEYCODE_X`；Home/Dynamic 同时接受
+  `Key.X` / `Key.ButtonX`，长按 repeat 由 InputRouter 吞掉。
+- Home 按 X 刷新当前 tab 后焦点落到右上角刷新按钮（旧卡被替换，避免焦点丢失），
+  Down 回第一张卡；刷新按钮本身仍保持焦点。
+- 225 单测通过；Duo 用 `input gamepad keyevent 99`（BUTTON_X）验证刷新与焦点。
+
+## 0.2.0-rc44（2026-11-08）
+
+- `bili-duo-0.2.0-rc44-release.apk`
+  - R8 minify，正式 release keystore 签名；可覆盖安装同 key 的 rc43。
+  - APK SHA-256：`f637c1bf4bc6abb3d3022d13d6464f435c6f8d51f29dddd881d620b45a0908db`
+- `bili-duo-0.2.0-rc44-debug.apk`
+  - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
+  - SHA-256：`20083d2b54f8094624c2c38a54b5055794e8e115fe8559b98d7747d45983b20a`
+
+rc44 变更：
+- 主页推荐/热门/排行/直播/番剧/影视统一支持 X 刷新当前标签页，与右上角刷新按钮
+  共用 `HomeViewModel.refresh()`；长按 X 由 InputRouter 吞 repeat，只刷新一次。
+- 225 单测通过；Duo 实测 X 后推荐内容更新。
+
+## 0.2.0-rc43（2026-11-08）
+
+- `bili-duo-0.2.0-rc43-release.apk`
+  - R8 minify，正式 release keystore 签名；可覆盖安装同 key 的 rc42。
+  - APK SHA-256：`c1b549ae8938fe4424d4579a2d762e88edbea2586623cf083e03ef51eebc2110`
+- `bili-duo-0.2.0-rc43-debug.apk`
+  - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
+  - SHA-256：`12e6ba67445847bda2895416cc45808057c78c2d4a17afb38cb46025d6d15b44`
+
+rc43 变更：
+- 图片查看器左摇杆平移方向取反：推右/上时画面向左/下移动（滚动式）；触摸拖动
+  方向不变。R2/L2 缩放、双指缩放不变。
+- 225 单测通过；已装 Duo，真实手柄方向待用户复测。
+
+## 0.2.0-rc42（2026-11-08）
+
+- `bili-duo-0.2.0-rc42-release.apk`
+  - R8 minify，正式 release keystore 签名；可覆盖安装同 key 的 rc41。
+  - APK SHA-256：`53943ad17d1c698d2a36493f826a0379754f5f894e2f15cf560461ccac0a78c9`
+- `bili-duo-0.2.0-rc42-debug.apk`
+  - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
+  - SHA-256：`057b3230930a1ad93143409a0286c482a658426134e0aad7a48ecdc71cf0f43f`
+
+rc42 变更：
+- 评论图片与动态画册支持 R2/L2 1–4x 缩放、左摇杆平移、双指缩放/单指拖动；
+  切换图片重置缩放。左摇杆仅在查看器打开时生效，HAT/DPAD 不拦截。
+- 主页推荐接入 `fresh_idx/fresh_idx_1h` 无限滚动；Header 新增刷新按钮（可聚焦，
+  加载中显示 spinner，Down 到首卡）；刷新保留旧列表，失败不清空。
+- 225 单测通过；Duo 已验证动态画册缩放/拖动/复位、首页刷新与分页。
+  真实左摇杆与双指捏合待用户用手柄/触摸复测。
+
+## 0.2.0-rc41（2026-11-08）
+
+- `bili-duo-0.2.0-rc41-release.apk`
+  - R8 minify，正式 release keystore 签名；可覆盖安装同 key 的 rc40。
+  - APK SHA-256：`823b85b4790edafac2151c709eb9f3aa335982aa31a2650a35ca8fea00b4ead7`
+- `bili-duo-0.2.0-rc41-debug.apk`
+  - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
+  - SHA-256：`74975c9ec5fa307fa3b7c55095b4d28a5fb954c8eaef37faed542b16586beab4`
+
+rc41 变更（用户逐项选择）：
+- 输入框统一为 `DuoTextFieldGate`：非编辑态禁用字段 + 透明焦点 overlay；A/Enter/
+  触摸后切到真实字段并弹 IME，B 收键盘但保留焦点。
+- C 不抢焦点 11 处：主搜索、下载/历史/收藏/关注/UP 主空间搜索、短信验证码、
+  密码登录密码、直播评论、动态评论、收藏夹简介。
+- A 选中待命 2 处：短信登录手机号、密码登录账号。
+- B 进入即弹 4 处：弹幕发送、视频评论发送、播放设置屏蔽词、收藏夹标题。
+- 搜索按钮去重：列表搜索模式隐藏页头搜索图标；主搜索页去掉右侧提交放大镜。
+- `showDuoIme()` 增加 300/600ms 重试：修复冷启动第一次 IME 在 Presentation
+  更新可见性时被系统拒绝（`PHASE_SERVER_UPDATE_CLIENT_VISIBILITY`）。
+- Duo 已验证收藏夹标题 B、主搜索 C（含冷启动 IME、触屏重开 IME）、直播评论 C；
+  221 单测通过。登录字段与播放器弹幕/评论浮层待账号/视频样本复测。
+
+## 0.2.0-rc40（2026-11-08）
+
+- `bili-duo-0.2.0-rc40-release.apk`
+  - R8 minify，正式 release keystore 签名；可覆盖安装同 key 的 rc39。
+  - APK SHA-256：`082b16c05e7d918444d14c6ed2b7dcaa0057cff89c9939f622dbac63dffd710c`
+- `bili-duo-0.2.0-rc40-debug.apk`
+  - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
+  - SHA-256：`57a45165d99bd3cb7e92ea738a051eff10f3b37755a8f5011174e552f17a4ab8`
+
+rc40 变更（用户反馈）：
+- 所有输入框：聚焦只显示选中/焦点环，按 A 才弹出输入法。
+- B 先收起输入法，焦点保留在输入框；再按 B 才返回或关闭浮层。
+- 搜索、登录、评论/弹幕发送等自动聚焦入口不再自动弹键盘。
+- 新增 `Modifier.duoTextInput()`；补全登录、收藏夹简介、屏蔽词、评论等输入框。
+- Duo 已验证搜索框完整流程（聚焦→A→B 收键盘保留焦点→B 返回）；221 单测通过。
+
+## 0.2.0-rc39（2026-11-08）
+
+- `bili-duo-0.2.0-rc39-release.apk`
+  - R8 minify，正式 release keystore 签名；可覆盖安装同 key 的 rc38。
+  - APK SHA-256：`6b746f99cdf9a1b6e87b03fb250b4145d1fb6b2d3802e1d5a4b495a3b17b2634`
+- `bili-duo-0.2.0-rc39-debug.apk`
+  - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
+  - SHA-256：`904fc3d3e1492460337045f883479fc98c9fde1ce3c6132e46f4ec6ba6bc84ea`
+
+rc39 变更（用户反馈）：
+- 动态评论发送后 700ms 补拉一次，减少手动刷新需要。
+- Y 暂不映射：动态列表回顶、搜索页切排序移除。
+- 动态评论「加载更多」保持焦点，加载中 spinner 不替换焦点节点。
+- 上屏直播 SC 卡片移除，SC 只在下屏显示；直播左栏新增「弹幕 开/关」chip。
+- 下载自选分P：对勾改为居中图标；分P Up→全选，全选 Down→P1。
+- Duo 已验证下载弹窗焦点/对勾与直播弹幕 chip；221 单测通过。
+
+## 0.2.0-rc38（2026-11-08）
+
+- `bili-duo-0.2.0-rc38-release.apk`
+  - R8 minify，正式 release keystore 签名；可覆盖安装同 key 的 rc37。
+  - APK SHA-256：`ec929cd647c867243edda3442a806a438c08164e6d09e43f5f4840c96b1f8833`
+- `bili-duo-0.2.0-rc38-debug.apk`
+  - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
+  - SHA-256：`d61a033c3db4f4c5f29f91cfc12e176176444237f8941cdc9322d0375c5b0c9a`
+
+rc38 变更：
+- 设置→存储的下载目录可打开 SAF 系统文件夹选择器，持久化 tree URI。
+- 新下载通过 DocumentsContract 在所选目录创建文档，filePath 为 content://；
+  写入支持 "wa" 追加，删除走 DocumentsContract。
+- 下载页可直接播放 SAF 文件（Media3 content://），删除任务同时删除文档。
+- 字幕改存应用私有目录，`DownloadInfo.subtitleUris` 记录；兼容旧同目录 JSON。
+- 可「恢复默认下载目录」回到应用私有 downloads。
+- Duo 已验证选目录、下载、上屏播放、暂停/续传（15.1MB→32.4MB）、删除与恢复默认。
+- 221 单测通过。
+
+## 0.2.0-rc37（2026-11-08）
+
+- `bili-duo-0.2.0-rc37-release.apk`
+  - R8 minify，正式 release keystore 签名；可覆盖安装同 key 的 rc36。
+  - APK SHA-256：`f4ca449467ea2f0d3f85745987338f910ed15689eea782d69583d95bc579e90a`
+- `bili-duo-0.2.0-rc37-debug.apk`
+  - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
+  - SHA-256：`85207f6aa47b311bc90fcc46f89c603be41edcd33612201fb7e319b5629fde5a`
+
+rc37 变更：
+- 下载范围新增「自选分P」：列出全部分P，默认勾选当前 P，逐项勾选 + 全选/清空。
+- 「开始下载」固定在浮层底部，分P 很多时不需要滚到列表末尾。
+- 批量入队只包含勾选的分P；按钮显示「下载已选 N 个」。
+- Duo 已验证：50 分P 视频自选 2 个 → 下载页生成 2 条任务 → 删除还原；221 单测。
+
+## 0.2.0-rc36（2026-11-08）
+
+- `bili-duo-0.2.0-rc36-release.apk`
+  - R8 minify，正式 release keystore 签名；可覆盖安装同 key 的 rc35。
+  - APK SHA-256：`cb20559f8dbaff5c5025fc55766c1f9fb19968c0a3162e0e64a83d60ec87c33f`
+- `bili-duo-0.2.0-rc36-debug.apk`
+  - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
+  - SHA-256：`7d5028855a3ebd3fb537af1264a3aa6e4712198b2e35360ae3c130ab23ebd790`
+
+rc36 变更：
+- 直播弹幕实时叠加到上屏：`LiveChatStore` 镜像下屏 WebSocket 消息，
+  `LiveDanmakuView` 按空闲泳道滚动，支持透明度/速度/字号/区域/屏蔽词/同屏上限。
+- 直播间 X 键开关弹幕，与 VOD 共用 `DanmakuPreference`；左栏增加提示。
+- SC 不进滚动层，改为上屏左下角卡片，取最新未过期 SC；真实 SC 样本待补测。
+- 离开直播间清理消息，不会带到下一个房间。
+- Duo 已验证：上屏弹幕出现、X 关/开生效；221 单测通过。
+
+## 0.2.0-rc35（2026-11-08）
+
+- `bili-duo-0.2.0-rc35-release.apk`
+  - R8 minify，正式 release keystore 签名；可覆盖安装同 key 的 rc34。
+  - APK SHA-256：`e26605a2a5da50699d27d935102264f59a017101df86b019ce4cc7b2728d1449`
+- `bili-duo-0.2.0-rc35-debug.apk`
+  - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
+  - SHA-256：`9f94db848a1e11935e15f036734447212fde8285ddabb7eb15b42a2def3c9582`
+
+rc35 变更：
+- 动态评论 tab 增加内联输入框（发送/1000 字校验/登录校验），发送后刷新列表。
+- 发送成功显示服务端 `success_toast`；若提示「被up主精选后对所有人可见」，评论
+  暂不出现在公开列表，这是 B 站审核机制，不是发送失败。
+- 发送键右侧出现「撤回」，仅对本次会话刚发布的评论生效；自己的评论行按 A 可删除（未实测）。
+- B 在输入框/发送/撤回聚焦时先关 IME 并回到「评论」tab，再按 B 才回正文。
+- 修复「图文」筛选仍显示视频卡：feed API 的 type 仅作提示，客户端统一再过滤。
+- 221 单测通过；Duo 已验证评论发送/提示/撤回与两段 B 返回。
+
 ## 0.2.0-rc34（2026-11-08）
 
 - `bili-duo-0.2.0-rc34-release.apk`

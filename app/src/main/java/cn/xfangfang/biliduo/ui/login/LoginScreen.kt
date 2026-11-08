@@ -52,7 +52,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import cn.xfangfang.biliduo.duo.DuoSessionViewModel
 import cn.xfangfang.biliduo.ui.duo.duoClickable
 import cn.xfangfang.biliduo.ui.duo.duoFocusRing
+import cn.xfangfang.biliduo.ui.duo.DuoTextFieldGate
 import cn.xfangfang.biliduo.ui.duo.duoTextFieldNavigation
+import cn.xfangfang.biliduo.ui.duo.rememberDuoTextFieldState
 import cn.xfangfang.biliduo.ui.top.TopAmbientUi
 import cn.xfangfang.biliduo.ui.top.TopGlyph
 import com.google.zxing.BarcodeFormat
@@ -461,33 +463,48 @@ internal fun LoginTextField(
         androidx.compose.ui.text.input.VisualTransformation.None,
     focusRequester: FocusRequester? = null,
 ) {
-    androidx.compose.material3.OutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
-        label = { Text(label, fontSize = 12.sp) },
-        singleLine = true,
-        visualTransformation = visualTransformation,
-        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-            keyboardType = keyboardType,
-        ),
-        shape = RoundedCornerShape(8.dp),
-        colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
-            focusedTextColor = LoginText,
-            unfocusedTextColor = LoginText,
-            focusedContainerColor = LoginSurface,
-            unfocusedContainerColor = LoginSurface,
-            focusedBorderColor = LoginPink,
-            unfocusedBorderColor = LoginOutline,
-            focusedLabelColor = LoginPink,
-            unfocusedLabelColor = LoginSecondary,
-            cursorColor = LoginPink,
-            focusedPlaceholderColor = LoginTertiary,
-            unfocusedPlaceholderColor = LoginTertiary,
-        ),
-        modifier = modifier
-            .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
-            .duoTextFieldNavigation(),
-    )
+    val fieldState = rememberDuoTextFieldState()
+    val localFocus = remember { FocusRequester() }
+    val requester = focusRequester ?: localFocus
+    DuoTextFieldGate(
+        state = fieldState,
+        focusRequester = requester,
+        modifier = modifier,
+    ) { editing, gateFocused, fieldModifier ->
+        androidx.compose.material3.OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            enabled = editing,
+            label = { Text(label, fontSize = 12.sp) },
+            singleLine = true,
+            visualTransformation = visualTransformation,
+            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                keyboardType = keyboardType,
+            ),
+            shape = RoundedCornerShape(8.dp),
+            colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                focusedTextColor = LoginText,
+                unfocusedTextColor = LoginText,
+                disabledTextColor = LoginText,
+                focusedContainerColor = LoginSurface,
+                unfocusedContainerColor = LoginSurface,
+                disabledContainerColor = LoginSurface,
+                focusedBorderColor = LoginPink,
+                unfocusedBorderColor = LoginOutline,
+                disabledBorderColor = if (gateFocused) LoginPink else LoginOutline,
+                focusedLabelColor = LoginPink,
+                unfocusedLabelColor = LoginSecondary,
+                disabledLabelColor = if (gateFocused) LoginPink else LoginSecondary,
+                cursorColor = LoginPink,
+                focusedPlaceholderColor = LoginTertiary,
+                unfocusedPlaceholderColor = LoginTertiary,
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .then(fieldModifier)
+                .then(if (editing) Modifier.duoTextFieldNavigation() else Modifier),
+        )
+    }
 }
 
 /** Shared primary action for the login forms. */

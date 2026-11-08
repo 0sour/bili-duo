@@ -420,7 +420,9 @@ data class DownloadInfo(
     val createTime: Long = System.currentTimeMillis(),
     val page: Int = 1,
     val part: String = "",
-    val aid: Long = 0
+    val aid: Long = 0,
+    /** Private subtitle JSON paths saved for this task; null for legacy rows. */
+    val subtitleUris: List<String>? = null
 ) {
     companion object {
         const val STATUS_PENDING = 0
