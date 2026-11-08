@@ -4,6 +4,21 @@
 `*.apk`），需要时本地 `./gradlew assembleDebug` / `assembleRelease` 生成，或从
 GitHub Releases 下载。
 
+## 0.2.0-rc34（2026-11-08）
+
+- `bili-duo-0.2.0-rc34-release.apk`
+  - R8 minify，正式 release keystore 签名；可覆盖安装同 key 的 rc33。
+  - APK SHA-256：`8a88f90c5e51e75602e01fa91186ed7a1c0f82a925e6c19725c08e88d0971712`
+- `bili-duo-0.2.0-rc34-debug.apk`
+  - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
+  - SHA-256：`be3c1064894eb65aa7b84626da7857574f2c98d0c4eeccb1297851594e440ccf`
+
+rc34 变更：
+- 动态详情新增「正文 / 评论」标签页，LB/RB 切换，评论内嵌加载/分页/X 点赞。
+- B 在评论页先回正文，再按 B 退出详情。
+- 移除 Y 评论入口；Y 在动态列表回到顶部。
+- 221 单测通过；rc34 未测试（MuMu/Duo 均未连接）。
+
 ## 0.2.0-rc33（2026-11-06）
 
 - `bili-duo-0.2.0-rc33-release.apk`

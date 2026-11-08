@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc33-FB7299">
+  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc34-FB7299">
   <img alt="status" src="https://img.shields.io/badge/status-untested%20RC-orange">
   <img alt="Android" src="https://img.shields.io/badge/Android-24%2B-3DDC84?logo=android&logoColor=white">
   <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-1.9.23-7F52FF?logo=kotlin&logoColor=white">
@@ -23,7 +23,7 @@
 上屏只负责视频画面，下屏用一块 `Presentation` 承载完整 UI；手柄和触摸共用同一棵
 Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，也没有上屏 OSD。
 
-> 当前版本：**0.2.0-rc33**（versionCode 34）
+> 当前版本：**0.2.0-rc34**（versionCode 35）
 > 状态：功能完整的 **未测试 RC**，221 个单元测试通过，已在 MuMu 与 Duo 真机做核心
 > 路径验证，尚未完成全流程回归。
 
@@ -204,6 +204,8 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
     顶部横幅，按 `end_time` 过期。
   - rc33 P2 收口：动态详情/纯文字阅读按 Y 或点评论数打开动态评论（`type=17`，
     只读列表/分页/重试）；直播右侧「回到直播」改为文字按钮，去掉 SkipNext 图标歧义。
+  - rc34 动态阅读：详情页新增「正文 / 评论」标签页，LB/RB 切换，B 在评论页回正文；
+    评论内嵌加载/点赞；取消 Y 评论入口，Y 在动态列表改为回到顶部。
   - 登录、个人中心、历史/收藏/关注只读浏览；弹幕发送→撤回闭环。
 
 ### 未实现（代码层面）

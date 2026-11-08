@@ -189,8 +189,6 @@ fun DynamicScreen(
     }
     var focusedIndex by remember { mutableStateOf<Int?>(null) }
     var overlay by remember { mutableStateOf<DynamicOverlay?>(null) }
-    var commentsCard by remember { mutableStateOf<DynamicCardUi?>(null) }
-    var commentsReturnFocus by remember { mutableStateOf<FocusRequester?>(null) }
     val loggedIn = BilibiliApi.parseSelfMid() != null
 
     fun closeToList() {
@@ -281,6 +279,14 @@ fun DynamicScreen(
         Modifier
             .fillMaxSize()
             .background(DuoPalette.Bg)
+            .onPreviewKeyEvent { event ->
+                if (event.type == KeyEventType.KeyDown && event.key == Key.Y) {
+                    scope.launch { listState.animateScrollToItem(0) }
+                    true
+                } else {
+                    false
+                }
+            }
             .duoTabCycling(
                 // Without a session the page is a login prompt; switching the
                 // filters there would fire anonymous requests for nothing.
@@ -447,26 +453,6 @@ fun DynamicScreen(
             },
             onOpenGallery = { openGallery(current, it) },
             onIndexChange = { changeImage(current, it) },
-            onComments = { card, focus ->
-                commentsReturnFocus = focus
-                commentsCard = card
-            },
-        )
-    }
-
-    commentsCard?.let { card ->
-        DynamicCommentsOverlay(
-            card = card,
-            session = session,
-            onReaderBack = { closeToList() },
-            onClose = {
-                commentsCard = null
-                val target = commentsReturnFocus
-                scope.launch {
-                    delay(100L)
-                    runCatching { target?.requestFocus() }
-                }
-            },
         )
     }
 }
@@ -1180,7 +1166,6 @@ private fun DynamicReaderLayer(
     onBack: () -> Unit,
     onOpenGallery: (Int) -> Unit,
     onIndexChange: (Int) -> Unit,
-    onComments: (DynamicCardUi, FocusRequester) -> Unit,
 ) {
     val focus = remember { FocusRequester() }
     val scroll = rememberScrollState()
@@ -1189,6 +1174,9 @@ private fun DynamicReaderLayer(
     val density = LocalDensity.current
     val imageCount = overlay.card.images.size
     val step = with(density) { 96.dp.toPx() }
+    var detailTab by remember(overlay.card.id, overlay.kind) { mutableStateOf(0) }
+    val detailBodyFocus = remember { FocusRequester() }
+    val detailCommentsFocus = remember { FocusRequester() }
 
     LaunchedEffect(overlay.card.id, overlay.kind) {
         delay(40L)
@@ -1196,9 +1184,13 @@ private fun DynamicReaderLayer(
     }
     // imageIndex is part of the key: B from the gallery must restore the
     // currently shown picture, not the index captured when the gallery opened.
-    DisposableEffect(session, overlay.card.id, overlay.kind, overlay.imageIndex) {
+    DisposableEffect(session, overlay.card.id, overlay.kind, overlay.imageIndex, detailTab) {
         session?.setBackInterceptor {
-            onBack()
+            if (overlay is DynamicOverlay.Detail && detailTab == 1) {
+                detailTab = 0
+            } else {
+                onBack()
+            }
             true
         }
         onDispose { session?.setBackInterceptor(null) }
@@ -1213,6 +1205,16 @@ private fun DynamicReaderLayer(
             .focusRequester(focus)
             .onPreviewKeyEvent { event ->
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                if (overlay is DynamicOverlay.Detail && detailTab == 1) {
+                    when (event.key) {
+                        Key.ButtonL1 -> {
+                            detailTab = 0
+                            true
+                        }
+                        Key.ButtonR1 -> true
+                        else -> return@onPreviewKeyEvent false
+                    }
+                }
                 when (event.key) {
                     Key.DirectionUp -> {
                         if (overlay !is DynamicOverlay.Gallery) {
@@ -1244,9 +1246,17 @@ private fun DynamicReaderLayer(
                         }
                         true
                     }
-                    Key.ButtonL1, Key.ButtonR1 -> {
-                        if (overlay is DynamicOverlay.Detail || overlay is DynamicOverlay.Text) {
-                            onComments(overlay.card, focus)
+                    Key.ButtonL1 -> {
+                        if (overlay is DynamicOverlay.Detail) {
+                            detailTab = 0
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                    Key.ButtonR1 -> {
+                        if (overlay is DynamicOverlay.Detail) {
+                            detailTab = 1
                             true
                         } else {
                             false
@@ -1255,14 +1265,6 @@ private fun DynamicReaderLayer(
                     Key.X -> {
                         shareCurrent()
                         true
-                    }
-                    Key.Y -> {
-                        if (overlay is DynamicOverlay.Detail || overlay is DynamicOverlay.Text) {
-                            onComments(overlay.card, focus)
-                            true
-                        } else {
-                            false
-                        }
                     }
                     else -> false
                 }
@@ -1281,7 +1283,19 @@ private fun DynamicReaderLayer(
                 onBack = onBack,
                 onOpenGallery = onOpenGallery,
                 onShare = shareCurrent,
-                onComments = { onComments(overlay.card, focus) },
+                tab = detailTab,
+                onTab = { detailTab = it },
+                bodyTabFocus = detailBodyFocus,
+                commentsTabFocus = detailCommentsFocus,
+                commentsContent = {
+                    DynamicCommentsOverlay(
+                        card = overlay.card,
+                        session = session,
+                        onReaderBack = onBack,
+                        onClose = { detailTab = 0 },
+                        embedded = true,
+                    )
+                },
             )
             is DynamicOverlay.Gallery -> DynamicGalleryOverlay(
                 card = overlay.card,
@@ -1306,6 +1320,7 @@ private fun DynamicCommentsOverlay(
     session: DuoSessionViewModel?,
     onReaderBack: () -> Unit,
     onClose: () -> Unit,
+    embedded: Boolean = false,
 ) {
     val repository = remember { BilibiliRepository() }
     val scope = rememberCoroutineScope()
@@ -1369,7 +1384,7 @@ private fun DynamicCommentsOverlay(
         }
     }
 
-    DisposableEffect(session, card.id) {
+    if (!embedded) DisposableEffect(session, card.id) {
         session?.setBackInterceptor {
             onClose()
             true
@@ -1386,8 +1401,7 @@ private fun DynamicCommentsOverlay(
 
     Column(
         Modifier
-            .fillMaxSize()
-            .background(DuoPalette.Bg)
+            .then(if (embedded) Modifier.fillMaxSize() else Modifier.fillMaxSize().background(DuoPalette.Bg))
             .onPreviewKeyEvent { event ->
                 if (event.type == KeyEventType.KeyDown && event.key == Key.X) {
                     val id = focusedRpid ?: return@onPreviewKeyEvent false
@@ -1398,35 +1412,37 @@ private fun DynamicCommentsOverlay(
                 }
             },
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().height(54.dp).padding(horizontal = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(34.dp)
-                    .clip(CircleShape)
-                    .background(DuoPalette.SurfaceHigh)
-                    .pointerInput(Unit) { detectTapGestures { onClose() } },
-                contentAlignment = Alignment.Center,
+        if (!embedded) {
+            Row(
+                modifier = Modifier.fillMaxWidth().height(54.dp).padding(horizontal = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("←", color = DuoPalette.Text, fontSize = 18.sp)
+                Box(
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clip(CircleShape)
+                        .background(DuoPalette.SurfaceHigh)
+                        .pointerInput(Unit) { detectTapGestures { onClose() } },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text("←", color = DuoPalette.Text, fontSize = 18.sp)
+                }
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        text = "动态评论",
+                        color = DuoPalette.Text,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        text = "${card.authorName} · ${formatCount(card.commentCount.toLong())} 条 · X 点赞",
+                        color = DuoPalette.Tertiary,
+                        fontSize = 10.sp,
+                    )
+                }
+                Text("B 返回", color = DuoPalette.Tertiary, fontSize = 10.sp)
             }
-            Spacer(Modifier.width(10.dp))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    text = "动态评论",
-                    color = DuoPalette.Text,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    text = "${card.authorName} · ${formatCount(card.commentCount.toLong())} 条 · X 点赞",
-                    color = DuoPalette.Tertiary,
-                    fontSize = 10.sp,
-                )
-            }
-            Text("B 返回", color = DuoPalette.Tertiary, fontSize = 10.sp)
         }
         when {
             loading -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -1627,7 +1643,11 @@ private fun DynamicDetailOverlay(
     onBack: () -> Unit,
     onOpenGallery: (Int) -> Unit,
     onShare: () -> Unit,
-    onComments: () -> Unit,
+    tab: Int,
+    onTab: (Int) -> Unit,
+    bodyTabFocus: FocusRequester,
+    commentsTabFocus: FocusRequester,
+    commentsContent: @Composable () -> Unit,
 ) {
     Column(Modifier.fillMaxSize().background(DuoPalette.Bg)) {
         ReaderHeader(
@@ -1636,6 +1656,23 @@ private fun DynamicDetailOverlay(
             onBack = onBack,
             onShare = onShare,
         )
+        Row(
+            modifier = Modifier.fillMaxWidth().height(44.dp).padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(18.dp),
+        ) {
+            ReaderTab("正文", tab == 0, bodyTabFocus) { onTab(0) }
+            ReaderTab("评论 ${formatCount(card.commentCount.toLong())}", tab == 1, commentsTabFocus) { onTab(1) }
+        }
+        LaunchedEffect(tab) {
+            delay(80L)
+            runCatching {
+                if (tab == 0) bodyTabFocus.requestFocus() else commentsTabFocus.requestFocus()
+            }
+        }
+        if (tab == 1) {
+            commentsContent()
+        } else {
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -1713,15 +1750,50 @@ private fun DynamicDetailOverlay(
                 )
             }
             Spacer(Modifier.height(12.dp))
-            DynamicStatsRow(card, showLike = true, onComments = onComments)
+            DynamicStatsRow(card, showLike = true, onComments = { onTab(1) })
             Spacer(Modifier.height(10.dp))
             Text(
-                text = "方向键滚动 · LB/RB 评论 · X 复制链接 · B 返回列表",
+                text = "方向键滚动 · LB/RB 切换 正文/评论 · X 复制链接 · B 返回",
                 color = DuoPalette.Tertiary,
                 fontSize = 10.sp,
             )
             Spacer(Modifier.height(16.dp))
         }
+        }
+    }
+}
+
+@Composable
+private fun ReaderTab(
+    text: String,
+    selected: Boolean,
+    focusRequester: FocusRequester,
+    onClick: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .height(38.dp)
+            .focusRequester(focusRequester)
+            .duoFocusRing(RoundedCornerShape(6.dp))
+            .duoClickable(onClick = onClick)
+            .padding(horizontal = 2.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(
+            text = text,
+            color = if (selected) DuoPalette.Pink else DuoPalette.Secondary,
+            fontSize = 13.sp,
+            fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
+        )
+        Spacer(Modifier.height(3.dp))
+        Box(
+            Modifier
+                .width(18.dp)
+                .height(2.dp)
+                .clip(RoundedCornerShape(1.dp))
+                .background(if (selected) DuoPalette.Pink else Color.Transparent),
+        )
     }
 }
 
