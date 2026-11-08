@@ -23,7 +23,7 @@
 上屏只负责视频画面，下屏用一块 `Presentation` 承载完整 UI；手柄和触摸共用同一棵
 Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，也没有上屏 OSD。
 
-> 当前版本：**0.2.0-rc50**（versionCode 51）
+> 当前版本：**0.2.0-rc50**（versionCode 51） · [GitHub Pre-release](https://github.com/0sour/bili-duo/releases/tag/v0.2.0-rc50)
 > 状态：功能完整的 **测试版 RC**，228 个单元测试通过；Duo 已完成本轮侧栏焦点、
 > L1/R1 标签、视频默认值、物理输入与图片查看器复测，用户反馈无明显 bug。
 

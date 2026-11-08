@@ -6,6 +6,8 @@ GitHub Releases 下载。
 
 ## 0.2.0-rc50（2026-11-08）
 
+已发布：https://github.com/0sour/bili-duo/releases/tag/v0.2.0-rc50
+
 - `bili-duo-0.2.0-rc50-release.apk`
   - R8 minify，正式 release keystore 签名；可覆盖安装同 key 的 rc49。
   - APK SHA-256：`4e7bbce73f5a694b46e232e5d56c0367edf16cba43613ba96950ef3e1fb49e11`
