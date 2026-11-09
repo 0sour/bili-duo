@@ -10,23 +10,24 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc52-FB7299">
+  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc53-FB7299">
   <img alt="status" src="https://img.shields.io/badge/status-test%20build-orange">
   <img alt="Android" src="https://img.shields.io/badge/Android-24%2B-3DDC84?logo=android&logoColor=white">
   <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-1.9.23-7F52FF?logo=kotlin&logoColor=white">
   <img alt="Compose" src="https://img.shields.io/badge/Jetpack%20Compose-2024.04-4285F4?logo=jetpackcompose&logoColor=white">
   <img alt="Media3" src="https://img.shields.io/badge/Media3-1.4.1-FF6D00">
-  <img alt="tests" src="https://img.shields.io/badge/tests-232%20passing-brightgreen">
+  <img alt="tests" src="https://img.shields.io/badge/tests-231%20passing-brightgreen">
   <img alt="license" src="https://img.shields.io/badge/license-MIT-blue">
 </p>
 
 上屏只负责视频画面，下屏用一块 `Presentation` 承载完整 UI；手柄和触摸共用同一棵
 Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，也没有上屏 OSD。
 
-> 当前版本：**0.2.0-rc52**（versionCode 53，待发布）
-> 状态：功能完整的 **本地测试版**，232 个单元测试通过；rc50 已在 Duo 完成侧栏焦点、
-> L1/R1 标签、视频默认值、物理输入与图片查看器复测。rc51 新增 RP Duo 手柄风格适配；rc52 把手柄设置独立成分类，
-> 修复切换页面时的焦点环残影，并缩短视频/直播起播等待。
+> 当前版本：**0.2.0-rc53**（versionCode 54，待发布）
+> 状态：功能完整的 **本地测试版**，231 个单元测试通过；rc50 已在 Duo 完成侧栏焦点、
+> L1/R1 标签、视频默认值、物理输入与图片查看器复测。rc51 新增 RP Duo 手柄风格适配；
+> rc52 把手柄设置独立成分类、修复切页焦点环残影并缩短起播等待；rc53 新增上下双屏
+> 亮暗色主题、日出日落/跟随系统/手动自动切换和侧栏快捷按钮。
 
 ## 界面预览
 
@@ -58,6 +59,9 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
   弹幕/点赞**，START 弹幕/字幕设置，LB/RB 切换右栏 tab。进度条可聚焦，左右键 ±10s。
 - **手柄风格**：设置 → 手柄可选 **Xbox / Retro**。实体位置功能不变；Retro 固件
   输出的 A/B、X/Y 会在 `InputRouter` 中归一化。首次启动可选择，可跳过（默认 Xbox）。
+- **亮暗色**：设置 → 外观可选 **日出日落 / 跟随系统 / 不自动切换**，侧栏左下角
+  可手动快捷切换。上下双屏一起换色；上屏播放留边、视频画面、弹幕和字幕保持黑色，
+  其余上屏场景走亮色。焦点环亮色为墨环 + 白分隔。
 - **肩键快捷键**：L1/R1 切一级 tab（搜索页切视频/用户），L2/R2 切二级筛选行；
   长按只走一格。
 - **overlay 独占**：清晰度、倍速、弹幕设置、发送、图片查看等打开时独占输入，
@@ -248,6 +252,10 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
     时指示器先闪到旧项/内容再回来的观感；API 限流改为按请求起点 120ms，VOD
     元数据等待 1.6s→0.6s（本地有进度时直接跳过），弹幕延后 900ms 加载；直播
     playurl 与房间详情并行、主播卡并行，起播实测约 2.0s→0.8s。232 单测通过。
+  - rc53 上下双屏亮色主题：`DuoColors` + `LocalDuoColors` 统一色板，侧栏左下角
+    快捷切换；设置 → 外观提供日出日落/跟随系统/不自动切换，日出日落按本地时间与
+    季节估算。上屏待机/预览/人物/设置/动态走亮色，播放留边与视频/弹幕/字幕保持
+    黑色；焦点环亮色改为墨环 + 白分隔。231 单测通过。
   - 登录、个人中心、历史/收藏/关注只读浏览；弹幕发送→撤回闭环。
 
 ### 未实现（代码层面）

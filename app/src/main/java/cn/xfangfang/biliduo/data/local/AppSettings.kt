@@ -13,6 +13,7 @@ object AppSettings {
     private const val KEY_WIFI_ONLY_PLAYBACK = "wifi_only_playback"
     private const val KEY_WIFI_ONLY_DOWNLOAD = "wifi_only_download"
     private const val KEY_THEME_MODE = "theme_mode"
+    private const val KEY_MANUAL_DARK = "manual_dark"
     private const val KEY_UPDATE_PROMPTED_TAG = "update_prompted_tag"
 
     private lateinit var prefs: SharedPreferences
@@ -26,15 +27,25 @@ object AppSettings {
             prefs.edit().putBoolean(KEY_WIFI_ONLY_DOWNLOAD, true).apply()
         }
         themeModeState = prefs.getInt(KEY_THEME_MODE, 0)
+        manualDarkState = prefs.getBoolean(KEY_MANUAL_DARK, true)
     }
 
     private var themeModeState by mutableIntStateOf(0)
+    private var manualDarkState by androidx.compose.runtime.mutableStateOf(true)
 
     var themeMode: Int
         get() = themeModeState
         set(value) {
             themeModeState = value
             prefs.edit().putInt(KEY_THEME_MODE, value).apply()
+        }
+
+    /** Last explicit light/dark choice; used by the rail quick toggle. */
+    var manualDark: Boolean
+        get() = manualDarkState
+        set(value) {
+            manualDarkState = value
+            prefs.edit().putBoolean(KEY_MANUAL_DARK, value).apply()
         }
 
     var wifiOnlyPlayback: Boolean

@@ -66,6 +66,8 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import cn.xfangfang.biliduo.duo.DuoSessionViewModel
+import cn.xfangfang.biliduo.ui.theme.DuoTheme
+import cn.xfangfang.biliduo.ui.common.DuoPalette
 import cn.xfangfang.biliduo.ui.duo.requestPageFocus
 import cn.xfangfang.biliduo.ui.duo.duoClickable
 import cn.xfangfang.biliduo.ui.duo.duoFocusRing
@@ -74,16 +76,16 @@ import cn.xfangfang.biliduo.ui.top.TopGlyph
 import cn.xfangfang.biliduo.ui.top.TopPersonUi
 import kotlinx.coroutines.delay
 
-private val ProfileBg = Color(0xFF0F0F0F)
-private val ProfileSurface = Color(0xFF17171A)
-private val ProfileSurface2 = Color(0xFF1F1F24)
-private val ProfileText = Color(0xFFF2F2F4)
-private val ProfileSecondary = Color(0xFFA6A6AE)
-private val ProfileTertiary = Color(0xFF73737F)
-private val ProfilePink = Color(0xFFFB7299)
-private val ProfileOnPink = Color(0xFF1A0710)
-private val ProfileOutline = Color(0xFF2A2A31)
-private val ProfileError = Color(0xFFF2555A)
+private val ProfileBg: Color @Composable get() = DuoTheme.colors.bg
+private val ProfileSurface: Color @Composable get() = DuoTheme.colors.surface1
+private val ProfileSurface2: Color @Composable get() = DuoTheme.colors.surface2
+private val ProfileText: Color @Composable get() = DuoTheme.colors.text
+private val ProfileSecondary: Color @Composable get() = DuoTheme.colors.secondary
+private val ProfileTertiary: Color @Composable get() = DuoTheme.colors.tertiary
+private val ProfilePink: Color @Composable get() = DuoTheme.colors.pinkInk
+private val ProfileOnPink: Color @Composable get() = DuoTheme.colors.onPink
+private val ProfileOutline: Color @Composable get() = DuoTheme.colors.outline
+private val ProfileError: Color @Composable get() = DuoTheme.colors.error
 
 @Composable
 fun ProfileScreen(
@@ -371,12 +373,12 @@ private fun ProfileHeader(
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(4.dp))
-                                .background(Color(0xFFFFD166).copy(alpha = 0.16f))
+                                .background(DuoPalette.Warning.copy(alpha = 0.16f))
                                 .padding(horizontal = 6.dp, vertical = 1.dp),
                         ) {
                             Text(
                                 text = "大会员",
-                                color = Color(0xFFFFD166),
+                                color = DuoPalette.Warning,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Medium,
                             )
@@ -594,7 +596,7 @@ private fun DialogButton(
                 width = if (selected) 2.dp else 1.dp,
                 color = when {
                     selected && danger -> ProfileError
-                    selected -> Color.White
+                    selected -> ProfileText
                     else -> ProfileOutline
                 },
                 shape = RoundedCornerShape(8.dp),

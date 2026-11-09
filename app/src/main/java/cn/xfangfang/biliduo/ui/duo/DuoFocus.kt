@@ -54,6 +54,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.SoftwareKeyboardController
 import androidx.compose.ui.text.style.TextOverflow
+import cn.xfangfang.biliduo.ui.theme.DuoTheme
 import cn.xfangfang.biliduo.duo.DuoImeState
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -65,10 +66,10 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusProperties
 import kotlinx.coroutines.delay
 
-private val BarBg = Color(0xFF141418)
-private val BarText = Color(0xFFF5F5F7)
-private val Accent = Color(0xFFFB7299)
-private val Muted = Color(0xFF73737F)
+private val BarBg: Color @Composable get() = DuoTheme.colors.surface1
+private val BarText: Color @Composable get() = DuoTheme.colors.text
+private val Accent: Color @Composable get() = DuoTheme.colors.pinkInk
+private val Muted: Color @Composable get() = DuoTheme.colors.tertiary
 
 /**
  * While the app rail owns focus after a navigation, destination pages must not
@@ -112,6 +113,7 @@ fun Modifier.duoFocusRing(
     // item/page while the new one was already highlighted, which read as the
     // indicator flashing to the wrong place.
     val progress = remember { Animatable(0f) }
+    val themeColors = DuoTheme.colors
     LaunchedEffect(enabled, isFocused) {
         if (enabled && isFocused) {
             progress.animateTo(1f, tween(durationMillis = 120))
@@ -141,17 +143,17 @@ fun Modifier.duoFocusRing(
                 this,
             )
 
-            // A thin dark edge keeps the white ring readable on bright covers,
-            // without the pink halo that read like a background tint.
+            // The halo separates the ring from busy covers; the ring inverts
+            // with the theme (white on dark, ink on light).
             translate(-gap, -gap) {
                 drawFocusOutline(
                     outline = outlineAt(gap),
-                    color = Color.Black.copy(alpha = 0.55f * ringAlpha),
+                    color = themeColors.focusHalo.copy(alpha = 0.55f * ringAlpha),
                     strokeWidth = edgeWidth,
                 )
                 drawFocusOutline(
                     outline = outlineAt(gap),
-                    color = Color.White.copy(alpha = 0.96f * ringAlpha),
+                    color = themeColors.focusRing.copy(alpha = 0.96f * ringAlpha),
                     strokeWidth = ringWidth,
                 )
             }

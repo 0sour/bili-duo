@@ -591,12 +591,12 @@ private fun DynamicAuthorChip(
             .clip(shape)
             .background(
                 if (selected) DuoPalette.Pink.copy(alpha = 0.16f)
-                else Color.White.copy(alpha = 0.05f)
+                else DuoPalette.SurfaceHigh
             )
             .border(
                 width = 1.dp,
                 color = if (selected) DuoPalette.Pink.copy(alpha = 0.7f)
-                else Color.White.copy(alpha = 0.08f),
+                else DuoPalette.Outline,
                 shape = shape,
             )
             .duoClickable(onClick = onClick)
@@ -657,12 +657,12 @@ private fun DynamicChip(
             .clip(shape)
             .background(
                 if (selected) DuoPalette.Pink.copy(alpha = 0.18f)
-                else Color.White.copy(alpha = 0.06f)
+                else DuoPalette.SurfaceHigh
             )
             .border(
                 width = 1.dp,
                 color = if (selected) DuoPalette.Pink.copy(alpha = 0.8f)
-                else Color.White.copy(alpha = 0.08f),
+                else DuoPalette.Outline,
                 shape = shape,
             )
             .duoClickable(onClick = onClick)
@@ -2204,8 +2204,8 @@ private fun DetailImageGrid(
                                 .background(DuoPalette.SurfaceHigh)
                                 .border(
                                     width = if (index == selected) 2.dp else 1.dp,
-                                    color = if (index == selected) Color.White
-                                    else Color.White.copy(alpha = 0.08f),
+                                    color = if (index == selected) DuoPalette.Text
+                                    else DuoPalette.Outline,
                                     shape = RoundedCornerShape(6.dp),
                                 )
                                 .pointerInput(index) {
@@ -2274,7 +2274,7 @@ private fun DynamicGalleryOverlay(
                         .fillMaxHeight(0.92f)
                         .clip(RoundedCornerShape(10.dp))
                         .background(DuoPalette.SurfaceHigh)
-                        .border(1.dp, Color.White.copy(alpha = 0.14f), RoundedCornerShape(10.dp)),
+                        .border(1.dp, DuoPalette.Outline, RoundedCornerShape(10.dp)),
                 ) {
                     val url = card.images.getOrNull(imageIndex)
                     if (!url.isNullOrBlank()) {
@@ -2323,8 +2323,8 @@ private fun DynamicGalleryOverlay(
                             .background(DuoPalette.SurfaceHigh)
                             .border(
                                 width = if (index == imageIndex) 2.dp else 1.dp,
-                                color = if (index == imageIndex) Color.White
-                                else Color.White.copy(alpha = 0.08f),
+                                color = if (index == imageIndex) DuoPalette.Text
+                                else DuoPalette.Outline,
                                 shape = RoundedCornerShape(6.dp),
                             )
                             .pointerInput(index) {

@@ -1,47 +1,51 @@
 package cn.xfangfang.biliduo.ui.theme
 
+import java.util.Calendar
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ThemeModeTest {
-
-    @Test
-    fun followSystemModeUsesSystemDarkFlag() {
-        assertTrue(resolveDarkTheme(THEME_FOLLOW_SYSTEM, systemDark = true))
-        assertFalse(resolveDarkTheme(THEME_FOLLOW_SYSTEM, systemDark = false))
+    private fun at(hour: Int): Calendar = Calendar.getInstance().apply {
+        set(Calendar.HOUR_OF_DAY, hour)
+        set(Calendar.MINUTE, 0)
+        set(Calendar.SECOND, 0)
+        set(Calendar.MILLISECOND, 0)
     }
 
     @Test
-    fun lightModeIgnoresSystemDarkFlag() {
-        assertFalse(resolveDarkTheme(THEME_LIGHT, systemDark = true))
-        assertFalse(resolveDarkTheme(THEME_LIGHT, systemDark = false))
+    fun manualModeUsesExplicitChoice() {
+        assertTrue(resolveDarkTheme(THEME_MANUAL, manualDark = true, systemDark = false, now = at(12)))
+        assertFalse(resolveDarkTheme(THEME_MANUAL, manualDark = false, systemDark = true, now = at(23)))
     }
 
     @Test
-    fun darkModeIgnoresSystemDarkFlag() {
-        assertTrue(resolveDarkTheme(THEME_DARK, systemDark = true))
-        assertTrue(resolveDarkTheme(THEME_DARK, systemDark = false))
+    fun followSystemUsesSystemFlag() {
+        assertTrue(resolveDarkTheme(THEME_FOLLOW_SYSTEM, false, systemDark = true, now = at(12)))
+        assertFalse(resolveDarkTheme(THEME_FOLLOW_SYSTEM, true, systemDark = false, now = at(12)))
     }
 
     @Test
-    fun invalidModeFallsBackToFollowSystem() {
-        assertTrue(resolveDarkTheme(99, systemDark = true))
-        assertFalse(resolveDarkTheme(-1, systemDark = false))
+    fun autoSunIsLightAtNoonAndDarkAtNight() {
+        assertFalse(resolveDarkTheme(THEME_AUTO_SUN, true, systemDark = true, now = at(12)))
+        assertTrue(resolveDarkTheme(THEME_AUTO_SUN, false, systemDark = false, now = at(2)))
     }
 
     @Test
     fun labelsMatchThreeModes() {
         assertEquals(3, themeModeLabels.size)
+        assertEquals("日出日落", themeModeLabels[THEME_AUTO_SUN])
         assertEquals("跟随系统", themeModeLabels[THEME_FOLLOW_SYSTEM])
-        assertEquals("浅色（白天）", themeModeLabels[THEME_LIGHT])
-        assertEquals("深色（黑夜）", themeModeLabels[THEME_DARK])
+        assertEquals("不自动切换", themeModeLabels[THEME_MANUAL])
     }
 
     @Test
-    fun rowTitleReflectsDarkState() {
-        assertEquals("深色模式", themeRowTitle(dark = true))
-        assertEquals("浅色模式", themeRowTitle(dark = false))
+    fun sunScheduleHasFormattedWindow() {
+        val text = SunSchedule.describe(at(12))
+        assertTrue(text.startsWith("约 "))
+        assertTrue(text.contains("日出"))
+        assertTrue(text.contains("日落"))
+        assertTrue(Regex("""\d{2}:\d{2}""").containsMatchIn(text))
     }
 }

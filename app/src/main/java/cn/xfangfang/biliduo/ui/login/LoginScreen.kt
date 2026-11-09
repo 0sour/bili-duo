@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import cn.xfangfang.biliduo.duo.DuoSessionViewModel
+import cn.xfangfang.biliduo.ui.theme.DuoTheme
 import cn.xfangfang.biliduo.ui.duo.duoClickable
 import cn.xfangfang.biliduo.ui.duo.duoFocusRing
 import cn.xfangfang.biliduo.ui.duo.DuoTextFieldGate
@@ -64,16 +65,16 @@ import kotlinx.coroutines.delay
 private const val QR_PIXELS = 600
 private const val QR_EXPIRY_MS = 180_000L
 
-private val LoginBg = Color(0xFF0F0F0F)
-private val LoginSurface = Color(0xFF17171A)
-private val LoginSurface2 = Color(0xFF1F1F24)
-private val LoginText = Color(0xFFF2F2F4)
-private val LoginSecondary = Color(0xFFA6A6AE)
-private val LoginTertiary = Color(0xFF73737F)
-private val LoginPink = Color(0xFFFB7299)
-private val LoginOnPink = Color(0xFF1A0710)
-private val LoginOutline = Color(0xFF2A2A31)
-private val LoginError = Color(0xFFF2555A)
+private val LoginBg: Color @Composable get() = DuoTheme.colors.bg
+private val LoginSurface: Color @Composable get() = DuoTheme.colors.surface1
+private val LoginSurface2: Color @Composable get() = DuoTheme.colors.surface2
+private val LoginText: Color @Composable get() = DuoTheme.colors.text
+private val LoginSecondary: Color @Composable get() = DuoTheme.colors.secondary
+private val LoginTertiary: Color @Composable get() = DuoTheme.colors.tertiary
+private val LoginPink: Color @Composable get() = DuoTheme.colors.pinkInk
+private val LoginOnPink: Color @Composable get() = DuoTheme.colors.onPink
+private val LoginOutline: Color @Composable get() = DuoTheme.colors.outline
+private val LoginError: Color @Composable get() = DuoTheme.colors.error
 
 private val tabLabels = listOf("扫码登录", "短信登录", "密码登录")
 
@@ -561,8 +562,8 @@ internal fun LoginFormColumn(
     }
 }
 
-internal val loginErrorColor: Color get() = LoginError
-internal val loginSecondaryColor: Color get() = LoginSecondary
-internal val loginTertiaryColor: Color get() = LoginTertiary
-internal val loginSurfaceColor: Color get() = LoginSurface
-internal val loginTextColor: Color get() = LoginText
+internal val loginErrorColor: Color @Composable get() = LoginError
+internal val loginSecondaryColor: Color @Composable get() = LoginSecondary
+internal val loginTertiaryColor: Color @Composable get() = LoginTertiary
+internal val loginSurfaceColor: Color @Composable get() = LoginSurface
+internal val loginTextColor: Color @Composable get() = LoginText

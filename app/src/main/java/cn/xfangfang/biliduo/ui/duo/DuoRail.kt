@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
+
 package cn.xfangfang.biliduo.ui.duo
 
 import androidx.compose.foundation.background
@@ -10,6 +12,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.DarkMode
+import androidx.compose.material.icons.outlined.LightMode
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -25,21 +30,23 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import cn.xfangfang.biliduo.ui.theme.DuoTheme
 import cn.xfangfang.biliduo.ui.common.DuoLogo
 import cn.xfangfang.biliduo.ui.navigation.Screen
 import cn.xfangfang.biliduo.ui.navigation.railItems
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-private val RailBg = Color(0xFF0C0C0D)
-private val RailText = Color(0xFFA6A6AE)
-private val RailPink = Color(0xFFFB7299)
+private val RailBg: Color @Composable get() = DuoTheme.colors.surface2
+private val RailText: Color @Composable get() = DuoTheme.colors.secondary
+private val RailPink: Color @Composable get() = DuoTheme.colors.pinkInk
 
 /**
  * Remembers that the rail, not the destination page, owns focus after a
@@ -96,9 +103,11 @@ fun DuoRail(
     currentRoute: String?,
     focusState: DuoRailFocusState,
     onNavigate: (Screen) -> Unit,
+    onToggleTheme: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     val itemFocuses = remember(railItems.size) { List(railItems.size) { FocusRequester() } }
+    val themeFocus = remember { FocusRequester() }
 
     DisposableEffect(focusState) {
         onDispose { focusState.reset() }
@@ -137,6 +146,9 @@ fun DuoRail(
                     .fillMaxWidth()
                     .padding(horizontal = 6.dp)
                     .focusRequester(itemFocuses[index])
+                    .focusProperties {
+                        if (index == railItems.lastIndex) down = themeFocus
+                    }
                     .onFocusChanged { focus ->
                         focusState.onItemFocus(screen.route, focus.isFocused)
                         if (!focus.isFocused && selected && focusState.locked) {
@@ -153,7 +165,7 @@ fun DuoRail(
                     .duoFocusRing(RoundedCornerShape(8.dp))
                     .clip(RoundedCornerShape(8.dp))
                     .background(
-                        if (selected) Color.White.copy(alpha = 0.07f) else Color.Transparent
+                        if (selected) DuoTheme.colors.selectionFill else Color.Transparent
                     )
                     .duoClickable {
                         // Touch/click does not move focus on its own. Focus the
@@ -180,6 +192,36 @@ fun DuoRail(
                 )
             }
             Spacer(Modifier.height(4.dp))
+        }
+        Spacer(Modifier.weight(1f))
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 6.dp)
+                .focusRequester(themeFocus)
+                .focusProperties {
+                    up = itemFocuses.lastOrNull() ?: FocusRequester.Cancel
+                    down = FocusRequester.Cancel
+                }
+                .duoFocusRing(RoundedCornerShape(8.dp))
+                .clip(RoundedCornerShape(8.dp))
+                .duoClickable(onClick = onToggleTheme)
+                .padding(vertical = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            val dark = DuoTheme.colors.isDark
+            Icon(
+                imageVector = if (dark) Icons.Outlined.LightMode else Icons.Outlined.DarkMode,
+                contentDescription = if (dark) "切换浅色模式" else "切换深色模式",
+                tint = DuoTheme.colors.secondary,
+                modifier = Modifier.size(20.dp),
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = if (dark) "浅色" else "深色",
+                color = DuoTheme.colors.secondary,
+                fontSize = 9.sp,
+            )
         }
         Spacer(Modifier.height(8.dp))
     }

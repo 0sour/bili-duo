@@ -110,7 +110,7 @@ internal fun ChannelVideoRow(
         ) {
             Text(
                 text = title,
-                color = Color.White,
+                color = DuoPalette.Text,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
                 maxLines = 2,

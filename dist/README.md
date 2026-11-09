@@ -4,6 +4,22 @@
 `*.apk`），需要时本地 `./gradlew assembleDebug` / `assembleRelease` 生成，或从
 GitHub Releases 下载。
 
+## 0.2.0-rc53（2026-11-09）
+
+- `bili-duo-0.2.0-rc53-release.apk`
+  - R8 minify，正式 release keystore 签名；可覆盖安装同 key 的 rc52。
+  - APK SHA-256：`ecfa8858fc787977431ea6db592f536be2d3054f56779bd04cb162dc1c61f7bc`
+- `bili-duo-0.2.0-rc53-debug.apk`
+  - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
+  - SHA-256：`89336646dd28c2977f4826d485ca9eb000a2532e1b07c5bb196087187a3b0f12`
+
+rc53 变更：
+- 上下双屏亮暗色主题；侧栏左下角快捷切换；设置 → 外观支持日出日落 / 跟随系统 /
+  不自动切换。日出日落按本地时间与季节估算。
+- 亮色焦点环为墨环 + 白分隔；上屏待机/预览等场景亮色，播放留边和视频/弹幕/字幕
+  保持黑色。
+- 231 单测通过。
+
 ## 0.2.0-rc52（2026-11-09）
 
 - `bili-duo-0.2.0-rc52-release.apk`

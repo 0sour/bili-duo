@@ -741,7 +741,7 @@ private fun DownloadCard(
             .background(DuoPalette.Surface)
             .border(
                 width = 2.dp,
-                color = if (contentFocused) Color.White else Color.Transparent,
+                color = if (contentFocused) DuoPalette.Text else Color.Transparent,
                 shape = shape,
             ),
         verticalAlignment = Alignment.CenterVertically,
@@ -873,7 +873,7 @@ private fun DownloadGroupHeader(
             .background(DuoPalette.Surface)
             .border(
                 width = 2.dp,
-                color = if (contentFocused) Color.White else Color.Transparent,
+                color = if (contentFocused) DuoPalette.Text else Color.Transparent,
                 shape = shape,
             ),
         verticalAlignment = Alignment.CenterVertically,
@@ -961,7 +961,7 @@ private fun DownloadSubRow(
             .background(DuoPalette.SurfaceHigh)
             .border(
                 width = 2.dp,
-                color = if (contentFocused) Color.White else Color.Transparent,
+                color = if (contentFocused) DuoPalette.Text else Color.Transparent,
                 shape = shape,
             ),
         verticalAlignment = Alignment.CenterVertically,

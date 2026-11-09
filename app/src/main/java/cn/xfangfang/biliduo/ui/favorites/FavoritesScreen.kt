@@ -641,7 +641,7 @@ private fun FolderRow(
             .background(DuoPalette.Surface)
             .border(
                 width = 2.dp,
-                color = if (contentFocused) Color.White else Color.Transparent,
+                color = if (contentFocused) DuoPalette.Text else Color.Transparent,
                 shape = shape,
             ),
         verticalAlignment = Alignment.CenterVertically,
@@ -804,7 +804,7 @@ private fun ResourceRow(
             .background(DuoPalette.Surface)
             .border(
                 width = 2.dp,
-                color = if (contentFocused) Color.White else Color.Transparent,
+                color = if (contentFocused) DuoPalette.Text else Color.Transparent,
                 shape = shape,
             ),
         verticalAlignment = Alignment.CenterVertically,
@@ -965,7 +965,7 @@ private fun FolderActionOverlay(
                             width = if (active) 2.dp else 1.dp,
                             color = when {
                                 active && index == 1 -> DuoPalette.Error
-                                active -> Color.White
+                                active -> DuoPalette.Text
                                 else -> DuoPalette.Outline
                             },
                             shape = RoundedCornerShape(8.dp),

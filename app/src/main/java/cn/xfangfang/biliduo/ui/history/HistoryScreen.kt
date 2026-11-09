@@ -438,7 +438,7 @@ private fun HistoryRow(
                 width = 2.dp,
                 // The delete button owns its own ring; lighting the whole
                 // card for it made the card border look clipped.
-                color = if (contentFocused) Color.White else Color.Transparent,
+                color = if (contentFocused) DuoPalette.Text else Color.Transparent,
                 shape = shape,
             ),
         verticalAlignment = Alignment.CenterVertically,

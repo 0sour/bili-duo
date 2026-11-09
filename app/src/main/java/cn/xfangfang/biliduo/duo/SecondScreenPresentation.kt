@@ -28,6 +28,7 @@ import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import cn.xfangfang.biliduo.ui.theme.BilibiliPureTheme
+import cn.xfangfang.biliduo.ui.theme.rememberDuoDarkTheme
 
 /**
  * Compose host on the bottom display.
@@ -88,7 +89,7 @@ class SecondScreenPresentation(
                     LocalActivityResultRegistryOwner provides owner,
                     LocalOnBackPressedDispatcherOwner provides owner,
                 ) {
-                    BilibiliPureTheme(darkTheme = true) {
+                    BilibiliPureTheme(darkTheme = rememberDuoDarkTheme()) {
                         content()
                     }
                 }

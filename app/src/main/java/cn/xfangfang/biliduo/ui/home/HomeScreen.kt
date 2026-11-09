@@ -75,6 +75,8 @@ import cn.xfangfang.biliduo.data.model.LiveFollowedAnchor
 import cn.xfangfang.biliduo.data.model.LiveRoomItem
 import cn.xfangfang.biliduo.data.model.LiveSubArea
 import cn.xfangfang.biliduo.data.model.PgcSeasonItem
+import cn.xfangfang.biliduo.ui.theme.DuoTheme
+import cn.xfangfang.biliduo.ui.common.DuoPalette
 import cn.xfangfang.biliduo.ui.duo.requestPageFocus
 import cn.xfangfang.biliduo.ui.duo.duoClickable
 import cn.xfangfang.biliduo.ui.duo.duoFocusRing
@@ -86,11 +88,11 @@ import cn.xfangfang.biliduo.util.fixPic
 import cn.xfangfang.biliduo.util.formatCount
 import kotlinx.coroutines.delay
 
-private val HomeBg = Color(0xFF0F0F0F)
-private val HomeCardBg = Color(0xFF1B1B1D)
-private val HomeText = Color(0xFFF2F2F4)
-private val HomeSecondary = Color(0xFFA6A6AE)
-private val HomePink = Color(0xFFFB7299)
+private val HomeBg: Color @Composable get() = DuoTheme.colors.bg
+private val HomeCardBg: Color @Composable get() = DuoTheme.colors.surface1
+private val HomeText: Color @Composable get() = DuoTheme.colors.text
+private val HomeSecondary: Color @Composable get() = DuoTheme.colors.secondary
+private val HomePink: Color @Composable get() = DuoTheme.colors.pinkInk
 
 // The ring is drawn outside the card, so list focus scrolling must leave this
 // much transparent space inside the focus target. Otherwise bring-into-view
@@ -311,7 +313,7 @@ fun HomeScreen(
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Text(state.error ?: "加载失败", color = Color(0xFFFF9AA9), fontSize = 12.sp)
+                    Text(state.error ?: "加载失败", color = DuoPalette.Error, fontSize = 12.sp)
                     Text(
                         text = "重试",
                         color = HomePink,
@@ -452,7 +454,7 @@ private fun RankingAreaRow(
             ) {
                 Text(
                     text = area.label,
-                    color = if (selected) HomePink else Color(0xFFE4E4EA),
+                    color = if (selected) HomePink else HomeSecondary,
                     fontSize = 10.sp,
                     fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
                 )
@@ -749,7 +751,7 @@ private fun LiveSection(
                             error != null -> Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
                             ) {
-                                Text(error, color = Color(0xFFFF9AA9), fontSize = 11.sp)
+                                Text(error, color = DuoPalette.Error, fontSize = 11.sp)
                                 Text(
                                     text = "重试",
                                     color = HomePink,
@@ -827,7 +829,7 @@ private fun LiveAreaChip(
                 if (selected) {
                     HomePink.copy(alpha = if (subtle) 0.10f else 0.18f)
                 } else {
-                    Color.White.copy(alpha = if (subtle) 0.03f else 0.06f)
+                    DuoPalette.SurfaceHigh
                 }
             )
             .border(
@@ -835,7 +837,7 @@ private fun LiveAreaChip(
                 color = if (selected) {
                     HomePink.copy(alpha = if (subtle) 0.5f else 0.8f)
                 } else {
-                    Color.White.copy(alpha = if (subtle) 0.05f else 0.08f)
+                    DuoPalette.Outline
                 },
                 shape = shape,
             )
@@ -1164,7 +1166,7 @@ private fun PgcSeasonCard(
                 if (season.rating.isNotBlank()) {
                     Text(
                         text = season.rating,
-                        color = Color(0xFFFFD166),
+                        color = DuoPalette.Error,
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Medium,
                         modifier = Modifier

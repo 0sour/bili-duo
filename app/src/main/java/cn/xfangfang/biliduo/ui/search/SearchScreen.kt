@@ -50,6 +50,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import cn.xfangfang.biliduo.ui.theme.DuoTheme
 import cn.xfangfang.biliduo.ui.duo.requestPageFocus
 import cn.xfangfang.biliduo.ui.duo.duoTabCycling
 import androidx.compose.ui.layout.ContentScale
@@ -79,12 +80,12 @@ import cn.xfangfang.biliduo.util.fixPic
 import cn.xfangfang.biliduo.util.formatCount
 import kotlinx.coroutines.delay
 
-private val SearchBg = Color(0xFF0F0F0F)
-private val SearchFieldBg = Color(0xFF1B1B1D)
-private val SearchCardBg = Color(0xFF17171A)
-private val SearchText = Color(0xFFF2F2F4)
-private val SearchSecondary = Color(0xFFA6A6AE)
-private val SearchPink = Color(0xFFFB7299)
+private val SearchBg: Color @Composable get() = DuoTheme.colors.bg
+private val SearchFieldBg: Color @Composable get() = DuoTheme.colors.surface3
+private val SearchCardBg: Color @Composable get() = DuoTheme.colors.surface1
+private val SearchText: Color @Composable get() = DuoTheme.colors.text
+private val SearchSecondary: Color @Composable get() = DuoTheme.colors.secondary
+private val SearchPink: Color @Composable get() = DuoTheme.colors.pinkInk
 
 @Composable
 fun SearchScreen(

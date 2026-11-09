@@ -96,6 +96,10 @@ import cn.xfangfang.biliduo.ui.common.DuoPalette
 import cn.xfangfang.biliduo.ui.duo.requestPageFocus
 import cn.xfangfang.biliduo.ui.duo.duoClickable
 import cn.xfangfang.biliduo.ui.duo.duoTabCycling
+import cn.xfangfang.biliduo.ui.theme.SunSchedule
+import cn.xfangfang.biliduo.ui.theme.THEME_MANUAL
+import cn.xfangfang.biliduo.ui.theme.themeModeLabels
+import cn.xfangfang.biliduo.ui.theme.themeModeOptions
 import cn.xfangfang.biliduo.ui.top.TopGlyph
 import cn.xfangfang.biliduo.ui.top.TopPanelUi
 import cn.xfangfang.biliduo.ui.duo.duoFocusRing
@@ -211,11 +215,13 @@ fun SettingsScreen(
         playerUi?.danmakuSpeed,
         downloads.size,
         storageBytes,
+        AppSettings.themeMode,
+        AppSettings.manualDark,
     ) {
         val meta = when (category) {
             1 -> Triple(TopGlyph.GAMEPAD, 0xFF9AA7FF, "实体按键位置固定，只切换固件映射。")
             2 -> Triple(TopGlyph.NETWORK, 0xFF00A1D6, "网络策略决定缓冲与流量。")
-            3 -> Triple(TopGlyph.THEME, 0xFFB18CFF, "深色界面为双屏掌机准备。")
+            3 -> Triple(TopGlyph.THEME, 0xFFB18CFF, "亮暗色、日出日落与侧栏快捷切换。")
             4 -> Triple(TopGlyph.DANMAKU, 0xFFFFB35C, "弹幕的密度、速度与屏蔽词。")
             5 -> Triple(TopGlyph.STORAGE, 0xFF6FD3A2, "本地缓存与已完成下载。")
             6 -> Triple(TopGlyph.ABOUT, 0xFFA9A9B4, "版本、许可证与开源仓库。")
@@ -228,7 +234,7 @@ fun SettingsScreen(
                 "字幕${if (videoPreference.subtitleEnabled) "开" else "关"}"
             1 -> "${gamepadStyle.label} · B 确认 / A 返回 / Y 刷新"
             2 -> "仅 WiFi 下载：${if (wifiOnlyDownload) "开" else "关"} · 当前 ${if (wifi) "WiFi" else "移动网络"}"
-            3 -> "深色主题 · 固定"
+            3 -> "${themeModeLabels[AppSettings.themeMode] ?: "不自动切换"} · ${if (AppSettings.manualDark) "深色" else "浅色"}"
             4 -> if (playerUi == null) {
                 "跟随播放控制台"
             } else {
@@ -855,22 +861,39 @@ private fun AppearanceSettings(
     backFocus: FocusRequester,
     bottomModifier: Modifier,
 ) {
-    SettingsSection("外观")
-    SettingsInfoRow(
-        title = "主题",
-        value = "深色（固定）",
+    val mode = AppSettings.themeMode
+    val modeIndex = themeModeOptions.indexOf(mode).coerceAtLeast(0)
+    SettingsSection("亮暗色")
+    SettingsValueRow(
+        title = "自动切换",
+        value = themeModeLabels[mode] ?: "不自动切换",
         focusRequester = firstFocus,
         modifier = settingsTopEdge(backFocus),
+        onClick = {
+            AppSettings.themeMode = themeModeOptions[(modeIndex + 1) % themeModeOptions.size]
+        },
     )
-    SettingsInfoRow("模式条", "底部常驻，显示当前手柄所有权")
+    SettingsValueRow(
+        title = "手动外观",
+        value = if (AppSettings.manualDark) "深色" else "浅色",
+        onClick = {
+            AppSettings.themeMode = THEME_MANUAL
+            AppSettings.manualDark = !AppSettings.manualDark
+        },
+    )
     SettingsInfoRow(
-        title = "焦点样式",
-        value = "白色焦点环 + 粉色选中态",
+        title = "日出日落",
+        value = SunSchedule.describe(),
+    )
+    SettingsInfoRow(
+        title = "快捷切换",
+        value = "侧栏左下角",
         modifier = bottomModifier,
     )
     Spacer(Modifier.height(10.dp))
     Text(
-        text = "Bili-Duo 只提供深色主题：上屏视频场景和下屏 OLED 需要稳定的对比度。",
+        text = "「日出日落」按本地时间与季节估算，约每分钟检查一次；" +
+            "侧栏快捷切换会改为手动模式。上屏播放留边始终保持黑色。",
         color = DuoPalette.Tertiary,
         fontSize = 10.sp,
         lineHeight = 14.sp,

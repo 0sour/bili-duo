@@ -67,23 +67,25 @@ import cn.xfangfang.biliduo.ui.duo.duoClickable
 import cn.xfangfang.biliduo.ui.duo.duoFocusRing
 import cn.xfangfang.biliduo.ui.duo.duoTextFieldNavigation
 import cn.xfangfang.biliduo.ui.duo.showDuoIme
+import cn.xfangfang.biliduo.ui.theme.DuoTheme
 import kotlinx.coroutines.delay
 
-/** Shared dark palette for secondary pages; mirrors Profile/Home/Console. */
+/** Shared palette for secondary pages; values follow the active light/dark theme. */
 object DuoPalette {
-    val Bg = Color(0xFF0F0F0F)
-    val Surface = Color(0xFF17171A)
-    val SurfaceHigh = Color(0xFF1F1F24)
-    val SurfaceHighest = Color(0xFF26262E)
-    val Text = Color(0xFFF2F2F4)
-    val Secondary = Color(0xFFA6A6AE)
-    val Tertiary = Color(0xFF73737F)
-    val Pink = Color(0xFFFB7299)
-    val OnPink = Color(0xFF1A0710)
-    val Outline = Color(0xFF2A2A31)
-    val Error = Color(0xFFF2555A)
-    val Success = Color(0xFF4CC38A)
-    val Scrim = Color.Black.copy(alpha = 0.66f)
+    val Bg: Color @Composable get() = DuoTheme.colors.bg
+    val Surface: Color @Composable get() = DuoTheme.colors.surface1
+    val SurfaceHigh: Color @Composable get() = DuoTheme.colors.surface2
+    val SurfaceHighest: Color @Composable get() = DuoTheme.colors.surface3
+    val Text: Color @Composable get() = DuoTheme.colors.text
+    val Secondary: Color @Composable get() = DuoTheme.colors.secondary
+    val Tertiary: Color @Composable get() = DuoTheme.colors.tertiary
+    val Pink: Color @Composable get() = DuoTheme.colors.pinkInk
+    val OnPink: Color @Composable get() = DuoTheme.colors.onPink
+    val Outline: Color @Composable get() = DuoTheme.colors.outline
+    val Error: Color @Composable get() = DuoTheme.colors.error
+    val Success: Color @Composable get() = DuoTheme.colors.success
+    val Warning: Color @Composable get() = DuoTheme.colors.warning
+    val Scrim: Color @Composable get() = DuoTheme.colors.scrim
 }
 
 @Composable
@@ -509,7 +511,7 @@ private fun ConfirmButton(
                 width = if (selected) 2.dp else 1.dp,
                 color = when {
                     selected && danger -> DuoPalette.Error
-                    selected -> Color.White
+                    selected -> DuoPalette.Text
                     else -> DuoPalette.Outline
                 },
                 shape = RoundedCornerShape(8.dp),

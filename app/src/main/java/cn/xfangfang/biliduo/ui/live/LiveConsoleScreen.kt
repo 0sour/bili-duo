@@ -102,6 +102,7 @@ import cn.xfangfang.biliduo.data.repository.BilibiliRepository
 import cn.xfangfang.biliduo.duo.DuoMode
 import cn.xfangfang.biliduo.duo.DuoOverlay
 import cn.xfangfang.biliduo.duo.DuoSessionViewModel
+import cn.xfangfang.biliduo.ui.theme.DuoTheme
 import cn.xfangfang.biliduo.ui.duo.duoClickable
 import cn.xfangfang.biliduo.ui.duo.duoFocusRing
 import cn.xfangfang.biliduo.ui.duo.DuoTextFieldGate
@@ -114,16 +115,18 @@ import cn.xfangfang.biliduo.util.formatCount
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-private val LiveBg = Color(0xFF0B0B0E)
-private val LiveSurface = Color(0xFF141418)
-private val LiveSurfaceHigh = Color(0xFF26262E)
-private val LivePink = Color(0xFFFB7299)
-private val LiveText = Color(0xFFF5F5F7)
-private val LiveTextSecondary = Color(0xFFA9A9B4)
-private val LiveTextTertiary = Color(0xFF73737F)
-private val LiveDivider = Color(0xFF2E2E38)
-private val LiveUsername = Color(0xFF7FB2F0)
-private val LiveMedal = Color(0xFFF0C674)
+private val LiveBg: Color @Composable get() = DuoTheme.colors.bg
+private val LiveSurface: Color @Composable get() = DuoTheme.colors.surface1
+private val LiveSurfaceHigh: Color @Composable get() = DuoTheme.colors.surface3
+private val LivePink: Color @Composable get() = DuoTheme.colors.pinkInk
+private val LiveText: Color @Composable get() = DuoTheme.colors.text
+private val LiveTextPrimary: Color @Composable get() = DuoTheme.colors.text
+private val LiveOnPink: Color @Composable get() = DuoTheme.colors.onPink
+private val LiveTextSecondary: Color @Composable get() = DuoTheme.colors.secondary
+private val LiveTextTertiary: Color @Composable get() = DuoTheme.colors.tertiary
+private val LiveDivider: Color @Composable get() = DuoTheme.colors.outline
+private val LiveUsername: Color @Composable get() = DuoTheme.colors.blue
+private val LiveMedal: Color @Composable get() = DuoTheme.colors.warning
 
 private const val MAX_CHAT_MESSAGES = 240
 private const val CHAT_TAB = 0
@@ -616,14 +619,14 @@ private fun LiveLeftPane(
                 if (isBuffering || ui.isLoading) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(22.dp),
-                        color = Color.White,
+                        color = LiveOnPink,
                         strokeWidth = 2.dp,
                     )
                 } else {
                     Icon(
                         imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                         contentDescription = if (isPlaying) "暂停" else "播放",
-                        tint = Color.White,
+                        tint = LiveOnPink,
                         modifier = Modifier.size(30.dp),
                     )
                 }
@@ -696,7 +699,7 @@ private fun LiveLeftPane(
             Column(Modifier.weight(1f)) {
                 Text(
                     text = detail?.anchorName?.ifBlank { "未知主播" } ?: "未知主播",
-                    color = Color.White,
+                    color = LiveTextPrimary,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,
@@ -959,7 +962,7 @@ private fun LiveConnectionBar(
     val (label, color) = when (state) {
         LiveChatState.CONNECTED -> "弹幕已连接" to LivePink
         LiveChatState.CONNECTING -> "连接弹幕…" to LiveTextSecondary
-        LiveChatState.DISCONNECTED -> "弹幕断开 · 重连中" to Color(0xFFFFB35C)
+        LiveChatState.DISCONNECTED -> "弹幕断开 · 重连中" to DuoTheme.colors.warning
     }
     Row(
         modifier = Modifier
@@ -975,7 +978,7 @@ private fun LiveConnectionBar(
         if (sendError != null) {
             Text(
                 text = sendError,
-                color = Color(0xFFFF9AA9),
+                color = DuoTheme.colors.error,
                 fontSize = 8.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -1015,7 +1018,7 @@ private fun LiveChatLine(message: LiveChatMessage) {
                 append(message.uname)
             }
             append("：")
-            withStyle(SpanStyle(color = Color.White)) {
+            withStyle(SpanStyle(color = LiveTextPrimary)) {
                 append(message.text)
             }
         },
@@ -1058,7 +1061,7 @@ private fun LiveSuperChatCard(message: LiveChatMessage) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = message.uname,
-                    color = Color.White,
+                    color = LiveTextPrimary,
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
@@ -1076,7 +1079,7 @@ private fun LiveSuperChatCard(message: LiveChatMessage) {
             Spacer(Modifier.height(2.dp))
             Text(
                 text = message.text,
-                color = Color.White,
+                color = LiveTextPrimary,
                 fontSize = 10.5.sp,
                 lineHeight = 15.sp,
                 maxLines = 4,
@@ -1142,7 +1145,7 @@ private fun LiveChatInput(
                     shape = RoundedCornerShape(7.dp),
                 )
                 .padding(horizontal = 10.dp, vertical = 8.dp),
-        textStyle = TextStyle(color = Color.White, fontSize = 11.sp),
+        textStyle = TextStyle(color = LiveTextPrimary, fontSize = 11.sp),
         cursorBrush = SolidColor(LivePink),
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
         keyboardActions = KeyboardActions(onSend = { onImeSend() }),
@@ -1180,7 +1183,7 @@ private fun LiveSendButton(
     ) {
         Text(
             text = if (sending) "发送中" else "发送",
-            color = if (enabled) Color.White else LiveTextTertiary,
+            color = if (enabled) LiveOnPink else LiveTextTertiary,
             fontSize = 10.sp,
             fontWeight = if (enabled) FontWeight.Medium else FontWeight.Normal,
         )
@@ -1224,7 +1227,7 @@ private fun LiveInfoTab(
             Column(Modifier.weight(1f)) {
                 Text(
                     text = detail?.anchorName?.ifBlank { "未知主播" } ?: "加载中…",
-                    color = Color.White,
+                    color = LiveTextPrimary,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
@@ -1254,7 +1257,7 @@ private fun LiveInfoTab(
             if (!followError.isNullOrBlank()) {
                 Text(
                     text = followError,
-                    color = Color(0xFFFF9AA9),
+                    color = DuoTheme.colors.error,
                     fontSize = 9.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -1329,7 +1332,7 @@ private fun LiveFollowButton(
             color = when {
                 !loggedIn -> LiveTextTertiary
                 followed -> LivePink
-                else -> Color.White
+                else -> LiveTextPrimary
             },
             fontSize = 10.sp,
             fontWeight = FontWeight.Medium,
@@ -1349,7 +1352,7 @@ private fun LiveStatCard(label: String, value: String, modifier: Modifier = Modi
         Spacer(Modifier.height(2.dp))
         Text(
             text = value,
-            color = Color.White,
+            color = LiveTextPrimary,
             fontSize = 12.sp,
             fontWeight = FontWeight.Medium,
             maxLines = 1,
@@ -1440,7 +1443,7 @@ private fun LiveTransportButton(
         Icon(
             imageVector = icon,
             contentDescription = description,
-            tint = if (enabled) Color.White else LiveTextTertiary,
+            tint = if (enabled) LiveTextPrimary else LiveTextTertiary,
             modifier = Modifier.size(20.dp),
         )
     }
@@ -1536,11 +1539,11 @@ private fun LiveCoverCard(detail: LiveRoomDetail?) {
                 .padding(horizontal = 5.dp, vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(Modifier.size(4.dp).clip(CircleShape).background(Color.White))
+            Box(Modifier.size(4.dp).clip(CircleShape).background(LiveOnPink))
             Spacer(Modifier.width(4.dp))
             Text(
                 text = if (detail?.isLive == true) "直播中" else "已下播",
-                color = Color.White,
+                color = LiveOnPink,
                 fontSize = 8.sp,
                 fontWeight = FontWeight.Bold,
             )
@@ -1567,13 +1570,13 @@ private fun LiveErrorBanner(message: String, onRetry: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(6.dp))
-            .background(Color(0xFF3A1519))
+            .background(DuoTheme.colors.error.copy(alpha = 0.12f))
             .padding(horizontal = 8.dp, vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             text = message,
-            color = Color(0xFFFF9AA9),
+            color = DuoTheme.colors.error,
             fontSize = 9.sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -1582,7 +1585,7 @@ private fun LiveErrorBanner(message: String, onRetry: () -> Unit) {
         Spacer(Modifier.width(6.dp))
         Text(
             text = "重试",
-            color = Color.White,
+            color = LiveTextPrimary,
             fontSize = 9.sp,
             modifier = Modifier
                 .duoFocusRing(RoundedCornerShape(4.dp))
@@ -1621,7 +1624,7 @@ private fun LiveQualityOverlay(
                 .padding(12.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("清晰度", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                Text("清晰度", color = LiveTextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
                 Spacer(Modifier.weight(1f))
                 Text(
                     "关闭",
@@ -1679,7 +1682,7 @@ private fun LiveQualityRow(
     ) {
         Text(
             text = label,
-            color = if (selected) LivePink else Color.White,
+            color = if (selected) LivePink else LiveTextPrimary,
             fontSize = 12.sp,
             modifier = Modifier.weight(1f),
         )

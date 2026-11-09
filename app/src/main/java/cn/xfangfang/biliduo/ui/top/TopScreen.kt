@@ -52,6 +52,7 @@ import coil.compose.AsyncImage
 import cn.xfangfang.biliduo.data.model.DanmakuItem
 import cn.xfangfang.biliduo.data.model.LiveChatMessage
 import cn.xfangfang.biliduo.data.model.SubtitleCue
+import cn.xfangfang.biliduo.ui.theme.DuoTheme
 import cn.xfangfang.biliduo.ui.common.DuoLogo
 import cn.xfangfang.biliduo.ui.live.LiveChatStore
 import cn.xfangfang.biliduo.ui.live.LiveDanmakuView
@@ -66,15 +67,15 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private val TopBg = Color(0xFF0B0B0E)
-private val TopSurface = Color(0xFF141418)
-private val TopSurface3 = Color(0xFF26262E)
-private val TopLine = Color(0xFF2E2E38)
-private val TopText = Color(0xFFF5F5F7)
-private val TopSecondary = Color(0xFFA9A9B4)
-private val TopTertiary = Color(0xFF73737F)
-private val TopPink = Color(0xFFFB7299)
-private val TopBlue = Color(0xFF00A1D6)
+private val TopBg: Color @Composable get() = DuoTheme.colors.bg
+private val TopSurface: Color @Composable get() = DuoTheme.colors.surface1
+private val TopSurface3: Color @Composable get() = DuoTheme.colors.surface3
+private val TopLine: Color @Composable get() = DuoTheme.colors.outline
+private val TopText: Color @Composable get() = DuoTheme.colors.text
+private val TopSecondary: Color @Composable get() = DuoTheme.colors.secondary
+private val TopTertiary: Color @Composable get() = DuoTheme.colors.tertiary
+private val TopPink: Color @Composable get() = DuoTheme.colors.pinkInk
+private val TopBlue: Color @Composable get() = DuoTheme.colors.blue
 
 /**
  * Top display host: the player Surface stays composed; the preview layer is
@@ -281,16 +282,18 @@ private fun TopReadOnlyLayer(
 
 @Composable
 private fun TopIdleScreen() {
+    val colors = DuoTheme.colors
+    val dark = colors.isDark
     Box(
         Modifier
             .fillMaxSize()
             .background(
                 Brush.linearGradient(
-                    colors = listOf(
-                        Color(0xFF120C12),
-                        TopBg,
-                        Color(0xFF071218),
-                    )
+                    colors = if (dark) {
+                        listOf(Color(0xFF120C12), TopBg, Color(0xFF071218))
+                    } else {
+                        listOf(Color(0xFFFDF4F7), TopBg, Color(0xFFF0F7FA))
+                    }
                 )
             )
     ) {
@@ -299,7 +302,7 @@ private fun TopIdleScreen() {
                 .fillMaxSize()
                 .background(
                     Brush.radialGradient(
-                        colors = listOf(TopPink.copy(alpha = 0.16f), Color.Transparent)
+                        colors = listOf(TopPink.copy(alpha = if (dark) 0.16f else 0.10f), Color.Transparent)
                     )
                 )
         )
@@ -308,7 +311,7 @@ private fun TopIdleScreen() {
                 .fillMaxSize()
                 .background(
                     Brush.radialGradient(
-                        colors = listOf(TopBlue.copy(alpha = 0.10f), Color.Transparent)
+                        colors = listOf(TopBlue.copy(alpha = if (dark) 0.10f else 0.06f), Color.Transparent)
                     )
                 )
         )
@@ -392,7 +395,7 @@ private fun TopIdleScreen() {
                                 .background(TopPink),
                             contentAlignment = Alignment.Center,
                         ) {
-                            Text("A", color = Color(0xFF1A0710), fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                            Text("B", color = DuoTheme.colors.onPink, fontSize = 8.sp, fontWeight = FontWeight.Bold)
                         }
                         Spacer(Modifier.width(7.dp))
                         Text("开始播放", color = TopText, fontSize = 9.sp)
@@ -440,8 +443,8 @@ private fun DeviceSketch() {
                 .width(270.dp)
                 .height(152.dp)
                 .clip(RoundedCornerShape(11.dp))
-                .background(Color(0xFF14171F))
-                .border(1.dp, Color.White.copy(alpha = 0.14f), RoundedCornerShape(11.dp))
+                .background(if (DuoTheme.colors.isDark) Color(0xFF14171F) else DuoTheme.colors.surface2)
+                .border(1.dp, DuoTheme.colors.outline, RoundedCornerShape(11.dp))
         ) {
             Text(
                 "TOP · VIDEO",
@@ -470,7 +473,7 @@ private fun DeviceSketch() {
                         .background(TopPink, CircleShape),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text("▶", color = Color(0xFF1A0710), fontSize = 15.sp)
+                    Text("▶", color = DuoTheme.colors.onPink, fontSize = 15.sp)
                 }
             }
         }
@@ -481,8 +484,8 @@ private fun DeviceSketch() {
                 .width(210.dp)
                 .height(142.dp)
                 .clip(RoundedCornerShape(11.dp))
-                .background(Color(0xFF141418))
-                .border(1.dp, Color.White.copy(alpha = 0.14f), RoundedCornerShape(11.dp))
+                .background(DuoTheme.colors.surface1)
+                .border(1.dp, DuoTheme.colors.outline, RoundedCornerShape(11.dp))
         ) {
             Text(
                 "BOTTOM · UI",
@@ -496,7 +499,7 @@ private fun DeviceSketch() {
                     .padding(start = 0.dp, top = 0.dp)
                     .width(22.dp)
                     .fillMaxHeight()
-                    .background(TopSurface.copy(alpha = 0.7f))
+                    .background(DuoTheme.colors.surface3)
             )
             Row(
                 modifier = Modifier
@@ -529,21 +532,24 @@ private fun TopBackdrop(
     accent: Color,
     content: @Composable () -> Unit,
 ) {
+    val colors = DuoTheme.colors
+    val dark = colors.isDark
+    val veil = if (dark) colors.bg else colors.surface1
     Box(Modifier.fillMaxSize().background(TopBg)) {
         if (!imageUrl.isNullOrBlank()) {
             AsyncImage(
                 model = fixPic(imageUrl),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize().alpha(0.18f),
+                modifier = Modifier.fillMaxSize().alpha(if (dark) 0.18f else 0.10f),
             )
             Box(
                 Modifier.fillMaxSize().background(
                     Brush.verticalGradient(
                         listOf(
-                            TopBg.copy(alpha = 0.42f),
-                            TopBg.copy(alpha = 0.88f),
-                            TopBg,
+                            veil.copy(alpha = 0.42f),
+                            veil.copy(alpha = 0.82f),
+                            veil,
                         )
                     )
                 )
@@ -552,14 +558,14 @@ private fun TopBackdrop(
         Box(
             Modifier.fillMaxSize().background(
                 Brush.radialGradient(
-                    listOf(accent.copy(alpha = 0.15f), Color.Transparent)
+                    listOf(accent.copy(alpha = if (dark) 0.15f else 0.10f), Color.Transparent)
                 )
             )
         )
         Box(
             Modifier.fillMaxSize().background(
                 Brush.radialGradient(
-                    listOf(TopBlue.copy(alpha = 0.08f), Color.Transparent)
+                    listOf(TopBlue.copy(alpha = if (dark) 0.08f else 0.05f), Color.Transparent)
                 )
             )
         )
@@ -568,7 +574,7 @@ private fun TopBackdrop(
             var x = 0f
             while (x <= size.width) {
                 drawLine(
-                    color = Color.White.copy(alpha = 0.022f),
+                    color = colors.text.copy(alpha = if (dark) 0.022f else 0.035f),
                     start = Offset(x, 0f),
                     end = Offset(x, size.height),
                     strokeWidth = 1f,
@@ -578,7 +584,7 @@ private fun TopBackdrop(
             var y = 0f
             while (y <= size.height) {
                 drawLine(
-                    color = Color.White.copy(alpha = 0.022f),
+                    color = colors.text.copy(alpha = if (dark) 0.022f else 0.035f),
                     start = Offset(0f, y),
                     end = Offset(size.width, y),
                     strokeWidth = 1f,

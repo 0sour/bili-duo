@@ -396,7 +396,7 @@ private fun FollowingRow(
             .background(DuoPalette.Surface)
             .border(
                 width = 2.dp,
-                color = if (contentFocused) Color.White else Color.Transparent,
+                color = if (contentFocused) DuoPalette.Text else Color.Transparent,
                 shape = shape,
             ),
         verticalAlignment = Alignment.CenterVertically,

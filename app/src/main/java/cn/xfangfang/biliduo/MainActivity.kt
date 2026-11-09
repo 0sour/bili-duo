@@ -104,7 +104,11 @@ import cn.xfangfang.biliduo.ui.top.TopPanelUi
 import cn.xfangfang.biliduo.ui.top.TopPersonUi
 import cn.xfangfang.biliduo.ui.top.TopPreviewUi
 import cn.xfangfang.biliduo.ui.settings.SettingsScreen
+import cn.xfangfang.biliduo.data.local.AppSettings
 import cn.xfangfang.biliduo.ui.theme.BilibiliPureTheme
+import cn.xfangfang.biliduo.ui.theme.DuoTheme
+import cn.xfangfang.biliduo.ui.theme.THEME_MANUAL
+import cn.xfangfang.biliduo.ui.theme.rememberDuoDarkTheme
 
 class MainActivity : ComponentActivity() {
 
@@ -194,7 +198,7 @@ class MainActivity : ComponentActivity() {
             BilibiliRepository().flushPendingReports(pending)
         }
         setContent {
-            BilibiliPureTheme(darkTheme = true) {
+            BilibiliPureTheme(darkTheme = rememberDuoDarkTheme()) {
                 LaunchedEffect(secondScreenAvailable) {
                     playerController.setEnabled(secondScreenAvailable)
                 }
@@ -362,6 +366,7 @@ fun MainScreen(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
     val railFocusState = rememberDuoRailFocusState()
+    val isDarkTheme = DuoTheme.colors.isDark
     var showGamepadSetup by remember { mutableStateOf(!GamepadStyleStore.hasChosen()) }
 
     val keyboard = LocalSoftwareKeyboardController.current
@@ -489,6 +494,10 @@ fun MainScreen(
                     DuoRail(
                         currentRoute = currentDestination?.route,
                         focusState = railFocusState,
+                        onToggleTheme = {
+                            AppSettings.themeMode = THEME_MANUAL
+                            AppSettings.manualDark = !isDarkTheme
+                        },
                         onNavigate = { screen ->
                             navController.navigate(screen.route) {
                                 popUpTo(navController.graph.findStartDestination().id) {

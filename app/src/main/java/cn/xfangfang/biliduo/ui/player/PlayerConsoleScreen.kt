@@ -103,6 +103,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
+import cn.xfangfang.biliduo.ui.theme.DuoTheme
 import cn.xfangfang.biliduo.ui.common.DuoPillButton
 import cn.xfangfang.biliduo.ui.common.DuoZoomableImage
 import cn.xfangfang.biliduo.ui.common.rememberImageZoomState
@@ -136,13 +137,14 @@ import cn.xfangfang.biliduo.util.fixPic
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-private val DuoBg = Color(0xFF0B0B0E)
-private val DuoSurface = Color(0xFF141418)
-private val DuoSurfaceHigh = Color(0xFF26262E)
-private val DuoPink = Color(0xFFFB7299)
-private val DuoTextSecondary = Color(0xFFA9A9B4)
-private val DuoTextTertiary = Color(0xFF73737F)
-private val DuoDivider = Color(0xFF2E2E38)
+private val DuoBg: Color @Composable get() = DuoTheme.colors.bg
+private val DuoSurface: Color @Composable get() = DuoTheme.colors.surface1
+private val DuoSurfaceHigh: Color @Composable get() = DuoTheme.colors.surface3
+private val DuoPink: Color @Composable get() = DuoTheme.colors.pinkInk
+private val DuoTextPrimary: Color @Composable get() = DuoTheme.colors.text
+private val DuoTextSecondary: Color @Composable get() = DuoTheme.colors.secondary
+private val DuoTextTertiary: Color @Composable get() = DuoTheme.colors.tertiary
+private val DuoDivider: Color @Composable get() = DuoTheme.colors.outline
 
 private val speedOptions = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f)
 
@@ -1048,7 +1050,7 @@ fun PlayerConsoleScreen(
                     Spacer(Modifier.width(4.dp))
                     Text(
                         text = ui.title.ifBlank { if (ui.isLoading) "正在加载…" else "未选择视频" },
-                        color = Color(0xFFF5F5F7),
+                        color = DuoTextPrimary,
                         fontSize = 17.sp,
                         lineHeight = 22.sp,
                         fontWeight = FontWeight.Bold,
@@ -1146,7 +1148,7 @@ fun PlayerConsoleScreen(
                         },
                         valueRange = 0f..duration.toFloat(),
                         colors = SliderDefaults.colors(
-                            thumbColor = Color.White,
+                            thumbColor = DuoPink,
                             activeTrackColor = DuoPink,
                             inactiveTrackColor = DuoDivider,
                         ),
@@ -1230,7 +1232,7 @@ fun PlayerConsoleScreen(
                             }
                             .then(
                                 if (playFocused) {
-                                    Modifier.border(2.dp, Color.White, CircleShape)
+                                    Modifier.border(2.dp, DuoTheme.colors.onPink, CircleShape)
                                 } else {
                                     Modifier
                                 }
@@ -1246,14 +1248,14 @@ fun PlayerConsoleScreen(
                         if (playback.isBuffering || ui.isLoading) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(22.dp),
-                                color = Color.White,
+                                color = DuoTheme.colors.onPink,
                                 strokeWidth = 2.dp,
                             )
                         } else {
                             Icon(
                                 imageVector = if (playback.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                                 contentDescription = if (playback.isPlaying) "暂停" else "播放",
-                                tint = Color.White,
+                                tint = DuoTheme.colors.onPink,
                                 modifier = Modifier.size(30.dp),
                             )
                         }
@@ -1491,7 +1493,7 @@ fun PlayerConsoleScreen(
                                 } else {
                                     "P${nextPage.page} ${nextPage.part.ifBlank { "第 ${nextPage.page} 话" }}"
                                 },
-                                color = Color(0xFFF5F5F7),
+                                color = DuoTextPrimary,
                                 fontSize = 11.sp,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
@@ -1755,13 +1757,13 @@ fun PlayerConsoleScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color(0xFF3A1519))
+                    .background(DuoTheme.colors.error.copy(alpha = 0.12f))
                     .padding(horizontal = 12.dp, vertical = 3.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
                     text = errorText,
-                    color = Color(0xFFFF9AA9),
+                    color = DuoTheme.colors.error,
                     fontSize = 11.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -1769,7 +1771,7 @@ fun PlayerConsoleScreen(
                 )
                 Text(
                     text = "重试",
-                    color = Color.White,
+                    color = DuoTextPrimary,
                     fontSize = 11.sp,
                     modifier = Modifier
                         .duoFocusRing(RoundedCornerShape(5.dp))
@@ -2089,7 +2091,7 @@ fun PlayerConsoleScreen(
                                 Spacer(Modifier.width(8.dp))
                                 Text(
                                     text = "P${page.page}  ${page.part.ifBlank { "分P ${page.page}" }}",
-                                    color = if (checked) Color.White else DuoTextSecondary,
+                                    color = if (checked) DuoTheme.colors.pinkInk else DuoTextSecondary,
                                     fontSize = 11.sp,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
@@ -2166,7 +2168,7 @@ fun PlayerConsoleScreen(
                 ) {
                     Text(
                         text = if (coinBusy) "投币中…" else "确认投 $amount 枚",
-                        color = Color.White,
+                        color = DuoTheme.colors.onPink,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
                     )
@@ -2350,15 +2352,15 @@ fun PlayerConsoleScreen(
                             label = { Text("用逗号或空格分隔", fontSize = 11.sp) },
                             singleLine = true,
                             textStyle = androidx.compose.ui.text.TextStyle(
-                                color = Color.White,
+                                color = DuoTextPrimary,
                                 fontSize = 12.sp,
                             ),
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                             keyboardActions = KeyboardActions(onDone = { applyBlockedWords() }),
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White,
-                                disabledTextColor = Color.White,
+                                focusedTextColor = DuoTextPrimary,
+                                unfocusedTextColor = DuoTextPrimary,
+                                disabledTextColor = DuoTextPrimary,
                                 focusedContainerColor = DuoSurfaceHigh,
                                 unfocusedContainerColor = DuoSurfaceHigh,
                                 disabledContainerColor = DuoSurfaceHigh,
@@ -2683,7 +2685,7 @@ private fun IntroTab(
         if (info == null) {
             Text(
                 text = uiState.title.ifBlank { "本地视频" },
-                color = Color.White,
+                color = DuoTextPrimary,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
             )
@@ -2711,7 +2713,7 @@ private fun IntroTab(
             Column(Modifier.weight(1f)) {
                 Text(
                     text = info.title,
-                    color = Color.White,
+                    color = DuoTextPrimary,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
                     maxLines = 2,
@@ -2799,7 +2801,7 @@ private fun IntroTab(
                     Column(Modifier.weight(1f)) {
                         Text(
                             text = info.owner.name,
-                            color = Color.White,
+                            color = DuoTextPrimary,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium,
                             maxLines = 1,
@@ -2896,7 +2898,7 @@ private fun IntroTab(
         }
 
         Spacer(Modifier.height(8.dp))
-        Text("简介", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        Text("简介", color = DuoTextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
         Spacer(Modifier.height(3.dp))
         Text(
             text = info.desc.ifBlank { "暂无简介" },
@@ -2998,7 +3000,7 @@ private fun CommentsTab(
                         verticalArrangement = Arrangement.Center,
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
-                        Text(error, color = Color(0xFFFF9AA9), fontSize = 11.sp)
+                        Text(error, color = DuoTheme.colors.error, fontSize = 11.sp)
                         Text(
                             text = "重试",
                             color = DuoPink,
@@ -3207,7 +3209,7 @@ private fun CommentRow(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = comment.member.uname,
-                        color = Color(0xFFF5F5F7),
+                        color = DuoTextPrimary,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Medium,
                         maxLines = 1,
@@ -3226,7 +3228,7 @@ private fun CommentRow(
                     comment.content.message.count { it == '\n' } >= 3
                 Text(
                     text = comment.content.message,
-                    color = Color(0xFFF5F5F7),
+                    color = DuoTextPrimary,
                     fontSize = 11.5.sp,
                     lineHeight = 17.sp,
                     maxLines = if (bodyExpanded) Int.MAX_VALUE else 3,
@@ -3310,7 +3312,7 @@ private fun CommentRow(
                     repliesError != null && replies.isEmpty() -> {
                         Text(
                             text = repliesError,
-                            color = Color(0xFFFF9AA9),
+                            color = DuoTheme.colors.error,
                             fontSize = 9.sp,
                             modifier = Modifier.padding(vertical = 5.dp),
                         )
@@ -3369,7 +3371,7 @@ private fun CommentRow(
                         if (repliesError != null && replies.isNotEmpty()) {
                             Text(
                                 text = repliesError,
-                                color = Color(0xFFFF9AA9),
+                                color = DuoTheme.colors.error,
                                 fontSize = 8.5.sp,
                                 modifier = Modifier.padding(vertical = 3.dp),
                             )
@@ -3424,7 +3426,7 @@ private fun ReplyRow(
             Spacer(Modifier.height(2.dp))
             Text(
                 text = reply.content.message,
-                color = Color(0xFFE8E8EE),
+                color = DuoTextPrimary,
                 fontSize = 10.5.sp,
                 lineHeight = 15.sp,
                 maxLines = 3,
@@ -3536,7 +3538,7 @@ private fun RelatedTab(
                         Column(Modifier.weight(1f)) {
                             Text(
                                 text = item.title,
-                                color = Color.White,
+                                color = DuoTextPrimary,
                                 fontSize = 11.sp,
                                 maxLines = 2,
                                 overflow = TextOverflow.Ellipsis,
@@ -3600,7 +3602,7 @@ private fun PartsTab(
                     )
                     Text(
                         text = page.part.ifBlank { "第 ${page.page} 话" },
-                        color = if (selected) Color.White else Color(0xFFD8D8DE),
+                        color = if (selected) DuoTheme.colors.pinkInk else DuoTextSecondary,
                         fontSize = 11.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -3835,7 +3837,7 @@ private fun DanmakuInputField(
                     shape = RoundedCornerShape(8.dp),
                 )
                 .padding(horizontal = 10.dp, vertical = 10.dp),
-            textStyle = TextStyle(color = Color.White, fontSize = 12.sp),
+            textStyle = TextStyle(color = DuoTextPrimary, fontSize = 12.sp),
             cursorBrush = SolidColor(DuoPink),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
             keyboardActions = KeyboardActions(onSend = { onIme() }),
@@ -3890,7 +3892,7 @@ private fun CommentSendOverlay(
                     value = text,
                     onValueChange = onText,
                     enabled = editing,
-                    textStyle = TextStyle(color = Color.White, fontSize = 12.sp),
+                    textStyle = TextStyle(color = DuoTextPrimary, fontSize = 12.sp),
                     minLines = 3,
                     maxLines = 5,
                     colors = OutlinedTextFieldDefaults.colors(
@@ -3901,9 +3903,9 @@ private fun CommentSendOverlay(
                         unfocusedBorderColor = DuoDivider,
                         disabledBorderColor = if (gateFocused) DuoPink else DuoDivider,
                         cursorColor = DuoPink,
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        disabledTextColor = Color.White,
+                        focusedTextColor = DuoTextPrimary,
+                        unfocusedTextColor = DuoTextPrimary,
+                        disabledTextColor = DuoTextPrimary,
                     ),
                     shape = RoundedCornerShape(8.dp),
                     modifier = Modifier
@@ -4110,7 +4112,7 @@ private fun OverlayCard(
                 .padding(12.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(title, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                Text(title, color = DuoTextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
                 Spacer(Modifier.weight(1f))
                 Text(
                     text = "关闭",
@@ -4160,7 +4162,7 @@ private fun DownloadQualityChip(
     ) {
         Text(
             text = label,
-            color = if (selected) DuoPink else Color.White,
+            color = if (selected) DuoPink else DuoTextPrimary,
             fontSize = 10.sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -4196,7 +4198,7 @@ private fun OverlayRow(
     ) {
         Text(
             text = label,
-            color = if (selected) DuoPink else Color.White,
+            color = if (selected) DuoPink else DuoTextPrimary,
             fontSize = 12.sp,
             modifier = Modifier.weight(1f),
         )
@@ -4226,7 +4228,7 @@ private fun TransportButton(
         Icon(
             imageVector = icon,
             contentDescription = description,
-            tint = if (enabled) Color.White else Color(0xFF5A5A60),
+            tint = if (enabled) DuoTextPrimary else DuoTheme.colors.tertiary,
             modifier = Modifier.size(22.dp),
         )
     }
@@ -4297,7 +4299,7 @@ private fun ConsoleChip(
     ) {
         Text(
             text = text,
-            color = if (active) DuoPink else Color(0xFFE4E4EA),
+            color = if (active) DuoPink else DuoTextSecondary,
             fontSize = 9.5.sp,
             maxLines = 1,
         )
@@ -4325,7 +4327,7 @@ private fun ConsoleIconChip(
         Icon(
             imageVector = icon,
             contentDescription = description,
-            tint = Color(0xFFE4E4EA),
+            tint = DuoTextSecondary,
             modifier = Modifier.size(14.dp),
         )
     }
@@ -4351,7 +4353,7 @@ private fun DanmakuSettingRow(
     ) {
         Text(
             text = label,
-            color = Color.White,
+            color = DuoTextPrimary,
             fontSize = 12.sp,
             modifier = Modifier.weight(1f),
         )
@@ -4386,7 +4388,7 @@ private fun OverlayActionButton(
     ) {
         Text(
             text = text,
-            color = if (primary) Color(0xFF1A0710) else Color.White,
+            color = if (primary) DuoTheme.colors.onPink else DuoTextPrimary,
             fontSize = 12.sp,
             fontWeight = FontWeight.Medium,
         )
@@ -4487,7 +4489,7 @@ private fun ConsoleTab(
         Row(verticalAlignment = Alignment.Bottom) {
             Text(
                 text = text,
-                color = if (selected) Color(0xFFF5F5F7) else DuoTextSecondary,
+                color = if (selected) DuoTextPrimary else DuoTextSecondary,
                 fontSize = 12.sp,
                 fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
             )
@@ -4536,11 +4538,11 @@ private fun ActionPill(
         Icon(
             imageVector = icon,
             contentDescription = text,
-            tint = if (active) DuoPink else Color(0xFFD8D8DE),
+            tint = if (active) DuoPink else DuoTextSecondary,
             modifier = Modifier.size(14.dp),
         )
         Spacer(Modifier.width(4.dp))
-        Text(text, color = if (active) DuoPink else Color(0xFFD8D8DE), fontSize = 10.sp)
+        Text(text, color = if (active) DuoPink else DuoTextSecondary, fontSize = 10.sp)
     }
 }
 
@@ -4627,7 +4629,7 @@ private fun DanmakuPositionRow(mode: Int, onMode: (Int) -> Unit) {
             ) {
                 Text(
                     text = label,
-                    color = if (selected) DuoPink else Color(0xFFD8D8DE),
+                    color = if (selected) DuoPink else DuoTextSecondary,
                     fontSize = 10.sp,
                 )
             }
@@ -4650,7 +4652,7 @@ private fun DanmakuOptionRow(
     ) {
         Text(
             text = label,
-            color = Color.White,
+            color = DuoTextPrimary,
             fontSize = 12.sp,
             modifier = Modifier.width(44.dp),
         )
