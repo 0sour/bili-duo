@@ -221,7 +221,7 @@ fun ChannelScreen(
             TopAmbientUi(
                 eyebrow = "SPACE / UP 主空间",
                 title = name ?: "UP 主空间",
-                subtitle = "下屏浏览视频与合集；A 播放，B 返回。",
+                subtitle = "下屏浏览视频与合集；B 播放，A 返回。",
                 hint = "上屏只读 · 焦点视频显示预览",
                 glyph = TopGlyph.PERSON,
             )

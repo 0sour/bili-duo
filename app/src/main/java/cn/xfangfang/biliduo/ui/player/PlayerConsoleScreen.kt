@@ -1528,11 +1528,11 @@ fun PlayerConsoleScreen(
 
                 Spacer(Modifier.weight(1f))
                 Text(
-                    text = "方向键选择 · A 确认 · B 返回\n" +
+                    text = "方向键选择 · B 确认 · A 返回\n" +
                         if (selectedTab == TAB_COMMENTS) {
-                            "LB/RB 切 tab · L2/R2 评论排序 · X 弹幕 · START 弹幕/字幕"
+                            "LB/RB 切 tab · L2/R2 评论排序 · Y 弹幕 · START 弹幕/字幕"
                         } else {
-                            "LB/RB 切换 tab · X 弹幕 · START 弹幕/字幕"
+                            "LB/RB 切换 tab · Y 弹幕 · START 弹幕/字幕"
                         },
                     color = DuoTextTertiary,
                     fontSize = 9.5.sp,
@@ -2460,7 +2460,7 @@ fun PlayerConsoleScreen(
                         )
                     }
                     Text(
-                        text = "L1/R1 切标签 · 方向键选择 · B 关闭",
+                        text = "L1/R1 切标签 · 方向键选择 · A 关闭",
                         color = DuoTextTertiary,
                         fontSize = 9.sp,
                         modifier = Modifier.padding(top = 2.dp, bottom = 2.dp),
@@ -3774,7 +3774,7 @@ private fun CommentImageViewerOverlay(
             )
         }
         Text(
-            text = "方向键切换 · R2/L2 缩放 · 左摇杆/拖动移动 · 双指缩放 · B 关闭",
+            text = "方向键切换 · R2/L2 缩放 · 左摇杆/拖动移动 · 双指缩放 · A 关闭",
             color = DuoTextTertiary,
             fontSize = 9.sp,
             modifier = Modifier

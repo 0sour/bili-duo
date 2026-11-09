@@ -152,7 +152,7 @@ data class TopPreviewUi(
     val eyebrow: String = "● 已选择 · 即将播放",
     val metaLine: String? = null,
     val ownerLabel: String = "UP 主",
-    val actionHint: String = "开始播放 · B 返回",
+    val actionHint: String = "开始播放 · A 返回",
 )
 
 data class TopScreenUiState(

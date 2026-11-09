@@ -148,7 +148,7 @@ fun SearchScreen(
                 TopAmbientUi(
                     eyebrow = "SEARCH / 搜索",
                     title = "正在输入「${state.query.trim()}」。",
-                    subtitle = "下屏选择搜索建议，A 直接搜索；上屏只展示结果预览。",
+                    subtitle = "下屏选择搜索建议，B 直接搜索；上屏只展示结果预览。",
                     glyph = TopGlyph.SEARCH,
                 )
             )
@@ -848,7 +848,7 @@ private fun SortRow(
         }
         Spacer(Modifier.weight(1f))
         Text(
-            text = "Y 切排序",
+            text = "L2/R2 排序",
             color = SearchSecondary.copy(alpha = 0.7f),
             fontSize = 9.sp,
         )
@@ -1148,9 +1148,9 @@ private fun searchAmbient(state: SearchUiState, searchFocused: Boolean): TopAmbi
         searchFocused -> {
             title = "搜索「${state.query}」。"
             subtitle = if (isUser) {
-                "共 $itemCount 位用户；方向键回到结果列表，A 进入 UP 主空间。"
+                "共 $itemCount 位用户；方向键回到结果列表，B 进入 UP 主空间。"
             } else {
-                "共 $itemCount 条结果；方向键回到结果列表，A 直接播放。"
+                "共 $itemCount 条结果；方向键回到结果列表，B 直接播放。"
             }
         }
         else -> {

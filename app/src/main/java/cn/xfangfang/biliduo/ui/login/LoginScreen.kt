@@ -111,7 +111,7 @@ fun LoginScreen(
             }
             is LoginUiState.Expired -> {
                 title = "二维码已失效。"
-                subtitle = "在下屏按 A 刷新二维码，或改用短信、密码登录。"
+                subtitle = "在下屏按 B 刷新二维码，或改用短信、密码登录。"
             }
             is LoginUiState.Error -> {
                 title = "登录没有完成。"
@@ -336,7 +336,7 @@ private fun QrLoginContent(
                     )
                     Spacer(Modifier.height(6.dp))
                     Text(
-                        text = "二维码 $remainingSeconds 秒后失效，A 刷新",
+                        text = "二维码 $remainingSeconds 秒后失效，B 刷新",
                         color = LoginTertiary,
                         fontSize = 11.sp,
                     )

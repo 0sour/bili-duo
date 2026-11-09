@@ -455,7 +455,7 @@ fun FavoritesScreen(
                                 description = "打开收藏夹后，可在下屏浏览其中的视频。",
                                 metaLine = "${folder.mediaCount} 个内容 · ${privacyLabel(folder.attr)}",
                                 ownerName = "",
-                                actionHint = "打开收藏夹 · B 返回",
+                                actionHint = "打开收藏夹 · A 返回",
                             )
                         )
                     },

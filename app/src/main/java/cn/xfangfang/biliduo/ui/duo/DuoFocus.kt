@@ -460,15 +460,15 @@ fun DuoModeBar(
     }
     val middle = when {
         !enabled || !gamepadConnected -> null
-        overlay != null -> "B 关闭 · 方向键选择"
-        !playerActive -> "B 返回"
-        else -> "B 返回"
+        overlay != null -> "A 关闭 · 方向键选择"
+        !playerActive -> "A 返回"
+        else -> "A 返回"
     }
     val right = when {
         !enabled || !gamepadConnected -> null
-        overlay != null -> "A 确认"
-        !playerActive -> "A 确认"
-        else -> "A 确认"
+        overlay != null -> "B 确认"
+        !playerActive -> "B 确认"
+        else -> "B 确认"
     }
     val dotColor = when {
         !enabled || !gamepadConnected -> Muted

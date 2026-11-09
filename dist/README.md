@@ -4,6 +4,23 @@
 `*.apk`），需要时本地 `./gradlew assembleDebug` / `assembleRelease` 生成，或从
 GitHub Releases 下载。
 
+## 0.2.0-rc51（2026-11-09）
+
+- `bili-duo-0.2.0-rc51-release.apk`
+  - R8 minify，正式 release keystore 签名；可覆盖安装同 key 的 rc50。
+  - APK SHA-256：`e067bdfbfa28e46b9c45c000d974f5257fc1efaf9e17ffaad6bb2e7f32f59ea3`
+- `bili-duo-0.2.0-rc51-debug.apk`
+  - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
+  - SHA-256：`f21ffc0a61f42db5be5fc96a76d0b321a8bd2cf82a1153e6bfd2bc5b51bee587`
+
+rc51 变更：
+- RP Duo 手柄风格：设置 → 播放 → 手柄可选 Xbox / Retro；首次启动显示选择页，
+  可跳过并默认 Xbox。Retro 在 `InputRouter` 入口做 A↔B、X↔Y 归一化。
+- 实体位置功能固定：B 确认、A 返回、Y 刷新/弹幕/点赞/复制；屏幕提示统一改为
+  实体丝印，X（物理上方）不绑定。
+- Duo 实测：Xbox 96/97/99 = 确认/返回/刷新；Retro 97/96/100 =
+  确认/返回/刷新；切换设置立即生效。232 单测通过。
+
 ## 0.2.0-rc50（2026-11-08）
 
 已发布：https://github.com/0sour/bili-duo/releases/tag/v0.2.0-rc50

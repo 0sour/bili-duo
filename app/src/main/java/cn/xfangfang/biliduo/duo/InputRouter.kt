@@ -5,6 +5,8 @@ import android.util.Log
 import android.view.KeyEvent
 import cn.xfangfang.biliduo.BilibiliApp
 import cn.xfangfang.biliduo.BuildConfig
+import cn.xfangfang.biliduo.data.local.GamepadStyle
+import cn.xfangfang.biliduo.data.local.GamepadStyleStore
 
 /**
  * Single owner of gamepad/keyboard events coming from the top Activity.
@@ -17,12 +19,14 @@ import cn.xfangfang.biliduo.BuildConfig
 class InputRouter(
     private val session: DuoSessionViewModel,
     private val bridge: BottomUiBridge,
+    private val styleProvider: () -> GamepadStyle = { GamepadStyleStore.current() },
 ) {
     private val handledDown = mutableSetOf<Int>()
     private val forwardedDown = mutableSetOf<Int>()
     private val lastDownAt = mutableMapOf<Int, Long>()
 
-    fun dispatch(event: KeyEvent): Boolean {
+    fun dispatch(rawEvent: KeyEvent): Boolean {
+        val event = normalizeFaceButtons(rawEvent)
         return when (event.action) {
             KeyEvent.ACTION_DOWN -> onDown(event)
             KeyEvent.ACTION_UP -> {
@@ -109,6 +113,23 @@ class InputRouter(
         // X / START / LB / RB stay routed to the console; each screen decides
         // whether they are meaningful.
         return forward(event)
+    }
+
+    /**
+     * The handheld-style option only changes face-button keycodes. Every
+     * bottom-UI handler keeps the canonical Xbox layout, so normalizing here
+     * preserves the physical actions in both styles.
+     */
+    private fun normalizeFaceButtons(event: KeyEvent): KeyEvent {
+        val mapped = styleProvider().normalizeFaceKey(event.keyCode)
+        if (mapped == event.keyCode) return event
+        return KeyEvent(
+            event.downTime,
+            event.eventTime,
+            event.action,
+            mapped,
+            event.repeatCount,
+        )
     }
 
     private fun forward(event: KeyEvent): Boolean {

@@ -10,22 +10,22 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc50-FB7299">
+  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc51-FB7299">
   <img alt="status" src="https://img.shields.io/badge/status-test%20build-orange">
   <img alt="Android" src="https://img.shields.io/badge/Android-24%2B-3DDC84?logo=android&logoColor=white">
   <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-1.9.23-7F52FF?logo=kotlin&logoColor=white">
   <img alt="Compose" src="https://img.shields.io/badge/Jetpack%20Compose-2024.04-4285F4?logo=jetpackcompose&logoColor=white">
   <img alt="Media3" src="https://img.shields.io/badge/Media3-1.4.1-FF6D00">
-  <img alt="tests" src="https://img.shields.io/badge/tests-228%20passing-brightgreen">
+  <img alt="tests" src="https://img.shields.io/badge/tests-232%20passing-brightgreen">
   <img alt="license" src="https://img.shields.io/badge/license-MIT-blue">
 </p>
 
 上屏只负责视频画面，下屏用一块 `Presentation` 承载完整 UI；手柄和触摸共用同一棵
 Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，也没有上屏 OSD。
 
-> 当前版本：**0.2.0-rc50**（versionCode 51） · [GitHub Pre-release](https://github.com/0sour/bili-duo/releases/tag/v0.2.0-rc50)
-> 状态：功能完整的 **测试版 RC**，228 个单元测试通过；Duo 已完成本轮侧栏焦点、
-> L1/R1 标签、视频默认值、物理输入与图片查看器复测，用户反馈无明显 bug。
+> 当前版本：**0.2.0-rc51**（versionCode 52，待发布）
+> 状态：功能完整的 **本地测试版**，232 个单元测试通过；rc50 已在 Duo 完成侧栏焦点、
+> L1/R1 标签、视频默认值、物理输入与图片查看器复测。rc51 新增 RP Duo 手柄风格适配。
 
 ## 界面预览
 
@@ -53,12 +53,14 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
   下屏 `Presentation` 中；`canHostTasks=false` 的设备也能正常显示。
 - **单焦点模型**：`BROWSE / PLAYER / OVERLAY` 三种状态，不再有
   `TOP_PLAYER ↔ BOTTOM_UI` 双模式和 Y 键切换。
-- **键位**：D-pad 移动焦点，A 确认，B 逐级返回，X 弹幕开关，START 弹幕/字幕设置，
-  LB/RB 切换右栏 tab；Y 不绑定。进度条可聚焦，左右键 ±10s。
+- **键位**：屏幕提示使用实体丝印：D-pad 移动焦点，**B 确认，A 逐级返回，Y 刷新/
+  弹幕/点赞**，START 弹幕/字幕设置，LB/RB 切换右栏 tab。进度条可聚焦，左右键 ±10s。
+- **手柄风格**：设置 → 播放可选 **Xbox / Retro**。实体位置功能不变；Retro 固件
+  输出的 A/B、X/Y 会在 `InputRouter` 中归一化。首次启动可选择，可跳过（默认 Xbox）。
 - **肩键快捷键**：L1/R1 切一级 tab（搜索页切视频/用户），L2/R2 切二级筛选行；
   长按只走一格。
 - **overlay 独占**：清晰度、倍速、弹幕设置、发送、图片查看等打开时独占输入，
-  B 只关闭 overlay，不退出播放。
+  A 只关闭 overlay，不退出播放。
 
 ### 内容
 
@@ -78,13 +80,13 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
   底部泳道、暂停冻结、seek 重建；下屏开关、透明度/速度/字号/显示区域、屏蔽词、
   同屏上限；普通视频支持发送与撤回。
 - **字幕**：多字幕轨选择、开关、上屏只读字幕层；控制台「播放设置」内可调字号/
-  背景/位置，样式全局持久化。
+  背景/位置，播放页修改只作用于当前视频；默认值在 设置 → 播放。
 - **直播**：分区 chips（一级 + 子分区）、关注主播行、双列房间、HLS 播放、
   双栏控制台、实时弹幕/SC、清晰度/音量、直播信息；网格下滚时收起二级筛选行。
 - **动态**：关注动态流、全部/视频/图文筛选、UP 主筛选、视频直达播放、图文详情/
-  画册/纯文字阅读，上屏同步只读场景；卡片头部显示点赞状态与数量，A/触摸可点赞，
-  手柄 X 直接点赞/取消（优化请求、失败回滚）；转发/发布仍只读。
-- **账号**：扫码 / 短信 / 密码三 tab 登录，二维码倒计时、A 刷新、极验 WebView；
+  画册/纯文字阅读，上屏同步只读场景；卡片头部显示点赞状态与数量，B/触摸可点赞，
+  手柄 Y 直接点赞/取消（优化请求、失败回滚）；转发/发布仍只读。
+- **账号**：扫码 / 短信 / 密码三 tab 登录，二维码倒计时、B 刷新、极验 WebView；
   个人中心、历史、收藏、关注、下载、设置等二级页均为深色手柄 UI。设置页为
   双栏焦点闭环：分类栏可聚焦，←/→ 在分类与内容之间切换，L1/R1 切分类，
   内容行逐行聚焦、首尾止步，卡片间距保证焦点环完整。
@@ -130,17 +132,17 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
 
 ### 已验证
 
-- **单元测试**：228 个用例通过（`./gradlew testDebugUnitTest`）。
+- **单元测试**：232 个用例通过（`./gradlew testDebugUnitTest`）。
 - **MuMu（1280×960 / 320dpi）**：双屏壳层、首页、搜索、播放控制台、直播列表与
   HLS 播放、动态空态/登录态、单屏回退提示、签名包安装与冷启动。
 - **Retroid Pocket Duo 真机**：
   - 双屏冷启动、上屏视频、下屏触摸与系统 IME、后台恢复。
-  - 视频：初始聚焦播放键、A 暂停、进度 ±10s/seek、X 弹幕、START 弹幕/字幕设置、
-    B 从右栏回播放键、再 B 退出。
-  - 直播：初始聚焦、LB/RB 切 tab、输入框 B 收键盘、B 层级退出、触摸直点。
+  - 视频：初始聚焦播放键、B 暂停、进度 ±10s/seek、Y 弹幕、START 弹幕/字幕设置、
+    A 从右栏回播放键、再 A 退出。
+  - 直播：初始聚焦、LB/RB 切 tab、输入框 A 收键盘、A 层级退出、触摸直点。
   - 首页 L1/R1 切 tab、直播 L2/R2 切分区、动态 L1/R1 切筛选、L2/R2 切 UP 主。
   - 直播子分区 + 关注主播行下滚自动收起、回到顶部展开。
-  - 搜索视频/用户切换、用户行上屏人物卡、A 进入 UP 主空间。
+  - 搜索视频/用户切换、用户行上屏人物卡、B 进入 UP 主空间。
   - 关注/搜索用户行聚焦：上屏显示资料、粉丝/视频数、最近动态与最近视频。
   - UP 主空间深色资料卡、视频/合集 chip、资料卡聚焦后的上屏动态/视频预览。
   - 评论图片全屏、弹幕开关/设置、字幕设置、PGC 切集、UP 主空间。
@@ -237,6 +239,9 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
   - rc50 焦点规则：左侧栏切页后焦点留在新栏位；L1/R1 切标签后直接聚焦内容，
     直接点击标签则保留标签焦点；L2/R2 筛选仍停在新 chip。侧栏聚焦时肩键由
     根节点转发给当前页面。
+  - rc51 手柄风格：设置 → 播放可选 Xbox / Retro，首次启动可跳过（默认 Xbox）；
+    InputRouter 归一化 Retro 的 A/B、X/Y，实体功能固定为 B 确认、A 返回、Y 刷新；
+    屏幕提示统一改为实体丝印。232 单测通过。
   - 登录、个人中心、历史/收藏/关注只读浏览；弹幕发送→撤回闭环。
 
 ### 未实现（代码层面）
@@ -278,13 +283,15 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
 
 ### 浏览页（`BROWSE`）
 
+以下均为**实体丝印**；Xbox/Retro 固件差异由设置里的「手柄风格」归一化。
+
 | 输入 | 行为 |
 | --- | --- |
 | D-pad | 移动焦点 / 列表滚动 |
-| A | 确认、播放、打开 |
-| B | 关闭页内确认层 → 返回上一页 |
-| X | 页面上下文操作 |
-| Y | 搜索页切排序；其他页面无绑定 |
+| B | 确认、播放、打开 |
+| A | 关闭页内确认层 → 返回上一页 |
+| Y | 页面上下文操作（首页刷新、动态点赞/复制） |
+| X | 不绑定 |
 | L1 / R1 | 切一级 tab（首页、动态、UP 主空间）；搜索页切视频/用户 |
 | L2 / R2 | 切二级筛选（直播分区、动态 UP 主、搜索排序） |
 | START | 页面菜单（如有） |
@@ -294,17 +301,17 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
 | 输入 | 行为 |
 | --- | --- |
 | D-pad | 移动焦点；视频进度条聚焦时左右 seek 10s |
-| A | 激活焦点：播放/暂停、±10s、清晰度、倍速、弹幕、字幕、音量、tab、评论操作 |
-| B | 关 overlay → 右栏回播放键 → 左栏根退出 |
-| X | 弹幕开/关（直播不绑定） |
+| B | 激活焦点：播放/暂停、±10s、清晰度、倍速、弹幕、字幕、音量、tab、评论操作 |
+| A | 关 overlay → 右栏回播放键 → 左栏根退出 |
+| Y | 弹幕开/关（直播不绑定） |
+| X | 不绑定 |
 | START / MENU | 打开弹幕/字幕播放设置（清晰度用 chips） |
 | LB / RB | 切换右栏 tab（评论/推荐/简介/分P；直播评论/信息） |
-| Y | 不绑定 |
 | 触摸 | 一次点击直接操作 |
 
 ### Overlay
 
-D-pad 选择，A 确认，B 关闭并回到触发控件；Y 不绑定，不允许越过 overlay 切模式。
+D-pad 选择，B 确认，A 关闭并回到触发控件；X 不绑定，不允许越过 overlay 切模式。
 
 ---
 

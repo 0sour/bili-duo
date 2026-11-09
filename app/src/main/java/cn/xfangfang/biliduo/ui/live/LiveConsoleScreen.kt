@@ -721,7 +721,7 @@ private fun LiveLeftPane(
 
         Spacer(Modifier.height(10.dp))
         Text(
-            text = "X 或弹幕 chip 开关 · START 菜单",
+            text = "Y 或弹幕 chip 开关 · START 菜单",
             color = LiveTextTertiary,
             fontSize = 8.sp,
         )

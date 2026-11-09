@@ -1209,13 +1209,13 @@ private fun DynamicReaderLayer(
         session?.setHintOverride(
             when (overlay) {
                 is DynamicOverlay.Detail -> if (detailTab == 1) {
-                    "LB/RB 正文/评论 · X 点赞 · 方向键滚动"
+                    "LB/RB 正文/评论 · Y 点赞 · 方向键滚动"
                 } else {
-                    "LB/RB 正文/评论 · X 复制链接 · 方向键滚动"
+                    "LB/RB 正文/评论 · Y 复制链接 · 方向键滚动"
                 }
                 is DynamicOverlay.Gallery ->
                     "R2/L2 缩放 · 左摇杆/拖动移动 · 方向键切换"
-                is DynamicOverlay.Text -> "X 复制链接 · 方向键滚动"
+                is DynamicOverlay.Text -> "Y 复制链接 · 方向键滚动"
             },
         )
         onDispose { session?.setHintOverride(null) }
@@ -1613,12 +1613,12 @@ private fun DynamicCommentsOverlay(
                         fontWeight = FontWeight.SemiBold,
                     )
                     Text(
-                        text = "${card.authorName} · ${formatCount(card.commentCount.toLong())} 条 · X 点赞",
+                        text = "${card.authorName} · ${formatCount(card.commentCount.toLong())} 条 · Y 点赞",
                         color = DuoPalette.Tertiary,
                         fontSize = 10.sp,
                     )
                 }
-                Text("B 返回", color = DuoPalette.Tertiary, fontSize = 10.sp)
+                Text("A 返回", color = DuoPalette.Tertiary, fontSize = 10.sp)
             }
         }
         if (deleteTarget != null) {
@@ -2015,7 +2015,7 @@ private fun ReaderHeader(
             )
             Spacer(Modifier.width(8.dp))
         }
-        Text("B 返回", color = DuoPalette.Tertiary, fontSize = 10.sp)
+        Text("A 返回", color = DuoPalette.Tertiary, fontSize = 10.sp)
     }
 }
 
@@ -2124,7 +2124,7 @@ private fun DynamicDetailOverlay(
                         fontSize = 11.sp,
                     )
                     Spacer(Modifier.weight(1f))
-                    Text("A 查看大图", color = DuoPalette.Pink, fontSize = 10.sp)
+                    Text("B 查看大图", color = DuoPalette.Pink, fontSize = 10.sp)
                 }
                 Spacer(Modifier.height(6.dp))
                 DetailImageGrid(
@@ -2137,7 +2137,7 @@ private fun DynamicDetailOverlay(
             DynamicStatsRow(card, showLike = true, onComments = { onTab(1) })
             Spacer(Modifier.height(10.dp))
             Text(
-                text = "方向键滚动 · LB/RB 切换 正文/评论 · X 复制链接 · B 返回",
+                text = "方向键滚动 · LB/RB 切换 正文/评论 · Y 复制链接 · A 返回",
                 color = DuoPalette.Tertiary,
                 fontSize = 10.sp,
             )
@@ -2342,9 +2342,9 @@ private fun DynamicGalleryOverlay(
         }
         Text(
             text = if (count > 1) {
-                "B 返回详情 · 方向键切换 · R2/L2 缩放 · 左摇杆/拖动移动 · 双指缩放"
+                "A 返回详情 · 方向键切换 · R2/L2 缩放 · 左摇杆/拖动移动 · 双指缩放"
             } else {
-                "B 返回详情 · R2/L2 缩放 · 左摇杆/拖动移动 · 双指缩放"
+                "A 返回详情 · R2/L2 缩放 · 左摇杆/拖动移动 · 双指缩放"
             },
             color = DuoPalette.Tertiary,
             fontSize = 9.sp,
@@ -2432,7 +2432,7 @@ private fun DynamicTextOverlay(
             DynamicStatsRow(card, showLike = true)
             Spacer(Modifier.height(10.dp))
             Text(
-                text = "方向键滚动 · LB/RB 评论 · X 复制链接 · B 返回列表",
+                text = "方向键滚动 · LB/RB 评论 · Y 复制链接 · A 返回列表",
                 color = DuoPalette.Tertiary,
                 fontSize = 10.sp,
             )
@@ -2489,7 +2489,7 @@ private fun DynamicCardUi.toTopPreview(): TopPreviewUi {
         coverFit = video == null && !image.isNullOrBlank(),
         eyebrow = "● 动态预览",
         ownerLabel = "UP 主",
-        actionHint = if (video != null) "开始播放 · B 返回" else "仅预览 · B 返回",
+        actionHint = if (video != null) "开始播放 · A 返回" else "仅预览 · A 返回",
     )
 }
 
@@ -2526,7 +2526,7 @@ private fun dynamicAmbient(loggedIn: Boolean, state: DynamicUiState): TopAmbient
     else -> TopAmbientUi(
         eyebrow = "DYNAMIC / 动态",
         title = "关注动态。",
-        subtitle = "聚焦卡片查看作者、正文与配图；带视频的动态按 A 直接播放。",
+        subtitle = "聚焦卡片查看作者、正文与配图；带视频的动态按 B 直接播放。",
         glyph = TopGlyph.DYNAMIC,
     )
 }

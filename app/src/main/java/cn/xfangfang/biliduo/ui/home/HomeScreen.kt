@@ -1228,7 +1228,7 @@ private fun homeTabAmbient(tab: HomeTab): TopAmbientUi = TopAmbientUi(
         HomeTab.MOVIE -> "影视精选。"
     },
     subtitle = when (tab) {
-        HomeTab.LIVE -> "聚焦直播间，上屏会展示封面、主播与实时人气；按 A 直接进入直播。"
+        HomeTab.LIVE -> "聚焦直播间，上屏会展示封面、主播与实时人气；按 B 直接进入直播。"
         HomeTab.RECOMMEND -> "下屏滑动浏览，焦点停在卡片上，上屏立刻展示封面、简介与 UP 主。"
         HomeTab.POPULAR -> "全站热度最高的视频，按热度持续更新。"
         HomeTab.RANKING -> "每日排行榜，从全站到分区，一屏看完。"
@@ -1389,7 +1389,7 @@ private fun LiveRoomItem.toTopPreview(): TopPreviewUi {
             }
         },
         ownerLabel = "主播",
-        actionHint = "进入直播间 · B 返回",
+        actionHint = "进入直播间 · A 返回",
     )
 }
 

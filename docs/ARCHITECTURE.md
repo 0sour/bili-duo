@@ -330,13 +330,14 @@ class InputRouter(
 - `MainActivity.dispatchKeyEvent(event)` 只在 `secondScreenAvailable` 时先给
   `InputRouter`；单屏回退不拦截。
 - 播放中没有 `TOP_PLAYER` / `BOTTOM_UI` 双模式：`DuoMode.PLAYER` 下 D-pad、A、
-  X、START、LB/RB 全部转发给下屏同一棵 Compose 焦点树。A 翻译为合成的
-  `DPAD_CENTER`；B 走 `requestBack()`。
+  X、START、LB/RB 全部转发给下屏同一棵 Compose 焦点树（这里 A/B/X 是 canonical
+  Xbox keycode；实体丝印对应 B/A/Y）。A 翻译为合成的 `DPAD_CENTER`；B 走
+  `requestBack()`。Retro 固件在 InputRouter 入口做 A↔B、X↔Y 归一化。
 - `BottomUiBridge.dispatch` 调
   `presentation.window.decorView.dispatchKeyEvent(event)`；失败/未显示时丢弃。
   MuMu/Duo 实测返回 `handled=true`，Compose 焦点为 `AndroidComposeView`。
-- 全局键由控制台根 `onPreviewKeyEvent` 处理：X 弹幕开关、START 清晰度菜单、
-  LB/RB 右栏 tab；没有 Y 动作。
+- 全局键由控制台根 `onPreviewKeyEvent` 处理：canonical X（实体 Y）弹幕开关、
+  START 弹幕/字幕设置、LB/RB 右栏 tab；canonical Y 不绑定。
 - 去重：同 keyCode 40ms 窗口；只处理 ACTION_DOWN；A/B 和方向键 repeat 被吞掉，
   保证长按只移动一格。
 - 触摸：`duoClickable` 直接聚焦并点击，没有“第一次触摸只切模式”的中间态。

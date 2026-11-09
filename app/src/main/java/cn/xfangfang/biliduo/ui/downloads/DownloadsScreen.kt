@@ -1040,7 +1040,7 @@ private fun downloadTopPreview(download: DownloadInfo): TopPreviewUi {
         eyebrow = "● 本地缓存 · $status",
         metaLine = meta,
         ownerName = "",
-        actionHint = "播放 · B 返回",
+        actionHint = "播放 · A 返回",
     )
 }
 
@@ -1055,7 +1055,7 @@ private fun groupTopPreview(group: DownloadGroup): TopPreviewUi {
         eyebrow = "● 本地缓存 · 分P合集",
         metaLine = "${group.downloads.size} 个分P",
         ownerName = "",
-        actionHint = "展开 / 播放 · B 返回",
+        actionHint = "展开 / 播放 · A 返回",
     )
 }
 

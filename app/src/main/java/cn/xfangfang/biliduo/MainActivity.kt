@@ -71,9 +71,12 @@ import cn.xfangfang.biliduo.ui.detail.DetailScreen
 import cn.xfangfang.biliduo.ui.detail.NoteScreen
 import cn.xfangfang.biliduo.ui.downloads.DownloadsScreen
 import cn.xfangfang.biliduo.ui.dynamic.DynamicScreen
+import cn.xfangfang.biliduo.data.local.GamepadStyle
+import cn.xfangfang.biliduo.data.local.GamepadStyleStore
 import cn.xfangfang.biliduo.ui.duo.DuoModeBar
 import cn.xfangfang.biliduo.ui.duo.DuoRail
 import cn.xfangfang.biliduo.ui.duo.DuoShoulderDispatcher
+import cn.xfangfang.biliduo.ui.duo.GamepadStyleSetupOverlay
 import cn.xfangfang.biliduo.ui.duo.rememberDuoRailFocusState
 import cn.xfangfang.biliduo.ui.favorites.FavoritesScreen
 import cn.xfangfang.biliduo.ui.following.FollowingListScreen
@@ -318,24 +321,24 @@ class MainActivity : ComponentActivity() {
 
 private fun duoPageHint(route: String?): String? = when (route) {
     Screen.Home.route ->
-        "X 刷新 · LB/RB 切标签 · L2/R2 直播/排行分区"
+        "Y 刷新 · LB/RB 切标签 · L2/R2 直播/排行分区"
     Screen.Search.route ->
-        "LB/RB 视频/用户 · L2/R2 排序 · A 输入/播放"
+        "LB/RB 视频/用户 · L2/R2 排序 · B 输入/播放"
     Screen.Dynamic.route ->
-        "LB/RB 全部/视频/图文 · L2/R2 UP 筛选 · X 点赞/复制"
-    Screen.Profile.route -> "A 进入"
-    Routes.HISTORY -> "A 播放"
-    Routes.FAVORITES -> "A 打开/播放"
-    Routes.FOLLOWING -> "A 进入 UP 主空间"
-    Routes.DOWNLOADS -> "LB/RB 切筛选 · A 播放/展开"
+        "LB/RB 全部/视频/图文 · L2/R2 UP 筛选 · Y 点赞/复制"
+    Screen.Profile.route -> "B 进入"
+    Routes.HISTORY -> "B 播放"
+    Routes.FAVORITES -> "B 打开/播放"
+    Routes.FOLLOWING -> "B 进入 UP 主空间"
+    Routes.DOWNLOADS -> "LB/RB 切筛选 · B 播放/展开"
     Routes.SETTINGS ->
         "↑/↓ 分类 · → 进入 · ← 回分类 · LB/RB 切分类"
-    Routes.LOGIN -> "A 输入/刷新二维码 · B 收键盘"
-    Routes.CHANNEL -> "LB/RB 视频/合集 · A 播放/进入"
+    Routes.LOGIN -> "B 输入/刷新二维码 · A 收键盘"
+    Routes.CHANNEL -> "LB/RB 视频/合集 · B 播放/进入"
     Routes.PLAYER, Routes.PLAYER_CID, Routes.DOWNLOAD_PLAY, Routes.PGC_PLAYER ->
-        "LB/RB 切 tab · L2/R2 评论排序 · X 弹幕 · START 弹幕/字幕"
-    Routes.LIVE_PLAYER -> "方向键/A 切换评论与信息"
-    Routes.DETAIL, Routes.NOTE -> "方向键移动 · A 播放/进入"
+        "LB/RB 切 tab · L2/R2 评论排序 · Y 弹幕 · START 弹幕/字幕"
+    Routes.LIVE_PLAYER -> "方向键/B 切换评论与信息"
+    Routes.DETAIL, Routes.NOTE -> "方向键移动 · B 播放/进入"
     else -> null
 }
 
@@ -359,6 +362,7 @@ fun MainScreen(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
     val railFocusState = rememberDuoRailFocusState()
+    var showGamepadSetup by remember { mutableStateOf(!GamepadStyleStore.hasChosen()) }
 
     val keyboard = LocalSoftwareKeyboardController.current
     val imeVisible = WindowInsets.isImeVisible
@@ -432,6 +436,14 @@ fun MainScreen(
         label = "duoRailWidth",
     )
 
+    fun finishGamepadSetup(style: GamepadStyle) {
+        GamepadStyleStore.save(style)
+        showGamepadSetup = false
+        // The overlay owned focus; hand it back to the rail so the next
+        // direction/confirm press has a predictable target.
+        railFocusState.beginNavigation(currentDestination?.route ?: Screen.Home.route)
+    }
+
     Scaffold(
         bottomBar = {
             DuoModeBar(
@@ -441,6 +453,7 @@ fun MainScreen(
                 )
         }
     ) { innerPadding ->
+        Box(Modifier.fillMaxSize()) {
         Row(
             modifier = Modifier
                 .fillMaxSize()
@@ -823,6 +836,14 @@ fun MainScreen(
                     onTopPerson = onTopPerson,
                     onFocusCleared = onTopFocusCleared,
                     onTopAmbient = onTopAmbient,
+                    session = duoSession,
+                )
+            }
+        }
+            if (showGamepadSetup) {
+                GamepadStyleSetupOverlay(
+                    onChoose = { style -> finishGamepadSetup(style) },
+                    onSkip = { finishGamepadSetup(GamepadStyle.XBOX) },
                     session = duoSession,
                 )
             }

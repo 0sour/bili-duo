@@ -72,6 +72,8 @@ import cn.xfangfang.biliduo.BuildConfig
 import cn.xfangfang.biliduo.data.download.DownloadLocation
 import cn.xfangfang.biliduo.data.download.DownloadManager
 import cn.xfangfang.biliduo.data.local.AppSettings
+import cn.xfangfang.biliduo.data.local.GamepadStyle
+import cn.xfangfang.biliduo.data.local.GamepadStyleStore
 import cn.xfangfang.biliduo.data.local.SearchHistoryManager
 import cn.xfangfang.biliduo.data.local.VideoPreference
 import cn.xfangfang.biliduo.data.local.VideoPreferenceManager
@@ -147,9 +149,14 @@ fun SettingsScreen(
         )
     }
     var videoPreference by remember { mutableStateOf(videoPreferenceManager.load()) }
+    var gamepadStyle by remember { mutableStateOf(GamepadStyleStore.current()) }
     fun updateVideoPreference(next: VideoPreference) {
         videoPreference = next
         videoPreferenceManager.save(next)
+    }
+    fun updateGamepadStyle(next: GamepadStyle) {
+        gamepadStyle = next
+        GamepadStyleStore.save(next)
     }
     var category by remember { mutableIntStateOf(0) }
     var wifiOnlyPlayback by remember { mutableStateOf(AppSettings.wifiOnlyPlayback) }
@@ -409,6 +416,8 @@ fun SettingsScreen(
                     0 -> PlaySettings(
                         preference = videoPreference,
                         onPreference = { updateVideoPreference(it) },
+                        gamepadStyle = gamepadStyle,
+                        onGamepadStyle = { updateGamepadStyle(it) },
                         wifiOnlyPlayback = wifiOnlyPlayback,
                         onWifiOnlyPlayback = {
                             wifiOnlyPlayback = it
@@ -661,6 +670,8 @@ private fun CategoryRail(
 private fun PlaySettings(
     preference: VideoPreference,
     onPreference: (VideoPreference) -> Unit,
+    gamepadStyle: GamepadStyle,
+    onGamepadStyle: (GamepadStyle) -> Unit,
     wifiOnlyPlayback: Boolean,
     onWifiOnlyPlayback: (Boolean) -> Unit,
     firstFocus: FocusRequester,
@@ -741,6 +752,25 @@ private fun PlaySettings(
     Text(
         text = "播放控制台里修改清晰度 / 倍速 / 字幕只影响当前视频；" +
             "弹幕设置与「弹幕」分类双向同步。",
+        color = DuoPalette.Tertiary,
+        fontSize = 10.sp,
+        lineHeight = 14.sp,
+        modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+    )
+    Spacer(Modifier.height(6.dp))
+    SettingsSection("手柄")
+    SettingsValueRow(
+        title = "手柄风格",
+        value = gamepadStyle.label,
+        onClick = {
+            onGamepadStyle(
+                if (gamepadStyle == GamepadStyle.XBOX) GamepadStyle.RETRO else GamepadStyle.XBOX
+            )
+        },
+    )
+    Text(
+        text = "实体按键固定：B 确认 · A 返回 · Y 刷新。" +
+            "切换风格只改变固件输出的 ABXY keycode，不改变实体位置功能。",
         color = DuoPalette.Tertiary,
         fontSize = 10.sp,
         lineHeight = 14.sp,

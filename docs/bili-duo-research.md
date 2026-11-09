@@ -118,12 +118,13 @@ wiliwili 的 C++/borealis UI 与 SDL window 绑定，不能直接作为下屏 Pr
 
 只允许一个输入所有者；播放中不再分“控视频/控界面”：
 
-- 所有页面/播放中的方向键都移动下屏焦点。A 激活焦点，B 关闭 overlay/键盘或
-  返回焦点层级；X 弹幕开关，START 清晰度菜单，LB/RB 右栏 tab，Y 不绑定。
-- 视频进度条可聚焦，左右键 seek；音量 chip 用 A 循环。
+- 所有页面/播放中的方向键都移动下屏焦点。屏幕提示按实体丝印：B 激活，A 关闭
+  overlay/键盘或返回层级；Y 弹幕开关，START 弹幕/字幕设置，LB/RB 右栏 tab，
+  物理 X 不绑定。Xbox/Retro 固件差异由 InputRouter 归一化。
+- 视频进度条可聚焦，左右键 seek；音量 chip 用 B 循环。
 - 触摸一次点击直接操作，不做“第一次只切模式”。
 - 所有 overlay（清晰度、倍速、音量、更多、退出确认）都是下屏的模态层，打开时
-  独占输入，B 只关闭 overlay，不退出播放。
+  独占输入，A 只关闭 overlay，不退出播放。
 - 旧的 `TOP_PLAYER/BOTTOM_UI + Y 切换` 设计已废弃；当前实现见
   [`README.md`](../README.md) 和 [`ui/INPUT_AND_FOCUS.md`](ui/INPUT_AND_FOCUS.md)。
 
