@@ -83,6 +83,7 @@ import cn.xfangfang.biliduo.ui.common.DuoPageHeader
 import cn.xfangfang.biliduo.ui.common.DuoPalette
 import cn.xfangfang.biliduo.ui.common.DuoPillButton
 import cn.xfangfang.biliduo.ui.common.DuoSearchField
+import cn.xfangfang.biliduo.ui.duo.requestPageFocus
 import cn.xfangfang.biliduo.ui.duo.duoClickable
 import cn.xfangfang.biliduo.ui.duo.duoFocusRing
 import cn.xfangfang.biliduo.ui.duo.DuoTextFieldGate
@@ -147,7 +148,7 @@ fun FavoritesScreen(
     fun restoreFocus(focus: FocusRequester?) {
         scope.launch {
             delay(120)
-            runCatching { focus?.requestFocus() }
+            runCatching { focus?.requestPageFocus() }
         }
     }
 
@@ -183,7 +184,7 @@ fun FavoritesScreen(
     LaunchedEffect(loggedIn) {
         if (!loggedIn) {
             delay(80)
-            runCatching { loginFocus.requestFocus() }
+            runCatching { loginFocus.requestPageFocus() }
         }
     }
     LaunchedEffect(
@@ -236,9 +237,9 @@ fun FavoritesScreen(
             delay(80)
             runCatching {
                 if (inFolder) {
-                    if (uiState.resources.isNotEmpty()) firstResourceFocus.requestFocus()
+                    if (uiState.resources.isNotEmpty()) firstResourceFocus.requestPageFocus()
                 } else {
-                    if (uiState.folders.isNotEmpty()) firstFolderFocus.requestFocus()
+                    if (uiState.folders.isNotEmpty()) firstFolderFocus.requestPageFocus()
                 }
             }
         }
@@ -247,7 +248,7 @@ fun FavoritesScreen(
         if (!uiState.showCreateFolder && !uiState.showEditFolder && !searchMode) {
             delay(100)
             runCatching {
-                if (inFolder) firstResourceFocus.requestFocus() else firstFolderFocus.requestFocus()
+                if (inFolder) firstResourceFocus.requestPageFocus() else firstFolderFocus.requestPageFocus()
             }
         }
     }
@@ -255,7 +256,7 @@ fun FavoritesScreen(
         if (searchMode) {
             // C: keep the ring on 取消 instead of focusing the input.
             delay(80)
-            runCatching { searchCancelFocus.requestFocus() }
+            runCatching { searchCancelFocus.requestPageFocus() }
         } else {
             keyboard?.hide()
         }
@@ -264,14 +265,14 @@ fun FavoritesScreen(
         if (uiState.showCreateFolder) {
             formError = null
             delay(80)
-            runCatching { formTitleFocus.requestFocus() }
+            runCatching { formTitleFocus.requestPageFocus() }
         }
     }
     LaunchedEffect(uiState.showEditFolder) {
         if (uiState.showEditFolder) {
             formError = null
             delay(120)
-            runCatching { formTitleFocus.requestFocus() }
+            runCatching { formTitleFocus.requestPageFocus() }
         }
     }
     LaunchedEffect(uiState.opError) {
@@ -891,7 +892,7 @@ private fun FolderActionOverlay(
     val focusRequester = remember { FocusRequester() }
     val options = listOf("编辑收藏夹", "删除收藏夹")
 
-    LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
+    LaunchedEffect(Unit) { runCatching { focusRequester.requestPageFocus() } }
 
     Box(
         modifier = Modifier
@@ -1010,7 +1011,7 @@ private fun FolderFormOverlay(
     val introFocus = remember { FocusRequester() }
     LaunchedEffect(loading) {
         if (!loading) {
-            runCatching { titleFocus.requestFocus() }
+            runCatching { titleFocus.requestPageFocus() }
             delay(60L)
             DuoImeState.onShown()
             keyboard?.show()

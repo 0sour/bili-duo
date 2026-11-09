@@ -4,6 +4,23 @@
 `*.apk`），需要时本地 `./gradlew assembleDebug` / `assembleRelease` 生成，或从
 GitHub Releases 下载。
 
+## 0.2.0-rc52（2026-11-09）
+
+- `bili-duo-0.2.0-rc52-release.apk`
+  - R8 minify，正式 release keystore 签名；可覆盖安装同 key 的 rc51。
+  - APK SHA-256：`cead2e4a4a10a56f063941487183dde0fd2d3c73f9d0d476cc1fe6a368bb064c`
+- `bili-duo-0.2.0-rc52-debug.apk`
+  - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
+  - SHA-256：`b9d8d54f276169c19547f071a020bc74cea9e40f1d0b21e23b2d765b0a931f7b`
+
+rc52 变更：
+- 设置新增独立「手柄」分类，手柄风格与实体按键映射从「播放」迁入。
+- 焦点环失焦立即消失，rail 点击先聚焦目标项；页面入口焦点在 rail 锁定期间被
+  `DuoPageFocusGate` 拦截，消除切页时指示器闪旧项/内容再回来的残影。
+- 起播优化：API 限流改为按请求起点 120ms；VOD 元数据等待 1.6s→0.6s、本地有进度
+  跳过；弹幕延后 900ms；VIP 状态缓存 5 分钟；直播 playurl 与房间详情并行。
+- Duo 实测同一直播间首帧约 2.0s→0.8s；VOD 约 0.7–1.5s。232 单测通过。
+
 ## 0.2.0-rc51（2026-11-09）
 
 - `bili-duo-0.2.0-rc51-release.apk`

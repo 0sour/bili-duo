@@ -50,6 +50,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import cn.xfangfang.biliduo.ui.duo.requestPageFocus
 import cn.xfangfang.biliduo.ui.duo.duoTabCycling
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
@@ -186,7 +187,7 @@ fun SearchScreen(
             // C: entering the page focuses the back button, not the input.
             else -> backFocus
         }
-        runCatching { target.requestFocus() }
+        runCatching { target.requestPageFocus() }
         focusContentOnTypeShortcut = false
     }
 
@@ -199,7 +200,7 @@ fun SearchScreen(
             delay(80L)
             runCatching {
                 sortFocusers[SearchSort.options.indexOfFirst { it.value == state.sortBy.value }]
-                    .requestFocus()
+                    .requestPageFocus()
             }
             pendingSortFocus = false
         }
@@ -260,7 +261,7 @@ fun SearchScreen(
             onQueryChange = viewModel::onQueryChange,
             onClear = {
                 viewModel.clearResults()
-                runCatching { searchFocus.requestFocus() }
+                runCatching { searchFocus.requestPageFocus() }
                 Unit
             },
             onSubmit = submitSearch,

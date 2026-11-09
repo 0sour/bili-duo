@@ -75,6 +75,7 @@ import cn.xfangfang.biliduo.data.model.LiveFollowedAnchor
 import cn.xfangfang.biliduo.data.model.LiveRoomItem
 import cn.xfangfang.biliduo.data.model.LiveSubArea
 import cn.xfangfang.biliduo.data.model.PgcSeasonItem
+import cn.xfangfang.biliduo.ui.duo.requestPageFocus
 import cn.xfangfang.biliduo.ui.duo.duoClickable
 import cn.xfangfang.biliduo.ui.duo.duoFocusRing
 import cn.xfangfang.biliduo.ui.duo.duoTabCycling
@@ -135,7 +136,7 @@ fun HomeScreen(
         if (pendingRankingFocus) {
             delay(80L)
             val index = homeRankingAreas.indexOfFirst { it.rid == state.rankingRid }
-            rankingFocusers.getOrNull(index)?.let { runCatching { it.requestFocus() } }
+            rankingFocusers.getOrNull(index)?.let { runCatching { it.requestPageFocus() } }
             pendingRankingFocus = false
         }
     }
@@ -144,10 +145,10 @@ fun HomeScreen(
         if (pendingAreaFocus) {
             delay(80L)
             if (state.liveAreaId == 0) {
-                runCatching { areaFocus.requestFocus() }
+                runCatching { areaFocus.requestPageFocus() }
             } else {
                 val index = state.liveAreas.indexOfFirst { it.id == state.liveAreaId }
-                areaFocusers.getOrNull(index)?.let { runCatching { it.requestFocus() } }
+                areaFocusers.getOrNull(index)?.let { runCatching { it.requestPageFocus() } }
             }
             pendingAreaFocus = false
         }
@@ -179,7 +180,7 @@ fun HomeScreen(
     LaunchedEffect(state.tab, firstKey, itemsEmpty, tabFocusTarget) {
         if (itemsEmpty || tabFocusTarget != TabFocusTarget.CONTENT) return@LaunchedEffect
         delay(80L)
-        runCatching { firstFocus.requestFocus() }
+        runCatching { firstFocus.requestPageFocus() }
         tabFocusTarget = null
     }
     LaunchedEffect(state.tab, tabFocusTarget) {
@@ -266,7 +267,7 @@ fun HomeScreen(
                     // Keep a stable focus target: the old card disappears when
                     // the new feed replaces the grid. Down from the refresh
                     // button goes to the first card.
-                    runCatching { refreshFocus.requestFocus() }
+                    runCatching { refreshFocus.requestPageFocus() }
                     viewModel.refresh()
                     true
                 } else {
@@ -280,7 +281,7 @@ fun HomeScreen(
                 // A/click on the tab itself leaves the indicator on that tab.
                 tabFocusTarget = TabFocusTarget.TAB
                 tabFocuses.getOrNull(HomeTab.entries.indexOf(tab))
-                    ?.let { runCatching { it.requestFocus() } }
+                    ?.let { runCatching { it.requestPageFocus() } }
                 viewModel.selectTab(tab)
             },
             tabFocusRequesters = tabFocuses,
@@ -604,7 +605,7 @@ private fun LiveSection(
     // removed focus node would leave the gamepad without a target.
     LaunchedEffect(showSecondaryRows) {
         if (!showSecondaryRows && secondaryRowFocused) {
-            runCatching { areaFocus.requestFocus() }
+            runCatching { areaFocus.requestPageFocus() }
         }
     }
     // L2/R2 can select an area that is scrolled out of the chip row; keep the

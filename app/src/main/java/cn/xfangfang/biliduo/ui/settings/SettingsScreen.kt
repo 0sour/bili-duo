@@ -33,6 +33,7 @@ import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.SportsEsports
 import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material.icons.outlined.Subtitles
 import androidx.compose.material.icons.outlined.Wifi
@@ -92,6 +93,7 @@ import cn.xfangfang.biliduo.duo.DuoSessionViewModel
 import cn.xfangfang.biliduo.ui.common.DuoConfirmOverlay
 import cn.xfangfang.biliduo.ui.common.DuoPageHeader
 import cn.xfangfang.biliduo.ui.common.DuoPalette
+import cn.xfangfang.biliduo.ui.duo.requestPageFocus
 import cn.xfangfang.biliduo.ui.duo.duoClickable
 import cn.xfangfang.biliduo.ui.duo.duoTabCycling
 import cn.xfangfang.biliduo.ui.top.TopGlyph
@@ -110,6 +112,7 @@ private data class SettingsCategory(
 
 private val settingsCategories = listOf(
     SettingsCategory("播放", Icons.Outlined.Bolt),
+    SettingsCategory("手柄", Icons.Outlined.SportsEsports),
     SettingsCategory("网络", Icons.Outlined.Wifi),
     SettingsCategory("外观", Icons.Outlined.DarkMode),
     SettingsCategory("弹幕", Icons.Outlined.Subtitles),
@@ -202,6 +205,7 @@ fun SettingsScreen(
         wifiOnlyPlayback,
         wifiOnlyDownload,
         videoPreference,
+        gamepadStyle,
         playerUi?.danmakuEnabled,
         playerUi?.danmakuOpacity,
         playerUi?.danmakuSpeed,
@@ -209,11 +213,12 @@ fun SettingsScreen(
         storageBytes,
     ) {
         val meta = when (category) {
-            1 -> Triple(TopGlyph.NETWORK, 0xFF00A1D6, "网络策略决定缓冲与流量。")
-            2 -> Triple(TopGlyph.THEME, 0xFFB18CFF, "深色界面为双屏掌机准备。")
-            3 -> Triple(TopGlyph.DANMAKU, 0xFFFFB35C, "弹幕的密度、速度与屏蔽词。")
-            4 -> Triple(TopGlyph.STORAGE, 0xFF6FD3A2, "本地缓存与已完成下载。")
-            5 -> Triple(TopGlyph.ABOUT, 0xFFA9A9B4, "版本、许可证与开源仓库。")
+            1 -> Triple(TopGlyph.GAMEPAD, 0xFF9AA7FF, "实体按键位置固定，只切换固件映射。")
+            2 -> Triple(TopGlyph.NETWORK, 0xFF00A1D6, "网络策略决定缓冲与流量。")
+            3 -> Triple(TopGlyph.THEME, 0xFFB18CFF, "深色界面为双屏掌机准备。")
+            4 -> Triple(TopGlyph.DANMAKU, 0xFFFFB35C, "弹幕的密度、速度与屏蔽词。")
+            5 -> Triple(TopGlyph.STORAGE, 0xFF6FD3A2, "本地缓存与已完成下载。")
+            6 -> Triple(TopGlyph.ABOUT, 0xFFA9A9B4, "版本、许可证与开源仓库。")
             else -> Triple(TopGlyph.PLAY, 0xFFFB7299, "清晰度、倍速与后台行为。")
         }
         val wifi = AppSettings.isWifiConnected(context)
@@ -221,15 +226,16 @@ fun SettingsScreen(
             0 -> "默认 ${videoQualityLabel(videoPreference.quality)} · " +
                 "${videoSpeedLabel(videoPreference.speed)} · " +
                 "字幕${if (videoPreference.subtitleEnabled) "开" else "关"}"
-            1 -> "仅 WiFi 下载：${if (wifiOnlyDownload) "开" else "关"} · 当前 ${if (wifi) "WiFi" else "移动网络"}"
-            2 -> "深色主题 · 固定"
-            3 -> if (playerUi == null) {
+            1 -> "${gamepadStyle.label} · B 确认 / A 返回 / Y 刷新"
+            2 -> "仅 WiFi 下载：${if (wifiOnlyDownload) "开" else "关"} · 当前 ${if (wifi) "WiFi" else "移动网络"}"
+            3 -> "深色主题 · 固定"
+            4 -> if (playerUi == null) {
                 "跟随播放控制台"
             } else {
                 "弹幕：${if (playerUi.danmakuEnabled) "开" else "关"} · " +
                     "${(playerUi.danmakuOpacity * 100).toInt()}% · ${playerUi.danmakuSpeed}x"
             }
-            4 -> "已下载 ${downloads.size} 项 · ${formatBytes(storageBytes)}"
+            5 -> "已下载 ${downloads.size} 项 · ${formatBytes(storageBytes)}"
             else -> "v${BuildConfig.VERSION_NAME} · MIT License"
         }
         onTopPanel(
@@ -250,7 +256,7 @@ fun SettingsScreen(
     // moving focus in the category rail must not steal focus back to content.
     LaunchedEffect(Unit) {
         delay(120)
-        runCatching { firstRowFocus.requestFocus() }
+        runCatching { firstRowFocus.requestPageFocus() }
     }
     LaunchedEffect(category) {
         // A long category can leave the next one scrolled halfway down.
@@ -261,7 +267,7 @@ fun SettingsScreen(
         if (focusContent) {
             scope.launch {
                 delay(120)
-                runCatching { firstRowFocus.requestFocus() }
+                runCatching { firstRowFocus.requestPageFocus() }
             }
         }
     }
@@ -283,7 +289,7 @@ fun SettingsScreen(
         confirmClearDownloads = false
         scope.launch {
             delay(120)
-            runCatching { clearRowFocus.requestFocus() }
+            runCatching { clearRowFocus.requestPageFocus() }
         }
     }
 
@@ -291,7 +297,7 @@ fun SettingsScreen(
         confirmClearAllDownloads = false
         scope.launch {
             delay(120)
-            runCatching { clearAllFocus.requestFocus() }
+            runCatching { clearAllFocus.requestPageFocus() }
         }
     }
 
@@ -299,7 +305,7 @@ fun SettingsScreen(
         confirmClearSearchHistory = false
         scope.launch {
             delay(120)
-            runCatching { clearRowFocus.requestFocus() }
+            runCatching { clearRowFocus.requestPageFocus() }
         }
     }
 
@@ -307,7 +313,7 @@ fun SettingsScreen(
         confirmClearImageCache = false
         scope.launch {
             delay(120)
-            runCatching { clearRowFocus.requestFocus() }
+            runCatching { clearRowFocus.requestPageFocus() }
         }
     }
 
@@ -400,7 +406,7 @@ fun SettingsScreen(
                             Key.DirectionLeft -> {
                                 scope.launch {
                                     delay(40)
-                                    runCatching { categoryFocus[category].requestFocus() }
+                                    runCatching { categoryFocus[category].requestPageFocus() }
                                 }
                                 true
                             }
@@ -416,8 +422,6 @@ fun SettingsScreen(
                     0 -> PlaySettings(
                         preference = videoPreference,
                         onPreference = { updateVideoPreference(it) },
-                        gamepadStyle = gamepadStyle,
-                        onGamepadStyle = { updateGamepadStyle(it) },
                         wifiOnlyPlayback = wifiOnlyPlayback,
                         onWifiOnlyPlayback = {
                             wifiOnlyPlayback = it
@@ -427,7 +431,14 @@ fun SettingsScreen(
                         backFocus = backFocus,
                         bottomModifier = bottomEdgeModifier,
                     )
-                    1 -> NetworkSettings(
+                    1 -> GamepadSettings(
+                        gamepadStyle = gamepadStyle,
+                        onGamepadStyle = { updateGamepadStyle(it) },
+                        firstFocus = firstRowFocus,
+                        backFocus = backFocus,
+                        bottomModifier = bottomEdgeModifier,
+                    )
+                    2 -> NetworkSettings(
                         wifiOnlyDownload = wifiOnlyDownload,
                         onWifiOnlyDownload = {
                             wifiOnlyDownload = it
@@ -437,12 +448,12 @@ fun SettingsScreen(
                         backFocus = backFocus,
                         bottomModifier = bottomEdgeModifier,
                     )
-                    2 -> AppearanceSettings(
+                    3 -> AppearanceSettings(
                         firstFocus = firstRowFocus,
                         backFocus = backFocus,
                         bottomModifier = bottomEdgeModifier,
                     )
-                    3 -> DanmakuSettings(
+                    4 -> DanmakuSettings(
                         ui = playerUi,
                         firstFocus = firstRowFocus,
                         backFocus = backFocus,
@@ -454,7 +465,7 @@ fun SettingsScreen(
                         onArea = { playerViewModel?.setDanmakuArea(it) },
                         onMax = { playerViewModel?.setDanmakuMaxOnScreen(it) },
                     )
-                    4 -> StorageSettings(
+                    5 -> StorageSettings(
                         total = downloads.size,
                         completed = completed.size,
                         bytes = storageBytes,
@@ -508,7 +519,7 @@ fun SettingsScreen(
                 storageTick++
                 scope.launch {
                     delay(120)
-                    runCatching { firstRowFocus.requestFocus() }
+                    runCatching { firstRowFocus.requestPageFocus() }
                 }
             },
             onCancel = {
@@ -529,7 +540,7 @@ fun SettingsScreen(
                 storageTick++
                 scope.launch {
                     delay(120)
-                    runCatching { firstRowFocus.requestFocus() }
+                    runCatching { firstRowFocus.requestPageFocus() }
                 }
             },
             onCancel = {
@@ -553,7 +564,7 @@ fun SettingsScreen(
                 Toast.makeText(context, "搜索历史已清除", Toast.LENGTH_SHORT).show()
                 scope.launch {
                     delay(120)
-                    runCatching { clearRowFocus.requestFocus() }
+                    runCatching { clearRowFocus.requestPageFocus() }
                 }
             },
             onCancel = {
@@ -577,7 +588,7 @@ fun SettingsScreen(
                 Toast.makeText(context, "图片缓存已清除", Toast.LENGTH_SHORT).show()
                 scope.launch {
                     delay(120)
-                    runCatching { clearRowFocus.requestFocus() }
+                    runCatching { clearRowFocus.requestPageFocus() }
                 }
             },
             onCancel = {
@@ -670,8 +681,6 @@ private fun CategoryRail(
 private fun PlaySettings(
     preference: VideoPreference,
     onPreference: (VideoPreference) -> Unit,
-    gamepadStyle: GamepadStyle,
-    onGamepadStyle: (GamepadStyle) -> Unit,
     wifiOnlyPlayback: Boolean,
     onWifiOnlyPlayback: (Boolean) -> Unit,
     firstFocus: FocusRequester,
@@ -758,25 +767,6 @@ private fun PlaySettings(
         modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
     )
     Spacer(Modifier.height(6.dp))
-    SettingsSection("手柄")
-    SettingsValueRow(
-        title = "手柄风格",
-        value = gamepadStyle.label,
-        onClick = {
-            onGamepadStyle(
-                if (gamepadStyle == GamepadStyle.XBOX) GamepadStyle.RETRO else GamepadStyle.XBOX
-            )
-        },
-    )
-    Text(
-        text = "实体按键固定：B 确认 · A 返回 · Y 刷新。" +
-            "切换风格只改变固件输出的 ABXY keycode，不改变实体位置功能。",
-        color = DuoPalette.Tertiary,
-        fontSize = 10.sp,
-        lineHeight = 14.sp,
-        modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
-    )
-    Spacer(Modifier.height(6.dp))
     SettingsSection("播放行为")
     SettingsSwitchRow(
         title = "仅 WiFi 播放视频",
@@ -787,6 +777,46 @@ private fun PlaySettings(
     SettingsInfoRow(
         title = "后台行为",
         value = "离开 App 会暂停并保留进度",
+        modifier = bottomModifier,
+    )
+}
+
+@Composable
+private fun GamepadSettings(
+    gamepadStyle: GamepadStyle,
+    onGamepadStyle: (GamepadStyle) -> Unit,
+    firstFocus: FocusRequester,
+    backFocus: FocusRequester,
+    bottomModifier: Modifier,
+) {
+    SettingsSection("手柄风格")
+    SettingsValueRow(
+        title = "当前风格",
+        value = gamepadStyle.label,
+        focusRequester = firstFocus,
+        modifier = settingsTopEdge(backFocus),
+        onClick = {
+            onGamepadStyle(
+                if (gamepadStyle == GamepadStyle.XBOX) GamepadStyle.RETRO else GamepadStyle.XBOX
+            )
+        },
+    )
+    Text(
+        text = "请与 RP Duo 系统设置里的「手柄风格」保持一致。实体位置固定，" +
+            "功能不随风格变化；屏幕提示始终按丝印标注。切换后立即生效，无需重启。",
+        color = DuoPalette.Tertiary,
+        fontSize = 10.sp,
+        lineHeight = 14.sp,
+        modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+    )
+    Spacer(Modifier.height(6.dp))
+    SettingsSection("实体按键")
+    SettingsInfoRow(title = "下 · B", value = "确认 / 播放 / 输入")
+    SettingsInfoRow(title = "右 · A", value = "返回 / 关闭 / 收键盘")
+    SettingsInfoRow(title = "左 · Y", value = "刷新 / 点赞 / 弹幕开关")
+    SettingsInfoRow(
+        title = "上 · X",
+        value = "未绑定",
         modifier = bottomModifier,
     )
 }

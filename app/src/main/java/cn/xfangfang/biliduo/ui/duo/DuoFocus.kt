@@ -2,7 +2,7 @@ package cn.xfangfang.biliduo.ui.duo
 
 
 
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -71,6 +71,24 @@ private val Accent = Color(0xFFFB7299)
 private val Muted = Color(0xFF73737F)
 
 /**
+ * While the app rail owns focus after a navigation, destination pages must not
+ * pull focus into their first card/row. Several pages request that focus from
+ * a delayed LaunchedEffect, which previously caused the ring to flash on the
+ * page and then jump back to the rail. [DuoRailFocusState] toggles this flag
+ * synchronously, and [requestPageFocus] is the guarded entry point.
+ */
+object DuoPageFocusGate {
+    @Volatile
+    var railLocked: Boolean = false
+}
+
+/** Requests page focus unless a rail navigation still owns it. */
+fun FocusRequester.requestPageFocus() {
+    if (DuoPageFocusGate.railLocked) return
+    runCatching { requestFocus() }
+}
+
+/**
  * bili-duo focus indicator: a thin white ring outside the content with a dark
  * separator edge, leaving a 4dp gap so the ring never covers text or artwork.
  *
@@ -89,11 +107,18 @@ fun Modifier.duoFocusRing(
 ): Modifier = composed {
     var localFocused by remember { mutableStateOf(false) }
     val isFocused = focused ?: localFocused
-    val progress by animateFloatAsState(
-        targetValue = if (enabled && isFocused) 1f else 0f,
-        animationSpec = tween(durationMillis = 120),
-        label = "duoFocusRing",
-    )
+    // Fade in to make focus easy to follow, but drop the ring immediately when
+    // focus leaves. A 120ms fade-out left a ghost ring on the previous rail
+    // item/page while the new one was already highlighted, which read as the
+    // indicator flashing to the wrong place.
+    val progress = remember { Animatable(0f) }
+    LaunchedEffect(enabled, isFocused) {
+        if (enabled && isFocused) {
+            progress.animateTo(1f, tween(durationMillis = 120))
+        } else {
+            progress.snapTo(0f)
+        }
+    }
     this
         .then(
             if (focused == null) {
@@ -104,7 +129,8 @@ fun Modifier.duoFocusRing(
         )
         .drawWithContent {
             drawContent()
-            if (progress <= 0.01f) return@drawWithContent
+            val ringAlpha = progress.value
+            if (ringAlpha <= 0.01f) return@drawWithContent
             val gap = 4.dp.toPx()
             val ringWidth = 1.5.dp.toPx()
             val edgeWidth = 3.5.dp.toPx()
@@ -120,12 +146,12 @@ fun Modifier.duoFocusRing(
             translate(-gap, -gap) {
                 drawFocusOutline(
                     outline = outlineAt(gap),
-                    color = Color.Black.copy(alpha = 0.55f * progress),
+                    color = Color.Black.copy(alpha = 0.55f * ringAlpha),
                     strokeWidth = edgeWidth,
                 )
                 drawFocusOutline(
                     outline = outlineAt(gap),
-                    color = Color.White.copy(alpha = 0.96f * progress),
+                    color = Color.White.copy(alpha = 0.96f * ringAlpha),
                     strokeWidth = ringWidth,
                 )
             }

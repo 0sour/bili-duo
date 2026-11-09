@@ -66,6 +66,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import cn.xfangfang.biliduo.duo.DuoSessionViewModel
+import cn.xfangfang.biliduo.ui.duo.requestPageFocus
 import cn.xfangfang.biliduo.ui.duo.duoClickable
 import cn.xfangfang.biliduo.ui.duo.duoFocusRing
 import cn.xfangfang.biliduo.ui.top.TopAmbientUi
@@ -145,14 +146,14 @@ fun ProfileScreen(
 
     LaunchedEffect(Unit) {
         delay(80)
-        runCatching { menuFocuses[0].requestFocus() }
+        runCatching { menuFocuses[0].requestPageFocus() }
     }
 
     LaunchedEffect(showLogoutConfirm) {
         if (!showLogoutConfirm && restoreLogoutFocus) {
             restoreLogoutFocus = false
             delay(120)
-            runCatching { logoutFocus.requestFocus() }
+            runCatching { logoutFocus.requestPageFocus() }
         }
     }
     // B is routed by InputRouter -> DuoSessionViewModel; while an in-screen
@@ -488,7 +489,7 @@ private fun LogoutConfirmOverlay(
     val focusRequester = remember { FocusRequester() }
 
     LaunchedEffect(Unit) {
-        runCatching { focusRequester.requestFocus() }
+        runCatching { focusRequester.requestPageFocus() }
     }
 
     Box(

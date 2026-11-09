@@ -711,6 +711,7 @@ private fun topGlyphIcon(glyph: TopGlyph): ImageVector = when (glyph) {
     TopGlyph.DOWNLOAD -> Icons.Outlined.FileDownload
     TopGlyph.PERSON, TopGlyph.LOGIN -> Icons.Outlined.Person
     TopGlyph.NETWORK -> Icons.Outlined.Wifi
+    TopGlyph.GAMEPAD -> Icons.Outlined.SportsEsports
     TopGlyph.THEME -> Icons.Outlined.DarkMode
     TopGlyph.DANMAKU -> Icons.Outlined.Subtitles
     TopGlyph.STORAGE -> Icons.Outlined.Storage

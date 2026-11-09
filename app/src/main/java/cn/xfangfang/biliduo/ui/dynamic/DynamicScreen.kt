@@ -92,6 +92,7 @@ import cn.xfangfang.biliduo.ui.common.DuoZoomableImage
 import cn.xfangfang.biliduo.ui.common.ImageZoomState
 import cn.xfangfang.biliduo.ui.common.rememberImageZoomState
 import cn.xfangfang.biliduo.ui.common.DuoPillButton
+import cn.xfangfang.biliduo.ui.duo.requestPageFocus
 import cn.xfangfang.biliduo.ui.duo.duoClickable
 import cn.xfangfang.biliduo.ui.duo.DuoTextFieldGate
 import cn.xfangfang.biliduo.ui.duo.rememberDuoTextFieldState
@@ -179,7 +180,7 @@ fun DynamicScreen(
     LaunchedEffect(state.filter, pendingFilterFocus) {
         if (pendingFilterFocus) {
             delay(80L)
-            runCatching { filterFocusers[state.filter.ordinal].requestFocus() }
+            runCatching { filterFocusers[state.filter.ordinal].requestPageFocus() }
             pendingFilterFocus = false
         }
     }
@@ -192,7 +193,7 @@ fun DynamicScreen(
                 state.authors.indexOfFirst { it.mid == state.authorMid } + 1
             }
             if (index in authorFocusers.indices) {
-                runCatching { authorFocusers[index].requestFocus() }
+                runCatching { authorFocusers[index].requestPageFocus() }
             }
             pendingAuthorFocus = false
         }
@@ -207,7 +208,7 @@ fun DynamicScreen(
         onVideoFocused(current.card.toTopPreview())
         scope.launch {
             delay(100L)
-            runCatching { current.returnFocus.requestFocus() }
+            runCatching { current.returnFocus.requestPageFocus() }
         }
     }
 
@@ -232,7 +233,7 @@ fun DynamicScreen(
             viewModel.refresh()
         } else {
             delay(80L)
-            runCatching { retryFocus.requestFocus() }
+            runCatching { retryFocus.requestPageFocus() }
         }
     }
     LaunchedEffect(state.filter, state.authorMid) {
@@ -259,7 +260,7 @@ fun DynamicScreen(
             ) {
                 return@LaunchedEffect
             }
-            runCatching { firstFocus.requestFocus() }
+            runCatching { firstFocus.requestPageFocus() }
             firstFocused = true
             focusContentOnFilterShortcut = false
         }
@@ -1223,7 +1224,7 @@ private fun DynamicReaderLayer(
 
     LaunchedEffect(overlay.card.id, overlay.kind) {
         delay(40L)
-        runCatching { focus.requestFocus() }
+        runCatching { focus.requestPageFocus() }
     }
     // imageIndex is part of the key: B from the gallery must restore the
     // currently shown picture, not the index captured when the gallery opened.
@@ -1457,7 +1458,7 @@ private fun DynamicCommentsOverlay(
         if (comments.isNotEmpty() && !focusedOnce) {
             focusedOnce = true
             delay(80L)
-            runCatching { firstFocus.requestFocus() }
+            runCatching { firstFocus.requestPageFocus() }
         }
     }
     fun submitComment() {
@@ -1477,7 +1478,7 @@ private fun DynamicCommentsOverlay(
                     onSentRpid(it.rpid.takeIf { rpid -> rpid > 0L })
                     onSentNotice(it.successToast.ifBlank { "评论已提交" })
                     load(1)
-                    runCatching { composeFocus.requestFocus() }
+                    runCatching { composeFocus.requestPageFocus() }
                     // 评论索引有延迟，稍后再拉一次，避免要手动刷新才看到。
                     delay(700L)
                     load(1)
@@ -1499,7 +1500,7 @@ private fun DynamicCommentsOverlay(
                     deleteError = null
                     comments = comments.filterNot { it.rpid == comment.rpid }
                     load(1)
-                    runCatching { firstFocus.requestFocus() }
+                    runCatching { firstFocus.requestPageFocus() }
                 }
                 .onFailure { deleteError = it.message ?: "删除失败" }
             deleting = false
@@ -1509,7 +1510,7 @@ private fun DynamicCommentsOverlay(
     val composerActive = fieldFocused || sendFocused || recallFocused
     suspend fun restoreCommentFocus() {
         delay(60L)
-        runCatching { firstFocus.requestFocus() }
+        runCatching { firstFocus.requestPageFocus() }
     }
     LaunchedEffect(deleteTarget, composerActive) {
         onComposerDismiss(
@@ -1527,7 +1528,7 @@ private fun DynamicCommentsOverlay(
                         fieldFocused = false
                         sendFocused = false
                         recallFocused = false
-                        tabFocus?.let { runCatching { it.requestFocus() } }
+                        tabFocus?.let { runCatching { it.requestPageFocus() } }
                     }
                 }
                 else -> null
@@ -1540,7 +1541,7 @@ private fun DynamicCommentsOverlay(
     LaunchedEffect(deleteTarget) {
         if (deleteTarget != null) {
             delay(60L)
-            runCatching { deleteConfirmFocus.requestFocus() }
+            runCatching { deleteConfirmFocus.requestPageFocus() }
         }
     }
 
@@ -2051,7 +2052,7 @@ private fun DynamicDetailOverlay(
         LaunchedEffect(tab) {
             delay(80L)
             runCatching {
-                if (tab == 0) bodyTabFocus.requestFocus() else commentsTabFocus.requestFocus()
+                if (tab == 0) bodyTabFocus.requestPageFocus() else commentsTabFocus.requestPageFocus()
             }
         }
         if (tab == 1) {

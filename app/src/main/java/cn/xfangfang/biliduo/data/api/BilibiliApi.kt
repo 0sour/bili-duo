@@ -704,23 +704,34 @@ interface BilibiliApi {
         }
 
         private class RateLimitInterceptor : Interceptor {
-            @Volatile private var lastRequestAt = 0L
+            /**
+             * Space API calls by request *start*, not by the previous
+             * response. Measuring from completion added the full response
+             * time to every gap and serialized playback startup behind
+             * unrelated calls (view → playurl → player/wbi).
+             */
+            @Volatile private var lastStartedAt = 0L
             override fun intercept(chain: Interceptor.Chain): Response {
                 val url = chain.request().url.toString()
                 val isApi = url.contains("api.bilibili.com") || url.contains("passport.bilibili.com")
                 if (isApi) {
-                    val elapsed = System.currentTimeMillis() - lastRequestAt
-                    val wait = MIN_API_INTERVAL_MS - elapsed
-                    if (wait > 0) {
-                        try { Thread.sleep(wait) } catch (_: InterruptedException) {}
-                    }
+                    awaitSlot()
                 }
-                val response = chain.proceed(chain.request())
-                if (isApi) lastRequestAt = System.currentTimeMillis()
-                return response
+                return chain.proceed(chain.request())
             }
+
+            @Synchronized
+            private fun awaitSlot() {
+                val elapsed = System.currentTimeMillis() - lastStartedAt
+                val wait = MIN_API_INTERVAL_MS - elapsed
+                if (wait > 0) {
+                    try { Thread.sleep(wait) } catch (_: InterruptedException) {}
+                }
+                lastStartedAt = System.currentTimeMillis()
+            }
+
             companion object {
-                private const val MIN_API_INTERVAL_MS = 300L
+                private const val MIN_API_INTERVAL_MS = 120L
             }
         }
 

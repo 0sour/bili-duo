@@ -69,11 +69,13 @@ class DuoRailFocusState {
     fun beginNavigation(route: String) {
         pendingRoute = route
         locked = true
+        DuoPageFocusGate.railLocked = true
     }
 
     fun release() {
         locked = false
         pendingRoute = null
+        DuoPageFocusGate.railLocked = false
     }
 
     fun reset() {
@@ -109,7 +111,7 @@ fun DuoRail(
         if (index < 0) return@LaunchedEffect
         // Let NavHost compose the destination first, then take focus back from
         // any initial-content request.
-        delay(60)
+        delay(16)
         if (focusState.locked && focusState.pendingRoute == pending) {
             runCatching { itemFocuses[index].requestFocus() }
             focusState.consume(pending)
@@ -139,7 +141,9 @@ fun DuoRail(
                         focusState.onItemFocus(screen.route, focus.isFocused)
                         if (!focus.isFocused && selected && focusState.locked) {
                             scope.launch {
-                                delay(40)
+                                // Reclaim in the same frame instead of waiting:
+                                // a delayed reclaim leaves the old rail item
+                                // highlighted after the destination is shown.
                                 if (focusState.locked && currentRoute == screen.route) {
                                     runCatching { itemFocuses[index].requestFocus() }
                                 }
@@ -152,6 +156,10 @@ fun DuoRail(
                         if (selected) Color.White.copy(alpha = 0.07f) else Color.Transparent
                     )
                     .duoClickable {
+                        // Touch/click does not move focus on its own. Focus the
+                        // tapped rail item first so the ring never lags on the
+                        // previously selected item while the page transitions.
+                        runCatching { itemFocuses[index].requestFocus() }
                         focusState.beginNavigation(screen.route)
                         onNavigate(screen)
                     }

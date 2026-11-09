@@ -61,6 +61,7 @@ import cn.xfangfang.biliduo.ui.common.DuoPageHeader
 import cn.xfangfang.biliduo.ui.common.DuoPalette
 import cn.xfangfang.biliduo.ui.common.DuoPillButton
 import cn.xfangfang.biliduo.ui.common.DuoSearchField
+import cn.xfangfang.biliduo.ui.duo.requestPageFocus
 import cn.xfangfang.biliduo.ui.duo.duoClickable
 import cn.xfangfang.biliduo.ui.duo.duoFocusRing
 import cn.xfangfang.biliduo.ui.top.TopAmbientUi
@@ -142,7 +143,7 @@ fun FollowingListScreen(
     LaunchedEffect(loggedIn) {
         if (!loggedIn) {
             delay(80)
-            runCatching { loginFocus.requestFocus() }
+            runCatching { loginFocus.requestPageFocus() }
         }
     }
 
@@ -163,7 +164,7 @@ fun FollowingListScreen(
     LaunchedEffect(uiState.isLoading, searchMode) {
         if (!searchMode && uiState.items.isNotEmpty() && !uiState.isLoading) {
             delay(80)
-            runCatching { firstItemFocus.requestFocus() }
+            runCatching { firstItemFocus.requestPageFocus() }
         }
     }
     LaunchedEffect(searchMode) {
@@ -171,7 +172,7 @@ fun FollowingListScreen(
             searchText = uiState.searchQuery.orEmpty()
             // C: keep the ring on 取消 instead of focusing the input.
             delay(80)
-            runCatching { searchCancelFocus.requestFocus() }
+            runCatching { searchCancelFocus.requestPageFocus() }
         } else {
             keyboard?.hide()
         }
@@ -188,7 +189,7 @@ fun FollowingListScreen(
         confirmUnfollow = null
         scope.launch {
             delay(120)
-            runCatching { focus?.requestFocus() }
+            runCatching { focus?.requestPageFocus() }
         }
     }
 

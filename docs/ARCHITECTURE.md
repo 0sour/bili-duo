@@ -341,6 +341,10 @@ class InputRouter(
 - 去重：同 keyCode 40ms 窗口；只处理 ACTION_DOWN；A/B 和方向键 repeat 被吞掉，
   保证长按只移动一格。
 - 触摸：`duoClickable` 直接聚焦并点击，没有“第一次触摸只切模式”的中间态。
+- rail 焦点锁：点击 rail 项时先请求该项焦点再导航；`DuoPageFocusGate` 同步记录
+  rail 锁定状态。页面入口的首项焦点必须走 `requestPageFocus()`，锁定时直接跳过，
+  防止内容抢焦点后被 rail 收回。焦点环失焦立即消失（仅保留 120ms 淡入），避免
+  旧项残影。
 - 返回：`DuoSessionViewModel.requestBack()` 先走屏幕级 `setBackInterceptor`
   （如直播输入框收键盘），再走播放器的 `setFocusBackInterceptor`
   （右栏 → 播放键），最后才通过 SharedFlow 让下屏 `navController.popBackStack()`。
@@ -467,6 +471,9 @@ sealed interface DuoRoute {
 - 上屏不订阅 Compose 状态；`PlayerView` 只绑 player。
 - 列表使用 `key` + immutable model；避免整页重组。
 - Coil：内存 16MB / 磁盘 50MB；快速滚动暂停请求。
+- 起播：`RateLimitInterceptor` 按请求**起点**间隔 120ms（不是响应结束后再等）；
+  VOD 的 `player/wbi/v2` 最多等 0.6s，本机有进度时直接跳过；弹幕 XML 延后 900ms；
+  VIP `/nav` 缓存 5 分钟。直播 playurl 与房间详情并行，主播卡与房间信息并行。
 - 目标：冷启动 < 2.5s 到下屏首页；播放首帧 < 1.5s；下屏焦点移动 < 16ms/帧。
 
 ---

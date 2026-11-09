@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc51-FB7299">
+  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc52-FB7299">
   <img alt="status" src="https://img.shields.io/badge/status-test%20build-orange">
   <img alt="Android" src="https://img.shields.io/badge/Android-24%2B-3DDC84?logo=android&logoColor=white">
   <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-1.9.23-7F52FF?logo=kotlin&logoColor=white">
@@ -23,9 +23,10 @@
 上屏只负责视频画面，下屏用一块 `Presentation` 承载完整 UI；手柄和触摸共用同一棵
 Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，也没有上屏 OSD。
 
-> 当前版本：**0.2.0-rc51**（versionCode 52，待发布）
+> 当前版本：**0.2.0-rc52**（versionCode 53，待发布）
 > 状态：功能完整的 **本地测试版**，232 个单元测试通过；rc50 已在 Duo 完成侧栏焦点、
-> L1/R1 标签、视频默认值、物理输入与图片查看器复测。rc51 新增 RP Duo 手柄风格适配。
+> L1/R1 标签、视频默认值、物理输入与图片查看器复测。rc51 新增 RP Duo 手柄风格适配；rc52 把手柄设置独立成分类，
+> 修复切换页面时的焦点环残影，并缩短视频/直播起播等待。
 
 ## 界面预览
 
@@ -55,7 +56,7 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
   `TOP_PLAYER ↔ BOTTOM_UI` 双模式和 Y 键切换。
 - **键位**：屏幕提示使用实体丝印：D-pad 移动焦点，**B 确认，A 逐级返回，Y 刷新/
   弹幕/点赞**，START 弹幕/字幕设置，LB/RB 切换右栏 tab。进度条可聚焦，左右键 ±10s。
-- **手柄风格**：设置 → 播放可选 **Xbox / Retro**。实体位置功能不变；Retro 固件
+- **手柄风格**：设置 → 手柄可选 **Xbox / Retro**。实体位置功能不变；Retro 固件
   输出的 A/B、X/Y 会在 `InputRouter` 中归一化。首次启动可选择，可跳过（默认 Xbox）。
 - **肩键快捷键**：L1/R1 切一级 tab（搜索页切视频/用户），L2/R2 切二级筛选行；
   长按只走一格。
@@ -242,6 +243,11 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
   - rc51 手柄风格：设置 → 播放可选 Xbox / Retro，首次启动可跳过（默认 Xbox）；
     InputRouter 归一化 Retro 的 A/B、X/Y，实体功能固定为 B 确认、A 返回、Y 刷新；
     屏幕提示统一改为实体丝印。232 单测通过。
+  - rc52 设置新增独立「手柄」分类，不再塞在「播放」里；焦点环失去焦点时立即
+    消失，rail 点击先聚焦目标项，页面首项在 rail 锁定期间不再抢焦点，消除切页
+    时指示器先闪到旧项/内容再回来的观感；API 限流改为按请求起点 120ms，VOD
+    元数据等待 1.6s→0.6s（本地有进度时直接跳过），弹幕延后 900ms 加载；直播
+    playurl 与房间详情并行、主播卡并行，起播实测约 2.0s→0.8s。232 单测通过。
   - 登录、个人中心、历史/收藏/关注只读浏览；弹幕发送→撤回闭环。
 
 ### 未实现（代码层面）

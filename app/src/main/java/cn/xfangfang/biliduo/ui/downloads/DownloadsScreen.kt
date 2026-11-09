@@ -68,6 +68,7 @@ import cn.xfangfang.biliduo.ui.common.DuoPageHeader
 import cn.xfangfang.biliduo.ui.common.DuoPalette
 import cn.xfangfang.biliduo.ui.common.DuoPillButton
 import cn.xfangfang.biliduo.ui.common.DuoSearchField
+import cn.xfangfang.biliduo.ui.duo.requestPageFocus
 import cn.xfangfang.biliduo.ui.duo.duoClickable
 import cn.xfangfang.biliduo.ui.duo.duoFocusRing
 import cn.xfangfang.biliduo.ui.duo.duoTabCycling
@@ -206,7 +207,7 @@ fun DownloadsScreen(
                 return@LaunchedEffect
             }
             val target = if (displayItems.isNotEmpty()) firstItemFocus else emptyActionFocus
-            runCatching { target.requestFocus() }
+            runCatching { target.requestPageFocus() }
             focusContentOnFilterShortcut = false
         }
     }
@@ -214,7 +215,7 @@ fun DownloadsScreen(
         if (searchMode) {
             // C: the input is not focused on entry; keep the ring on 取消.
             delay(80)
-            runCatching { searchCancelFocus.requestFocus() }
+            runCatching { searchCancelFocus.requestPageFocus() }
         } else {
             keyboard?.hide()
         }
@@ -222,7 +223,7 @@ fun DownloadsScreen(
     fun restoreFocus(focus: FocusRequester?) {
         scope.launch {
             delay(120)
-            runCatching { focus?.requestFocus() }
+            runCatching { focus?.requestPageFocus() }
         }
     }
 
@@ -316,7 +317,7 @@ fun DownloadsScreen(
         if (pendingFilterFocus) {
             delay(80L)
             val index = filters.indexOf(filter)
-            filterFocusers.getOrNull(index)?.let { runCatching { it.requestFocus() } }
+            filterFocusers.getOrNull(index)?.let { runCatching { it.requestPageFocus() } }
             pendingFilterFocus = false
         }
     }

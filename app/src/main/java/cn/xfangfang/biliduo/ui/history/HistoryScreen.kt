@@ -59,6 +59,7 @@ import cn.xfangfang.biliduo.ui.common.DuoPageHeader
 import cn.xfangfang.biliduo.ui.common.DuoPalette
 import cn.xfangfang.biliduo.ui.common.DuoPillButton
 import cn.xfangfang.biliduo.ui.common.DuoSearchField
+import cn.xfangfang.biliduo.ui.duo.requestPageFocus
 import cn.xfangfang.biliduo.ui.duo.duoClickable
 import cn.xfangfang.biliduo.ui.duo.duoFocusRing
 import cn.xfangfang.biliduo.ui.top.TopAmbientUi
@@ -111,7 +112,7 @@ fun HistoryScreen(
     LaunchedEffect(loggedIn) {
         if (!loggedIn) {
             delay(80)
-            runCatching { retryFocus.requestFocus() }
+            runCatching { retryFocus.requestPageFocus() }
         }
     }
     LaunchedEffect(loggedIn, uiState.isLoading, displayItems.size, uiState.searchQuery) {
@@ -154,7 +155,7 @@ fun HistoryScreen(
     LaunchedEffect(uiState.isLoading, searchMode) {
         if (!searchMode && displayItems.isNotEmpty() && !uiState.isLoading) {
             delay(80)
-            runCatching { firstItemFocus.requestFocus() }
+            runCatching { firstItemFocus.requestPageFocus() }
         }
         if (displayItems.isEmpty()) onFocusCleared()
     }
@@ -163,7 +164,7 @@ fun HistoryScreen(
         if (searchMode) {
             // C: keep the ring on 取消 instead of focusing the input.
             delay(80)
-            runCatching { searchCancelFocus.requestFocus() }
+            runCatching { searchCancelFocus.requestPageFocus() }
         } else {
             keyboard?.hide()
             viewModel.setSearchQuery("")
@@ -182,7 +183,7 @@ fun HistoryScreen(
         confirmDelete = null
         scope.launch {
             delay(120)
-            runCatching { focus?.requestFocus() }
+            runCatching { focus?.requestPageFocus() }
         }
     }
 

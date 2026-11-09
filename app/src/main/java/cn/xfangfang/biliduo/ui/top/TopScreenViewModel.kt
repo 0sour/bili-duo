@@ -46,6 +46,7 @@ enum class TopGlyph {
     PERSON,
     LOGIN,
     NETWORK,
+    GAMEPAD,
     THEME,
     DANMAKU,
     STORAGE,

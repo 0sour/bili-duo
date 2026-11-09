@@ -25,6 +25,7 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -35,7 +36,11 @@ import kotlinx.coroutines.withTimeoutOrNull
 enum class PlaybackSource { ONLINE, LOCAL }
 
 /** Cap the wait for player/v2 so a slow metadata call never blocks playback. */
-private const val META_WAIT_MS = 1_600L
+private const val META_WAIT_MS = 600L
+/** Danmaku XML can be several MB; let the first video segment win. */
+private const val DANMAKU_DEFER_MS = 900L
+/** /nav is only needed to lock VIP qualities; it need not run per video. */
+private const val VIP_CACHE_MS = 5 * 60_000L
 
 data class PlayerUiState(
     val isLoading: Boolean = true,
@@ -105,9 +110,14 @@ class PlayerViewModel(
 
     private var cachedDashData: DashData? = null
     private var vipJob: Job? = null
+    private var lastVipStatus: Boolean? = null
+    private var lastVipFetchAt: Long = 0L
     private var loadJob: Job? = null
     private var playUrlJob: Job? = null
     private var danmakuJob: Job? = null
+    private var danmakuScheduleJob: Job? = null
+    /** cid whose danmaku has already been requested; avoids refetch on retry. */
+    private var danmakuCid: Long? = null
     private var liveJob: Job? = null
     /** player/wbi/v2 result shared by subtitles and cloud resume. */
     private var metaJob: Deferred<Result<PlaybackMeta>>? = null
@@ -160,9 +170,17 @@ class PlayerViewModel(
             return
         }
         if (vipJob?.isActive == true) return
+        val cached = lastVipStatus
+        val now = System.currentTimeMillis()
+        if (cached != null && now - lastVipFetchAt < VIP_CACHE_MS) {
+            _uiState.value = _uiState.value.copy(isVip = cached)
+            return
+        }
         vipJob = viewModelScope.launch {
             repository.getNavInfo()
                 .onSuccess { nav ->
+                    lastVipStatus = nav.vipStatus == 1
+                    lastVipFetchAt = System.currentTimeMillis()
                     _uiState.value = _uiState.value.copy(isVip = nav.vipStatus == 1)
                 }
                 .onFailure {
@@ -274,7 +292,6 @@ class PlayerViewModel(
                 Log.d(BilibiliApp.TAG, "PlayerVM: resume aid=${info.aid} -> pageCid=${startPage.cid} resumeMs=${resumeMs}")
                 loadPlaybackMeta(info.aid, startPage.cid)
                 loadPlayUrlDash(bvid, startPage.cid)
-                loadDanmaku(startPage.cid)
             }
             .onFailure { e ->
                 Log.e(BilibiliApp.TAG, "PlayerVM: load failed", e)
@@ -298,6 +315,7 @@ class PlayerViewModel(
         metaJob?.cancel()
         metaJob = null
         danmakuJob?.cancel()
+        danmakuScheduleJob?.cancel()
         liveJob?.cancel()
         cachedDashData = null
         pgcEpisodeByCid.clear()
@@ -321,21 +339,32 @@ class PlayerViewModel(
         )
 
         liveJob = viewModelScope.launch {
-            val detail = if (!refreshDetail && cachedDetail != null) {
-                cachedDetail
+            val cached = if (!refreshDetail) cachedDetail else null
+            // Room detail (title/anchor/cover) and the play URL are independent.
+            // Start both together and let the video URL update the surface as
+            // soon as it arrives; the room card fills in separately.
+            val detailDeferred = if (cached == null) {
+                async { repository.getLiveRoomDetail(roomId) }
             } else {
-                repository.getLiveRoomDetail(roomId).getOrElse { error ->
-                    failLive(error.message ?: "直播间信息加载失败", cachedDetail)
-                    return@launch
+                null
+            }
+            if (detailDeferred != null) {
+                launch {
+                    detailDeferred.await().onSuccess { detail ->
+                        if (_uiState.value.liveRoomId == roomId) {
+                            _uiState.value = _uiState.value.copy(
+                                liveDetail = detail,
+                                title = detail.title.ifBlank { _uiState.value.title },
+                            )
+                        }
+                    }
                 }
             }
-            // No room-id guard here: on the first load liveDetail is still null,
-            // and a superseded load is already cancelled by liveJob.
-            _uiState.value = _uiState.value.copy(liveDetail = detail, title = detail.title)
 
             repository.getLivePlayUrl(roomId, qn)
                 .onSuccess { play ->
-                    if (_uiState.value.liveDetail?.roomId != roomId) return@onSuccess
+                    if (_uiState.value.liveRoomId != roomId) return@onSuccess
+                    val detail = _uiState.value.liveDetail ?: cached
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         error = null,
@@ -344,7 +373,7 @@ class PlayerViewModel(
                         videoInfo = null,
                         currentPage = null,
                         pages = emptyList(),
-                        title = detail.title,
+                        title = detail?.title.orEmpty().ifBlank { "直播间" },
                         liveDetail = detail,
                         liveQualities = play.qualities,
                         currentQuality = play.currentQuality,
@@ -359,7 +388,13 @@ class PlayerViewModel(
                     )
                 }
                 .onFailure { error ->
-                    if (_uiState.value.liveDetail?.roomId != roomId) return@onFailure
+                    if (_uiState.value.liveRoomId != roomId) return@onFailure
+                    // The room card may explain an offline/ended room better
+                    // than the play-url error. This only runs on failure, so it
+                    // no longer delays startup.
+                    val detail = cached
+                        ?: detailDeferred?.await()?.getOrNull()
+                        ?: _uiState.value.liveDetail
                     failLive(error.message ?: "直播地址加载失败", detail)
                 }
         }
@@ -413,6 +448,7 @@ class PlayerViewModel(
         metaJob?.cancel()
         metaJob = null
         danmakuJob?.cancel()
+        danmakuScheduleJob?.cancel()
         liveJob?.cancel()
         cachedDashData = null
         pgcEpisodeByCid.clear()
@@ -459,7 +495,6 @@ class PlayerViewModel(
                     )
                     loadPlaybackMeta(episode.aid, episode.cid, applySubtitles = false)
                     loadPgcPlayUrl(episode)
-                    loadDanmaku(episode.cid)
                 }
                 .onFailure { e ->
                     Log.e(BilibiliApp.TAG, "PlayerVM: loadPgc failed", e)
@@ -502,7 +537,13 @@ class PlayerViewModel(
         playUrlJob = viewModelScope.launch {
             val pendingMeta = metaJob
             val playUrlDeferred = async { repository.getPgcPlayUrl(episode.epId, episode.cid) }
-            val meta = pendingMeta?.let { withTimeoutOrNull(META_WAIT_MS) { it.await() } }?.getOrNull()
+            // Local progress already wins over the cloud position; waiting for
+            // player/wbi in that case only delays the first frame.
+            val meta = if (_uiState.value.resumePositionMs > 0L) {
+                null
+            } else {
+                pendingMeta?.let { withTimeoutOrNull(META_WAIT_MS) { it.await() } }?.getOrNull()
+            }
             playUrlDeferred.await()
                 .onSuccess { playUrlInfo ->
                     if (_uiState.value.currentPage?.cid != episode.cid) return@onSuccess
@@ -541,6 +582,7 @@ class PlayerViewModel(
                 videoUrl = null,
                 isPreview = false,
                 previewToast = "",
+                danmaku = emptyList(),
                 videoInfo = info?.copy(
                     bvid = episode.bvid,
                     aid = episode.aid,
@@ -550,7 +592,6 @@ class PlayerViewModel(
             playUrlJob?.cancel()
             loadPlaybackMeta(episode.aid, page.cid, applySubtitles = false)
             loadPgcPlayUrl(episode)
-            loadDanmaku(page.cid)
             return
         }
         // 本地已下载的分 P：直接切本地文件，不联网
@@ -602,12 +643,12 @@ class PlayerViewModel(
             currentPage = page,
             resumePositionMs = resumeMs,
             isLoading = true,
-            videoUrl = null
+            videoUrl = null,
+            danmaku = emptyList(),
         )
         playUrlJob?.cancel()
         loadPlaybackMeta(info.aid, page.cid)
         loadPlayUrlDash(bvid, page.cid)
-        loadDanmaku(page.cid)
     }
 
     /** Clear the current session when leaving the player. */
@@ -617,6 +658,7 @@ class PlayerViewModel(
         metaJob?.cancel()
         metaJob = null
         danmakuJob?.cancel()
+        danmakuScheduleJob?.cancel()
         liveJob?.cancel()
         cachedDashData = null
         pgcEpisodeByCid.clear()
@@ -733,6 +775,7 @@ class PlayerViewModel(
 
     private fun loadDanmaku(cid: Long, clearFirst: Boolean = true) {
         danmakuJob?.cancel()
+        danmakuCid = cid
         if (clearFirst) {
             _uiState.value = _uiState.value.copy(danmaku = emptyList())
         }
@@ -814,7 +857,13 @@ class PlayerViewModel(
             // start when it answers within META_WAIT_MS.
             val pendingMeta = metaJob
             val playUrlDeferred = async { repository.getPlayUrlDash(bvid, cid) }
-            val meta = pendingMeta?.let { withTimeoutOrNull(META_WAIT_MS) { it.await() } }?.getOrNull()
+            // Local progress already wins over the cloud position; waiting for
+            // player/wbi in that case only delays the first frame.
+            val meta = if (_uiState.value.resumePositionMs > 0L) {
+                null
+            } else {
+                pendingMeta?.let { withTimeoutOrNull(META_WAIT_MS) { it.await() } }?.getOrNull()
+            }
             playUrlDeferred.await()
                 .onSuccess { playUrlInfo ->
                     Log.d(BilibiliApp.TAG, "PlayerVM: dash loaded, accept=${playUrlInfo.accept_quality}")
@@ -882,6 +931,24 @@ class PlayerViewModel(
                     error = "无法获取播放链接"
                 )
             }
+        }
+        scheduleDanmaku(_uiState.value.currentPage?.cid)
+    }
+
+    /**
+     * Danmaku is not needed for the first frame. Loading its XML immediately
+     * competes with the video/audio segments, so wait until playback has had a
+     * chance to start. Quality changes and retries keep the existing list.
+     */
+    private fun scheduleDanmaku(cid: Long?) {
+        if (cid == null || cid <= 0L) return
+        // Keep the current list on quality changes/retries of the same cid, but
+        // never skip a new page just because the previous page had danmaku.
+        if (danmakuCid == cid && _uiState.value.danmaku.isNotEmpty()) return
+        danmakuScheduleJob?.cancel()
+        danmakuScheduleJob = viewModelScope.launch {
+            delay(DANMAKU_DEFER_MS)
+            if (_uiState.value.currentPage?.cid == cid) loadDanmaku(cid)
         }
     }
 

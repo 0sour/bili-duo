@@ -53,6 +53,7 @@ import cn.xfangfang.biliduo.ui.common.DuoPalette
 import cn.xfangfang.biliduo.ui.common.DuoPillButton
 import cn.xfangfang.biliduo.ui.common.DuoSearchField
 import cn.xfangfang.biliduo.ui.common.ScrollToTopFab
+import cn.xfangfang.biliduo.ui.duo.requestPageFocus
 import cn.xfangfang.biliduo.ui.duo.duoClickable
 import cn.xfangfang.biliduo.ui.duo.duoFocusRing
 import cn.xfangfang.biliduo.ui.duo.duoTabCycling
@@ -102,7 +103,7 @@ fun ChannelScreen(
         if (pendingModeFocus) {
             delay(80L)
             val index = if (uiState.viewMode == ChannelViewMode.VIDEOS) 0 else 1
-            modeFocusers[index].let { runCatching { it.requestFocus() } }
+            modeFocusers[index].let { runCatching { it.requestPageFocus() } }
             pendingModeFocus = false
         }
     }
@@ -134,7 +135,7 @@ fun ChannelScreen(
         showUnfollowConfirm = false
         scope.launch {
             delay(120)
-            runCatching { followFocus.requestFocus() }
+            runCatching { followFocus.requestPageFocus() }
         }
     }
 
@@ -170,7 +171,7 @@ fun ChannelScreen(
             searchQuery = ""
             // C: keep focus on the header search icon, not the input.
             delay(200)
-            runCatching { searchActionFocus.requestFocus() }
+            runCatching { searchActionFocus.requestPageFocus() }
         }
     }
 
@@ -201,7 +202,7 @@ fun ChannelScreen(
                 }
                 else -> return@LaunchedEffect
             }
-            runCatching { target.requestFocus() }
+            runCatching { target.requestPageFocus() }
             focusContentOnModeShortcut = false
             return@LaunchedEffect
         }
@@ -210,7 +211,7 @@ fun ChannelScreen(
         ) {
             delay(120)
             if (SystemClock.uptimeMillis() - lastModeShortcutAt < 600L) return@LaunchedEffect
-            runCatching { firstVideoFocus.requestFocus() }
+            runCatching { firstVideoFocus.requestPageFocus() }
             initialVideoFocusDone = true
         }
     }

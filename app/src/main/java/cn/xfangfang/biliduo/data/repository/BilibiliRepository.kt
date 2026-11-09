@@ -12,6 +12,8 @@ import cn.xfangfang.biliduo.data.model.*
 import cn.xfangfang.biliduo.util.cleanHtmlText
 import cn.xfangfang.biliduo.util.formatDuration
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
@@ -378,31 +380,37 @@ class BilibiliRepository(
     suspend fun getLiveRoomDetail(roomId: Long): Result<LiveRoomDetail> {
         if (BuildConfig.DEBUG) Log.d(BilibiliApp.TAG, "getLiveRoomDetail: roomId=$roomId")
         return runCatching {
-            val infoResponse = api.getLiveRoomInfo(roomId)
-            if (infoResponse.code != 0) throw Exception(infoResponse.message)
-            val info = infoResponse.data ?: throw Exception("直播间不存在")
-            val anchor = runCatching { api.getLiveAnchor(roomId) }
-                .getOrNull()
-                ?.takeIf { it.code == 0 }
-                ?.data
-                ?.info
-            LiveRoomDetail(
-                roomId = info.roomId.takeIf { it > 0 } ?: roomId,
-                uid = info.uid,
-                title = info.title,
-                description = info.description,
-                cover = info.userCover,
-                keyframe = info.keyframe,
-                liveStatus = info.liveStatus,
-                online = info.online,
-                attention = info.attention,
-                areaName = info.areaName,
-                parentAreaName = info.parentAreaName,
-                liveTime = info.liveTime,
-                anchorName = anchor?.uname.orEmpty(),
-                anchorFace = anchor?.face.orEmpty(),
-                anchorOfficial = anchor?.officialVerify?.desc.orEmpty(),
-            )
+            coroutineScope {
+                // Room info and anchor card are independent; the anchor request
+                // used to add a full round trip before the play URL could start.
+                val infoDeferred = async { api.getLiveRoomInfo(roomId) }
+                val anchorDeferred = async { runCatching { api.getLiveAnchor(roomId) } }
+                val infoResponse = infoDeferred.await()
+                if (infoResponse.code != 0) throw Exception(infoResponse.message)
+                val info = infoResponse.data ?: throw Exception("直播间不存在")
+                val anchor = anchorDeferred.await()
+                    .getOrNull()
+                    ?.takeIf { it.code == 0 }
+                    ?.data
+                    ?.info
+                LiveRoomDetail(
+                    roomId = info.roomId.takeIf { it > 0 } ?: roomId,
+                    uid = info.uid,
+                    title = info.title,
+                    description = info.description,
+                    cover = info.userCover,
+                    keyframe = info.keyframe,
+                    liveStatus = info.liveStatus,
+                    online = info.online,
+                    attention = info.attention,
+                    areaName = info.areaName,
+                    parentAreaName = info.parentAreaName,
+                    liveTime = info.liveTime,
+                    anchorName = anchor?.uname.orEmpty(),
+                    anchorFace = anchor?.face.orEmpty(),
+                    anchorOfficial = anchor?.officialVerify?.desc.orEmpty(),
+                )
+            }
         }.onFailure { Log.e(BilibiliApp.TAG, "getLiveRoomDetail failed", it) }
     }
 
