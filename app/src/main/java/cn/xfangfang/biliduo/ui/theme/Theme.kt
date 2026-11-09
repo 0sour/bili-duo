@@ -91,17 +91,20 @@ val DarkDuoColors = DuoColors(
 
 val LightDuoColors = DuoColors(
     isDark = false,
-    bg = Color(0xFFECEDF1),
-    surface1 = Color(0xFFFFFFFF),
-    surface2 = Color(0xFFF8F8FB),
-    surface3 = Color(0xFFE4E5EB),
-    surface4 = Color(0xFFD7D8E0),
-    outline = Color(0xFFD9DAE2),
-    outlineStrong = Color(0xFFB9BAC5),
-    text = Color(0xFF121216),
-    secondary = Color(0xFF3F3F4A),
-    tertiary = Color(0xFF5C5C68),
-    disabled = Color(0xFF92939E),
+    // A dim "paper" light theme: no pure white on large surfaces. Cards sit at
+    // ~95% luminance, the canvas at ~89%, which keeps hierarchy without the
+    // glare of #FFFFFF in a handheld held close to the eyes.
+    bg = Color(0xFFE2E3E8),
+    surface1 = Color(0xFFF3F4F7),
+    surface2 = Color(0xFFEAEBF0),
+    surface3 = Color(0xFFD8DAE1),
+    surface4 = Color(0xFFCBCDD7),
+    outline = Color(0xFFCFD0D8),
+    outlineStrong = Color(0xFFACAEBA),
+    text = Color(0xFF111115),
+    secondary = Color(0xFF383842),
+    tertiary = Color(0xFF53535E),
+    disabled = Color(0xFF878893),
     pink = Color(0xFFFB7299),
     pinkInk = Color(0xFFB02A5B),
     onPink = Color(0xFFFFFFFF),
@@ -112,7 +115,7 @@ val LightDuoColors = DuoColors(
     focusRing = Color(0xFF1B1B20),
     focusHalo = Color(0xFFFFFFFF),
     scrim = Color.Black.copy(alpha = 0.45f),
-    selectionFill = Color.Black.copy(alpha = 0.08f),
+    selectionFill = Color.Black.copy(alpha = 0.09f),
     stageBg = Color(0xFF000000),
 )
 

@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import cn.xfangfang.biliduo.ui.theme.DuoTheme
 
 private val DuoPink = Color(0xFFFB7299)
 private val DuoInk = Color(0xFF1A1A22)
@@ -33,21 +34,47 @@ fun DuoMark(
     size: Dp = 20.dp,
     accent: Color = DuoPink,
 ) {
+    val colors = DuoTheme.colors
     Canvas(modifier.size(size)) {
-        drawDuoMark(inset = this.size.minDimension * 0.02f, accent = accent)
+        drawDuoMark(
+            inset = this.size.minDimension * 0.02f,
+            accent = accent,
+            screen = colors.text.copy(alpha = 0.92f),
+            screenFill = colors.text.copy(alpha = 0.055f),
+            bottomFill = accent.copy(alpha = 0.18f),
+        )
     }
 }
 
 /**
- * The dark app-icon tile used in the top-left of the top screen and in the
+ * The app-icon tile used in the top-left of the top screen and in the
  * bottom-screen rail. This is the in-app counterpart of the launcher icon:
- * same two-screen geometry, same pink play glyph, black rounded-square field.
+ * same two-screen geometry, same pink play glyph, rounded-square field.
+ *
+ * Dark keeps the original black tile. Light uses the selected paper-ink
+ * variant: paper tile, ink screen outline, deep-pink play glyph. The mark
+ * geometry is identical in both themes.
  */
 @Composable
 fun DuoLogo(
     modifier: Modifier = Modifier,
     size: Dp = 36.dp,
 ) {
+    val colors = DuoTheme.colors
+    val dark = colors.isDark
+    val accent = if (dark) DuoPink else colors.pinkInk
+    val screen = if (dark) {
+        Color.White.copy(alpha = 0.92f)
+    } else {
+        DuoInk.copy(alpha = 0.92f)
+    }
+    val screenFill = if (dark) {
+        Color.White.copy(alpha = 0.055f)
+    } else {
+        DuoInk.copy(alpha = 0.045f)
+    }
+    val bottomFill = accent.copy(alpha = if (dark) 0.18f else 0.12f)
+
     Canvas(modifier.size(size)) {
         val w = this.size.width
         val h = this.size.height
@@ -63,7 +90,11 @@ fun DuoLogo(
 
         drawRoundRect(
             brush = Brush.linearGradient(
-                colors = listOf(Color(0xFF252532), Color(0xFF0B0B0E)),
+                colors = if (dark) {
+                    listOf(Color(0xFF252532), Color(0xFF0B0B0E))
+                } else {
+                    listOf(Color(0xFFF8F8FA), Color(0xFFEEEFF3))
+                },
                 start = Offset(0f, 0f),
                 end = Offset(w, h),
             ),
@@ -73,7 +104,10 @@ fun DuoLogo(
         clipPath(tilePath) {
             drawCircle(
                 brush = Brush.radialGradient(
-                    colors = listOf(DuoPink.copy(alpha = 0.22f), Color.Transparent),
+                    colors = listOf(
+                        accent.copy(alpha = if (dark) 0.22f else 0.10f),
+                        Color.Transparent,
+                    ),
                     center = Offset(w * 0.72f, h * 0.86f),
                     radius = w * 0.82f,
                 ),
@@ -82,7 +116,11 @@ fun DuoLogo(
             )
         }
         drawRoundRect(
-            color = Color.White.copy(alpha = 0.08f),
+            color = if (dark) {
+                Color.White.copy(alpha = 0.08f)
+            } else {
+                DuoInk.copy(alpha = 0.08f)
+            },
             size = Size(w, h),
             cornerRadius = CornerRadius(radius),
             style = Stroke(width = 1.dp.toPx()),
@@ -90,12 +128,21 @@ fun DuoLogo(
 
         drawDuoMark(
             inset = this.size.minDimension * 0.13f,
-            accent = DuoPink,
+            accent = accent,
+            screen = screen,
+            screenFill = screenFill,
+            bottomFill = bottomFill,
         )
     }
 }
 
-private fun DrawScope.drawDuoMark(inset: Float, accent: Color) {
+private fun DrawScope.drawDuoMark(
+    inset: Float,
+    accent: Color,
+    screen: Color,
+    screenFill: Color,
+    bottomFill: Color,
+) {
     val w = size.width - inset * 2f
     val h = size.height - inset * 2f
     val stroke = (w / 96f) * 4.5f
@@ -103,20 +150,20 @@ private fun DrawScope.drawDuoMark(inset: Float, accent: Color) {
 
     translate(inset, inset) {
         drawRoundRect(
-            color = Color.White.copy(alpha = 0.055f),
+            color = screenFill,
             topLeft = Offset(w * 0.06f, h * 0.06f),
             size = Size(w * 0.88f, h * 0.44f),
             cornerRadius = CornerRadius(corner),
         )
         drawRoundRect(
-            color = Color.White.copy(alpha = 0.92f),
+            color = screen,
             topLeft = Offset(w * 0.06f, h * 0.06f),
             size = Size(w * 0.88f, h * 0.44f),
             cornerRadius = CornerRadius(corner),
             style = Stroke(width = stroke),
         )
         drawRoundRect(
-            color = accent.copy(alpha = 0.18f),
+            color = bottomFill,
             topLeft = Offset(w * 0.18f, h * 0.66f),
             size = Size(w * 0.64f, h * 0.24f),
             cornerRadius = CornerRadius(corner * 0.7f),

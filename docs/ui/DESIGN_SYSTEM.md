@@ -86,17 +86,17 @@
 
 | Token | Hex | 用途 |
 |---|---|---|
-| `bg` | `#ECEDF1` | 页面底色 |
-| `surface1` | `#FFFFFF` | 卡片、列表行 |
-| `surface2` | `#F8F8FB` | sheet、rail、次级面板 |
-| `surface3` | `#E4E5EB` | 输入框、chip、次级按钮 |
-| `surface4` | `#D7D8E0` | 按下态、进度条底 |
-| `outline` | `#D9DAE2` | 分隔线、卡片描边 |
-| `outlineStrong` | `#B9BAC5` | 输入框描边 |
-| `textPrimary` | `#121216` | 标题、正文 |
-| `textSecondary` | `#3F3F4A` | 元信息、说明 |
-| `textTertiary` | `#5C5C68` | 时间、占位、弱提示 |
-| `textDisabled` | `#92939E` | 禁用 |
+| `bg` | `#E2E3E8` | 页面底色（约 89% 明度） |
+| `surface1` | `#F3F4F7` | 卡片、列表行（约 95% 明度，不用纯白） |
+| `surface2` | `#EAEBF0` | sheet、rail、次级面板 |
+| `surface3` | `#D8DAE1` | 输入框、chip、次级按钮 |
+| `surface4` | `#CBCDD7` | 按下态、进度条底 |
+| `outline` | `#CFD0D8` | 分隔线、卡片描边 |
+| `outlineStrong` | `#ACAEBA` | 输入框描边 |
+| `textPrimary` | `#111115` | 标题、正文 |
+| `textSecondary` | `#383842` | 元信息、说明 |
+| `textTertiary` | `#53535E` | 时间、占位、弱提示 |
+| `textDisabled` | `#878893` | 禁用 |
 | `pink` | `#FB7299` | 品牌、下划线、进度 |
 | `pinkInk` | `#B02A5B` | 亮色上的粉色文字/图标、选中 |
 | `onPink` | `#FFFFFF` | 深粉填充上的文字/图标 |
@@ -105,12 +105,20 @@
 | `warning` | `#8A5A00` | 弱网、仅 WiFi |
 | `error` | `#C0353B` | 错误、删除 |
 | `focusRing` | `#1B1B20` | 亮色焦点环 |
-| `focusHalo` | `#FFFFFF` | 环与内容的分隔 |
+| `focusHalo` | `#FFFFFF` | 环与内容的分隔（仅细线） |
 | `scrim` | `#000000` 45% | 模态遮罩 |
 | `stageBg` | `#000000` | 上屏播放留边（两主题都黑） |
 
+亮色采用「纸感灰」而不是纯白：大面积 `bg` 压到约 89%，卡片只比底色亮 17 级，
+纯白仅保留在二维码、焦点环分隔线、图片上的角标等小面积元素。参考 Material 3
+的 tonal surface container 与 iOS grouped background 的做法——层级靠 3–6% 的
+明度台阶，而不是白卡片压白背景。
+
+
 ### 3.3 使用规则
 
+- **亮色不用纯白铺底**：大卡片/页面用 `surface1`/`bg`，纯白只给二维码、焦点环细线、图片角标这类小面积；否则手持近距离观看会刺眼。
+- **上屏封面背景**：预览/详情用封面做 `TopBackdrop`，封面层不透明度深色 34% / 亮色 46%，上中下遮罩 32%/55%/90%（亮色 36%/52%/90%）；不要为了文字安全把封面压到几乎看不见。
 - **焦点**：深色为白环 1.5dp + 黑分隔 3.5dp；亮色为墨环 `#1B1B20` + 白分隔。环在组件外 4dp 空隙，不要只用颜色变化。
 - **选中但未聚焦**：`pink` 12% 背景 + `pink` 文字；焦点进入时再加描边。
 - **主按钮**：深色 `pink` 填充 + `onPink` 深字；亮色 `pinkInk` 填充 + `onPink` 白字。次要按钮 `surface3` + `textPrimary`；危险按钮 `error` 文字 + `error` 12% 背景。
@@ -336,10 +344,14 @@
 
 ## 12. 品牌与应用图标
 
-- 名称：`Bili-Duo`；上屏用 24dp `DuoLogo`（黑底 + 上 16:9 屏 + 下 4:3 屏 +
-  粉色播放三角）加 wordmark；下屏 rail 顶部用 40dp 同款 `DuoLogo`，不再放
-  文字或头像。启动器图标使用同一几何的黑底 adaptive icon。
+- 名称：`Bili-Duo`；上屏用 24dp `DuoLogo`（上 16:9 屏 + 下 4:3 屏 + 粉色播放三角）
+  加 wordmark；下屏 rail 顶部用 40dp 同款 `DuoLogo`，不再放文字或头像。
+  启动器图标使用同一几何的 adaptive icon。
 - 图标概念：深色圆角方形底，两个上下堆叠的圆角矩形（上 16:9、下 4:3）用白色描边；上屏内一个粉色播放三角。
+- 亮色模式：同一套图案位置 1:1 复刻，只换配色——纸白底 `#F8F8FA → #EEEFF3`、
+  墨色屏幕描边 `#1A1A22`、深粉播放键 `#B02A5B`。上屏页头与 rail 的 `DuoLogo`
+  随主题切换；暗色模式保持原黑底。启动器 adaptive icon 仍是深色静态资源，
+  Android 桌面图标不跟应用内主题切换。
 - 自适应图标：前景为双屏 + 播放三角，背景 `#0B0B0E`；安全区 66dp。
 - 启动页：纯黑 + 居中 64dp 图标 + 12sp「bili-duo」，不超过 600ms；不要动画。
 - 不用 B 站官方 logo/2233 娘，避免商标和版权问题。

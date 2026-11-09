@@ -292,7 +292,7 @@ private fun TopIdleScreen() {
                     colors = if (dark) {
                         listOf(Color(0xFF120C12), TopBg, Color(0xFF071218))
                     } else {
-                        listOf(Color(0xFFFDF4F7), TopBg, Color(0xFFF0F7FA))
+                        listOf(Color(0xFFF2ECEF), TopBg, Color(0xFFE7EDF1))
                     }
                 )
             )
@@ -534,22 +534,24 @@ private fun TopBackdrop(
 ) {
     val colors = DuoTheme.colors
     val dark = colors.isDark
-    val veil = if (dark) colors.bg else colors.surface1
+    val veil = if (dark) colors.bg else colors.surface2
     Box(Modifier.fillMaxSize().background(TopBg)) {
         if (!imageUrl.isNullOrBlank()) {
             AsyncImage(
                 model = fixPic(imageUrl),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize().alpha(if (dark) 0.18f else 0.10f),
+                modifier = Modifier.fillMaxSize().alpha(if (dark) 0.34f else 0.46f),
             )
+            // Keep the header/footer readable, but let the cover read as an
+            // actual image in the middle instead of a barely-there ghost.
             Box(
                 Modifier.fillMaxSize().background(
                     Brush.verticalGradient(
                         listOf(
-                            veil.copy(alpha = 0.42f),
-                            veil.copy(alpha = 0.82f),
-                            veil,
+                            veil.copy(alpha = if (dark) 0.32f else 0.36f),
+                            veil.copy(alpha = if (dark) 0.55f else 0.52f),
+                            veil.copy(alpha = 0.90f),
                         )
                     )
                 )
