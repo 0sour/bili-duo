@@ -1340,7 +1340,7 @@ private fun TopPreviewScreen(
                         fontSize = 17.sp,
                         lineHeight = 22.sp,
                         fontWeight = FontWeight.Bold,
-                        maxLines = 3,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
                     val meta = preview.metaLine ?: buildString {
@@ -1412,7 +1412,7 @@ private fun TopPreviewScreen(
                         color = TopSecondary,
                         fontSize = 10.sp,
                         lineHeight = 15.sp,
-                        maxLines = 4,
+                        maxLines = 3,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Spacer(Modifier.weight(1f))
