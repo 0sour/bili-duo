@@ -86,17 +86,17 @@
 
 | Token | Hex | 用途 |
 |---|---|---|
-| `bg` | `#F3F3F6` | 页面底色 |
+| `bg` | `#ECEDF1` | 页面底色 |
 | `surface1` | `#FFFFFF` | 卡片、列表行 |
-| `surface2` | `#FAFAFC` | sheet、rail、次级面板 |
-| `surface3` | `#ECECF1` | 输入框、chip、次级按钮 |
-| `surface4` | `#E0E0E7` | 按下态、进度条底 |
-| `outline` | `#E3E3E9` | 分隔线、卡片描边 |
-| `outlineStrong` | `#C7C7D0` | 输入框描边 |
-| `textPrimary` | `#17171C` | 标题、正文 |
-| `textSecondary` | `#4F4F5B` | 元信息、说明 |
-| `textTertiary` | `#686873` | 时间、占位、弱提示 |
-| `textDisabled` | `#A0A0AB` | 禁用 |
+| `surface2` | `#F8F8FB` | sheet、rail、次级面板 |
+| `surface3` | `#E4E5EB` | 输入框、chip、次级按钮 |
+| `surface4` | `#D7D8E0` | 按下态、进度条底 |
+| `outline` | `#D9DAE2` | 分隔线、卡片描边 |
+| `outlineStrong` | `#B9BAC5` | 输入框描边 |
+| `textPrimary` | `#121216` | 标题、正文 |
+| `textSecondary` | `#3F3F4A` | 元信息、说明 |
+| `textTertiary` | `#5C5C68` | 时间、占位、弱提示 |
+| `textDisabled` | `#92939E` | 禁用 |
 | `pink` | `#FB7299` | 品牌、下划线、进度 |
 | `pinkInk` | `#B02A5B` | 亮色上的粉色文字/图标、选中 |
 | `onPink` | `#FFFFFF` | 深粉填充上的文字/图标 |

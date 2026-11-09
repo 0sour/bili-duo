@@ -1210,8 +1210,8 @@ private fun TopAmbientScreen(ambient: TopAmbientUi) {
                                 contentAlignment = Alignment.Center,
                             ) {
                                 Text(
-                                    text = "A",
-                                    color = Color(0xFF1A0710),
+                                    text = "B",
+                                    color = DuoTheme.colors.onPink,
                                     fontSize = 8.sp,
                                     fontWeight = FontWeight.Bold,
                                 )
@@ -1423,8 +1423,8 @@ private fun TopPreviewScreen(
                             contentAlignment = Alignment.Center,
                         ) {
                             Text(
-                                "A",
-                                color = Color(0xFF1A0710),
+                                "B",
+                                color = DuoTheme.colors.onPink,
                                 fontSize = 8.sp,
                                 fontWeight = FontWeight.Bold,
                             )

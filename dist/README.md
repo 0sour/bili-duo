@@ -8,10 +8,10 @@ GitHub Releases 下载。
 
 - `bili-duo-0.2.0-rc53-release.apk`
   - R8 minify，正式 release keystore 签名；可覆盖安装同 key 的 rc52。
-  - APK SHA-256：`ecfa8858fc787977431ea6db592f536be2d3054f56779bd04cb162dc1c61f7bc`
+  - APK SHA-256：`564b2b34ab7e64e67855358c6997857c4ae3a9d2ae2c2b816badcaf71d87efbf`
 - `bili-duo-0.2.0-rc53-debug.apk`
   - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
-  - SHA-256：`89336646dd28c2977f4826d485ca9eb000a2532e1b07c5bb196087187a3b0f12`
+  - SHA-256：`4d8757b680c18d9fa57664f244677765d6949ce86e24c4bffcca4a1a54f40b2f`
 
 rc53 变更：
 - 上下双屏亮暗色主题；侧栏左下角快捷切换；设置 → 外观支持日出日落 / 跟随系统 /
