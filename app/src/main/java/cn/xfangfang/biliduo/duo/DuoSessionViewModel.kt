@@ -25,6 +25,8 @@ enum class DuoOverlay {
     SPEED,
     /** Playback settings: danmaku and subtitle options. */
     SETTINGS,
+    /** Live-room danmaku size/opacity/speed/area. */
+    LIVE_DANMAKU_SETTINGS,
     DANMAKU_SEND,
     COMMENT_SEND,
     COMMENT_DELETE,
@@ -142,17 +144,19 @@ class DuoSessionViewModel : ViewModel() {
         focusBackInterceptor = interceptor
     }
 
-    private var imeVisible: (() -> Boolean)? = null
     private var hideIme: (() -> Unit)? = null
     private var imeHiddenByBack = false
 
     /**
-     * B must first dismiss the soft keyboard and keep focus on the field. The
-     * root composable installs this from `WindowInsets.isImeVisible`; it runs
-     * before overlay/back interceptors so the first B never closes a sheet.
+     * B must first dismiss the soft keyboard and keep focus on the field.
+     *
+     * Do not consult WindowInsets here: the bottom Presentation can report the
+     * IME inset as visible on a cold start even when no input session exists,
+     * which made the first Return press silently disappear. [DuoImeState] is
+     * set by every field that actually opens the keyboard and is the source of
+     * truth.
      */
-    fun setImeBackHandler(isVisible: (() -> Boolean)?, hide: (() -> Unit)?) {
-        imeVisible = isVisible
+    fun setImeBackHandler(hide: (() -> Unit)?) {
         hideIme = hide
     }
 
@@ -163,8 +167,7 @@ class DuoSessionViewModel : ViewModel() {
             if (!DuoImeState.shown) return false
             imeHiddenByBack = false
         }
-        val visible = DuoImeState.shown || imeVisible?.invoke() == true
-        if (!visible) return false
+        if (!DuoImeState.shown) return false
         hideIme?.invoke()
         DuoImeState.onHiddenByBack()
         imeHiddenByBack = true
@@ -178,6 +181,22 @@ class DuoSessionViewModel : ViewModel() {
         if (backInterceptor?.invoke() == true) return
         if (focusBackInterceptor?.invoke() == true) return
         _backRequests.tryEmit(Unit)
+    }
+
+    /**
+     * System BACK / Return on the bottom display. The Presentation window owns
+     * focus while the user is on the panel, so its key no longer reaches
+     * MainActivity.dispatchKeyEvent -> InputRouter. Keep the same priority as
+     * gamepad B: close the IME, then an open overlay, then a screen interceptor,
+     * then pop the NavHost.
+     */
+    fun handleBackKey() {
+        if (overlay.value != null) {
+            if (handleImeBack()) return
+            if (!handleOverlayBack()) closeOverlay()
+            return
+        }
+        requestBack()
     }
 
     /** Re-request focus after the Presentation window is shown again. */

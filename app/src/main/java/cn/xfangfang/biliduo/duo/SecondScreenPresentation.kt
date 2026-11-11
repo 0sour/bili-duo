@@ -3,8 +3,13 @@ package cn.xfangfang.biliduo.duo
 import android.app.Presentation
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
+import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
 import android.view.Display
+import android.view.KeyEvent
+import android.window.OnBackInvokedCallback
+import android.window.OnBackInvokedDispatcher
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedDispatcher
 import androidx.activity.OnBackPressedDispatcherOwner
@@ -42,6 +47,7 @@ class SecondScreenPresentation(
     private val activity: ComponentActivity,
     display: Display,
     private val content: @Composable () -> Unit,
+    private val onBack: () -> Unit,
 ) : Presentation(activity, display),
     LifecycleOwner,
     ViewModelStoreOwner,
@@ -53,12 +59,45 @@ class SecondScreenPresentation(
     private val store = ViewModelStore()
     private val savedState = SavedStateRegistryController.create(this)
     private var composeView: ComposeView? = null
+    private var lastBackAt = 0L
+
+    private val backInvokedCallback: OnBackInvokedCallback? =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            OnBackInvokedCallback { dispatchBack() }
+        } else {
+            null
+        }
 
     /** Restore Android focus after the window is shown again (Home/return). */
     fun requestComposeFocus() {
         val root = composeView ?: return
         val target = root.getChildAt(0) ?: root
         target.requestFocus()
+    }
+
+    /**
+     * The bottom Presentation owns the focused window, so the Activity's
+     * dispatchKeyEvent no longer sees Return. Route the physical key and the
+     * platform back invocation through the same bottom-UI back pipeline as B.
+     */
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.keyCode == KeyEvent.KEYCODE_BACK || event.keyCode == KeyEvent.KEYCODE_ESCAPE) {
+            if (event.action == KeyEvent.ACTION_UP && !event.isCanceled) dispatchBack()
+            return true
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
+    @Suppress("DEPRECATION")
+    override fun onBackPressed() {
+        dispatchBack()
+    }
+
+    private fun dispatchBack() {
+        val now = SystemClock.uptimeMillis()
+        if (now - lastBackAt < BACK_DEBOUNCE_MS) return
+        lastBackAt = now
+        onBack()
     }
 
     override val lifecycle: Lifecycle get() = lifecycleRegistry
@@ -101,12 +140,29 @@ class SecondScreenPresentation(
 
     override fun onStart() {
         super.onStart()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            backInvokedCallback?.let { callback ->
+                window?.onBackInvokedDispatcher?.registerOnBackInvokedCallback(
+                    OnBackInvokedDispatcher.PRIORITY_DEFAULT,
+                    callback,
+                )
+            }
+        }
         lifecycleRegistry.currentState = Lifecycle.State.RESUMED
     }
 
     override fun onStop() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            backInvokedCallback?.let { callback ->
+                window?.onBackInvokedDispatcher?.unregisterOnBackInvokedCallback(callback)
+            }
+        }
         lifecycleRegistry.currentState = Lifecycle.State.DESTROYED
         store.clear()
         super.onStop()
+    }
+
+    private companion object {
+        const val BACK_DEBOUNCE_MS = 250L
     }
 }

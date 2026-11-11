@@ -166,6 +166,8 @@ fun SettingsScreen(
         GamepadStyleStore.save(next)
     }
     var category by remember { mutableIntStateOf(0) }
+    var danmakuSection by remember { mutableIntStateOf(0) }
+    var danmakuContentFocused by remember { mutableStateOf(false) }
     var wifiOnlyPlayback by remember { mutableStateOf(AppSettings.wifiOnlyPlayback) }
     var wifiOnlyDownload by remember { mutableStateOf(AppSettings.wifiOnlyDownload) }
     var confirmClearDownloads by remember { mutableStateOf(false) }
@@ -176,6 +178,7 @@ fun SettingsScreen(
     val clearRowFocus = remember { FocusRequester() }
     val clearAllFocus = remember { FocusRequester() }
     val firstRowFocus = remember { FocusRequester() }
+    val danmakuLiveTabFocus = remember { FocusRequester() }
     val backFocus = remember { FocusRequester() }
     val categoryFocus = remember { List(settingsCategories.size) { FocusRequester() } }
     val scrollState = rememberScrollState()
@@ -273,7 +276,12 @@ fun SettingsScreen(
         if (focusContent) {
             scope.launch {
                 delay(120)
-                runCatching { firstRowFocus.requestPageFocus() }
+                val target = if (index == 4 && danmakuSection == 1) {
+                    danmakuLiveTabFocus
+                } else {
+                    firstRowFocus
+                }
+                runCatching { target.requestPageFocus() }
             }
         }
     }
@@ -368,16 +376,36 @@ fun SettingsScreen(
             .background(DuoPalette.Bg)
             .duoTabCycling(
                 onPreviousTab = {
-                    selectCategory(
-                        (category - 1 + settingsCategories.size) % settingsCategories.size,
-                        focusContent = true,
-                    )
+                    if (category == 4 && danmakuContentFocused) {
+                        val next = (danmakuSection - 1 + 2) % 2
+                        danmakuSection = next
+                        val target = if (next == 0) firstRowFocus else danmakuLiveTabFocus
+                        scope.launch {
+                            delay(40)
+                            runCatching { target.requestFocus() }
+                        }
+                    } else {
+                        selectCategory(
+                            (category - 1 + settingsCategories.size) % settingsCategories.size,
+                            focusContent = true,
+                        )
+                    }
                 },
                 onNextTab = {
-                    selectCategory(
-                        (category + 1) % settingsCategories.size,
-                        focusContent = true,
-                    )
+                    if (category == 4 && danmakuContentFocused) {
+                        val next = (danmakuSection + 1) % 2
+                        danmakuSection = next
+                        val target = if (next == 0) firstRowFocus else danmakuLiveTabFocus
+                        scope.launch {
+                            delay(40)
+                            runCatching { target.requestFocus() }
+                        }
+                    } else {
+                        selectCategory(
+                            (category + 1) % settingsCategories.size,
+                            focusContent = true,
+                        )
+                    }
                 },
             ),
     ) {
@@ -386,7 +414,10 @@ fun SettingsScreen(
             onBack = onBack,
             backModifier = Modifier
                 .focusRequester(backFocus)
-                .focusProperties { up = FocusRequester.Cancel },
+                .focusProperties { up = FocusRequester.Cancel }
+                .onFocusChanged {
+                    if (it.isFocused) danmakuContentFocused = false
+                },
         )
 
         Row(Modifier.fillMaxSize()) {
@@ -394,6 +425,7 @@ fun SettingsScreen(
                 selected = category,
                 onSelect = { category = it },
                 onEnter = { selectCategory(it, focusContent = true) },
+                onFocus = { danmakuContentFocused = false },
                 focusRequesters = categoryFocus,
                 backFocus = backFocus,
             )
@@ -407,16 +439,22 @@ fun SettingsScreen(
                         }
                         when (event.key) {
                             // Left returns to the settings category rail.
-                            // Right has nowhere to go; swallow it so focus
-                            // cannot leak into the global app rail.
+                            // Right has nowhere to go in most categories; swallow
+                            // it so focus cannot leak into the global app rail.
+                            // The Danmaku tab row is the exception: let Left/Right
+                            // move between 视频弹幕 and 直播弹幕.
                             Key.DirectionLeft -> {
-                                scope.launch {
-                                    delay(40)
-                                    runCatching { categoryFocus[category].requestPageFocus() }
+                                if (category == 4) {
+                                    false
+                                } else {
+                                    scope.launch {
+                                        delay(40)
+                                        runCatching { categoryFocus[category].requestPageFocus() }
+                                    }
+                                    true
                                 }
-                                true
                             }
-                            Key.DirectionRight -> true
+                            Key.DirectionRight -> category != 4
                             else -> false
                         }
                     }
@@ -461,7 +499,12 @@ fun SettingsScreen(
                     )
                     4 -> DanmakuSettings(
                         ui = playerUi,
+                        section = danmakuSection,
+                        onSectionChange = { danmakuSection = it },
                         firstFocus = firstRowFocus,
+                        liveTabFocus = danmakuLiveTabFocus,
+                        leftFocus = categoryFocus[4],
+                        onContentFocusChanged = { danmakuContentFocused = it },
                         backFocus = backFocus,
                         bottomModifier = bottomEdgeModifier,
                         onEnabled = { playerViewModel?.setDanmakuEnabled(it) },
@@ -470,6 +513,11 @@ fun SettingsScreen(
                         onSize = { playerViewModel?.setDanmakuTextSize(it) },
                         onArea = { playerViewModel?.setDanmakuArea(it) },
                         onMax = { playerViewModel?.setDanmakuMaxOnScreen(it) },
+                        onLiveEnabled = { playerViewModel?.setLiveDanmakuEnabled(it) },
+                        onLiveOpacity = { playerViewModel?.setLiveDanmakuOpacity(it) },
+                        onLiveSpeed = { playerViewModel?.setLiveDanmakuSpeed(it) },
+                        onLiveSize = { playerViewModel?.setLiveDanmakuTextSize(it) },
+                        onLiveArea = { playerViewModel?.setLiveDanmakuArea(it) },
                     )
                     5 -> StorageSettings(
                         total = downloads.size,
@@ -611,6 +659,7 @@ private fun CategoryRail(
     selected: Int,
     onSelect: (Int) -> Unit,
     onEnter: (Int) -> Unit,
+    onFocus: () -> Unit,
     focusRequesters: List<FocusRequester>,
     backFocus: FocusRequester? = null,
 ) {
@@ -642,7 +691,10 @@ private fun CategoryRail(
                         focused = it.isFocused
                         // Moving through the rail previews each category
                         // without stealing focus away from the rail.
-                        if (it.isFocused) onSelect(index)
+                        if (it.isFocused) {
+                            onFocus()
+                            onSelect(index)
+                        }
                     }
                     .onPreviewKeyEvent { event ->
                         if (event.type == KeyEventType.KeyDown &&
@@ -904,7 +956,12 @@ private fun AppearanceSettings(
 @Composable
 private fun DanmakuSettings(
     ui: PlayerUiState?,
+    section: Int,
+    onSectionChange: (Int) -> Unit,
     firstFocus: FocusRequester,
+    liveTabFocus: FocusRequester,
+    leftFocus: FocusRequester,
+    onContentFocusChanged: (Boolean) -> Unit,
     backFocus: FocusRequester,
     bottomModifier: Modifier,
     onEnabled: (Boolean) -> Unit,
@@ -913,57 +970,208 @@ private fun DanmakuSettings(
     onSize: (Float) -> Unit,
     onArea: (Float) -> Unit,
     onMax: (Int) -> Unit,
+    onLiveEnabled: (Boolean) -> Unit,
+    onLiveOpacity: (Float) -> Unit,
+    onLiveSpeed: (Float) -> Unit,
+    onLiveSize: (Float) -> Unit,
+    onLiveArea: (Float) -> Unit,
 ) {
+    val firstRowFocus = remember { FocusRequester() }
+    val contentFocus = Modifier.onFocusChanged {
+        if (it.isFocused) onContentFocusChanged(true)
+    }
+    val noRight = contentFocus.then(Modifier.focusProperties { right = FocusRequester.Cancel })
+
     val enabled = ui?.danmakuEnabled ?: true
     val opacity = ui?.danmakuOpacity ?: 0.9f
     val speed = ui?.danmakuSpeed ?: 1f
     val size = ui?.danmakuTextSize ?: 16f
     val area = ui?.danmakuArea ?: 1f
     val max = ui?.danmakuMaxOnScreen ?: 0
+    val liveEnabled = ui?.liveDanmakuEnabled ?: true
+    val liveOpacity = ui?.liveDanmakuOpacity ?: 0.9f
+    val liveSpeed = ui?.liveDanmakuSpeed ?: 1f
+    val liveSize = ui?.liveDanmakuTextSize ?: 16f
+    val liveArea = ui?.liveDanmakuArea ?: 1f
 
-    SettingsSection("弹幕")
-    SettingsSwitchRow(
-        title = "默认显示弹幕",
-        subtitle = "进入播放时沿用上次开关",
-        checked = enabled,
-        focusRequester = firstFocus,
-        modifier = settingsTopEdge(backFocus),
-        onToggle = { onEnabled(!enabled) },
-    )
-    SettingsValueRow(
-        title = "不透明度",
-        value = "${(opacity * 100).toInt()}%",
-        onClick = { onOpacity(nextValue(opacity, danmakuOpacityOptions)) },
-    )
-    SettingsValueRow(
-        title = "速度",
-        value = speedLabel(speed),
-        onClick = { onSpeed(nextValue(speed, danmakuSpeedOptions)) },
-    )
-    SettingsValueRow(
-        title = "字号",
-        value = sizeLabel(size),
-        onClick = { onSize(nextValue(size, danmakuSizeOptions)) },
-    )
-    SettingsValueRow(
-        title = "显示区域",
-        value = areaLabel(area),
-        onClick = { onArea(nextValue(area, danmakuAreaOptions)) },
-    )
-    SettingsValueRow(
-        title = "同屏上限",
-        value = if (max <= 0) "不限" else "$max",
-        onClick = {
-            val index = danmakuMaxOptions.indexOf(max)
-            onMax(danmakuMaxOptions[(if (index >= 0) index + 1 else 0) % danmakuMaxOptions.size])
-        },
-    )
-    Spacer(Modifier.height(10.dp))
-    SettingsInfoRow(
-        title = "屏蔽词",
-        value = "在播放控制台「播放设置」内编辑",
-        modifier = bottomModifier,
-    )
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(18.dp),
+    ) {
+        DanmakuSectionTab(
+            text = "视频弹幕",
+            selected = section == 0,
+            focusRequester = firstFocus,
+            downFocus = firstRowFocus,
+            modifier = Modifier.focusProperties {
+                up = backFocus
+                right = liveTabFocus
+                left = leftFocus
+            }.then(contentFocus),
+            onClick = {
+                onSectionChange(0)
+                runCatching { firstFocus.requestFocus() }
+            },
+        )
+        DanmakuSectionTab(
+            text = "直播弹幕",
+            selected = section == 1,
+            focusRequester = liveTabFocus,
+            downFocus = firstRowFocus,
+            modifier = Modifier.focusProperties {
+                up = backFocus
+                right = FocusRequester.Cancel
+                left = firstFocus
+            }.then(contentFocus),
+            onClick = {
+                onSectionChange(1)
+                runCatching { liveTabFocus.requestFocus() }
+            },
+        )
+    }
+    Spacer(Modifier.height(8.dp))
+
+    if (section == 0) {
+        SettingsSwitchRow(
+            title = "默认显示弹幕",
+            subtitle = "视频播放时沿用上次开关",
+            checked = enabled,
+            focusRequester = firstRowFocus,
+            modifier = Modifier.focusProperties {
+                up = firstFocus
+                right = FocusRequester.Cancel
+            }.then(contentFocus),
+            onToggle = { onEnabled(!enabled) },
+        )
+        SettingsValueRow(
+            title = "不透明度",
+            value = "${(opacity * 100).toInt()}%",
+            modifier = noRight,
+            onClick = { onOpacity(nextValue(opacity, danmakuOpacityOptions)) },
+        )
+        SettingsValueRow(
+            title = "速度",
+            value = speedLabel(speed),
+            modifier = noRight,
+            onClick = { onSpeed(nextValue(speed, danmakuSpeedOptions)) },
+        )
+        SettingsValueRow(
+            title = "字号",
+            value = sizeLabel(size),
+            modifier = noRight,
+            onClick = { onSize(nextValue(size, danmakuSizeOptions)) },
+        )
+        SettingsValueRow(
+            title = "显示区域",
+            value = areaLabel(area),
+            modifier = noRight,
+            onClick = { onArea(nextValue(area, danmakuAreaOptions)) },
+        )
+        SettingsValueRow(
+            title = "同屏上限",
+            value = if (max <= 0) "不限" else "$max",
+            modifier = noRight,
+            onClick = {
+                val index = danmakuMaxOptions.indexOf(max)
+                onMax(danmakuMaxOptions[(if (index >= 0) index + 1 else 0) % danmakuMaxOptions.size])
+            },
+        )
+        SettingsInfoRow(
+            title = "屏蔽词",
+            value = "播放控制台 · 播放设置内编辑",
+            modifier = noRight,
+        )
+        Spacer(Modifier.height(10.dp))
+        SettingsInfoRow(
+            title = "同步位置",
+            value = "视频播放控制台",
+            modifier = bottomModifier.then(noRight),
+        )
+    } else {
+        SettingsSwitchRow(
+            title = "默认显示弹幕",
+            subtitle = "直播弹幕独立开关",
+            checked = liveEnabled,
+            focusRequester = firstRowFocus,
+            modifier = Modifier.focusProperties {
+                up = liveTabFocus
+                right = FocusRequester.Cancel
+            }.then(contentFocus),
+            onToggle = { onLiveEnabled(!liveEnabled) },
+        )
+        SettingsValueRow(
+            title = "不透明度",
+            value = "${(liveOpacity * 100).toInt()}%",
+            modifier = noRight,
+            onClick = { onLiveOpacity(nextValue(liveOpacity, danmakuOpacityOptions)) },
+        )
+        SettingsValueRow(
+            title = "速度",
+            value = speedLabel(liveSpeed),
+            modifier = noRight,
+            onClick = { onLiveSpeed(nextValue(liveSpeed, danmakuSpeedOptions)) },
+        )
+        SettingsValueRow(
+            title = "字号",
+            value = sizeLabel(liveSize),
+            modifier = noRight,
+            onClick = { onLiveSize(nextValue(liveSize, danmakuSizeOptions)) },
+        )
+        SettingsValueRow(
+            title = "显示区域",
+            value = areaLabel(liveArea),
+            modifier = noRight,
+            onClick = { onLiveArea(nextValue(liveArea, danmakuAreaOptions)) },
+        )
+        Spacer(Modifier.height(10.dp))
+        SettingsInfoRow(
+            title = "屏蔽词 / 同屏上限",
+            value = "直播弹幕不提供",
+            modifier = noRight,
+        )
+        Spacer(Modifier.height(10.dp))
+        SettingsInfoRow(
+            title = "同步位置",
+            value = "直播控制台 · 弹幕设置",
+            modifier = bottomModifier.then(noRight),
+        )
+    }
+}
+
+@Composable
+private fun DanmakuSectionTab(
+    text: String,
+    selected: Boolean,
+    focusRequester: FocusRequester,
+    downFocus: FocusRequester,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Column(
+        modifier = modifier
+            .focusRequester(focusRequester)
+            .focusProperties { down = downFocus }
+            .duoFocusRing(RoundedCornerShape(6.dp))
+            .clip(RoundedCornerShape(6.dp))
+            .duoClickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 5.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text = text,
+            color = if (selected) DuoPalette.Pink else DuoPalette.Secondary,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+        )
+        Spacer(Modifier.height(4.dp))
+        Box(
+            Modifier
+                .width(22.dp)
+                .height(2.dp)
+                .clip(RoundedCornerShape(1.dp))
+                .background(if (selected) DuoPalette.Pink else Color.Transparent)
+        )
+    }
 }
 
 @Composable

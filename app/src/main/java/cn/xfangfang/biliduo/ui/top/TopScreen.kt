@@ -77,6 +77,9 @@ private val TopTertiary: Color @Composable get() = DuoTheme.colors.tertiary
 private val TopPink: Color @Composable get() = DuoTheme.colors.pinkInk
 private val TopBlue: Color @Composable get() = DuoTheme.colors.blue
 
+/** HLS keeps a few seconds of live latency; warn once playback drifts past that baseline. */
+private const val LIVE_DELAY_WARN_MS = 5_000L
+
 /**
  * Top display host: the player Surface stays composed; the preview layer is
  * only drawn until the first video frame is rendered. It is read-only and
@@ -92,6 +95,23 @@ fun TopScreenHost(
     val topState by viewModel.state.collectAsState()
     val playerUi by playerViewModel.uiState.collectAsState()
     val liveChat by LiveChatStore.snapshot.collectAsState()
+
+    // HLS itself starts a few seconds behind the live edge. Track the smallest
+    // offset seen while playing and only report growth from that baseline, so
+    // the badge appears after pause/resume rather than on every live start.
+    var liveBaseOffsetMs by remember(playerUi.liveRoomId) { mutableLongStateOf(0L) }
+    LaunchedEffect(playerUi.liveRoomId, playback.liveOffsetMs, playback.isPlaying) {
+        if (playback.isPlaying && playback.liveOffsetMs > 0L) {
+            if (liveBaseOffsetMs == 0L || playback.liveOffsetMs < liveBaseOffsetMs) {
+                liveBaseOffsetMs = playback.liveOffsetMs
+            }
+        }
+    }
+    val liveDelayMs = if (liveBaseOffsetMs > 0L) {
+        (playback.liveOffsetMs - liveBaseOffsetMs).coerceAtLeast(0L)
+    } else {
+        0L
+    }
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         TopPlayerSurface(controller, Modifier.fillMaxSize())
@@ -114,14 +134,25 @@ fun TopScreenHost(
             LiveDanmakuOverlay(
                 roomId = playerUi.liveRoomId,
                 messages = liveChat.messages,
-                enabled = playerUi.danmakuEnabled,
-                opacity = playerUi.danmakuOpacity,
-                speed = playerUi.danmakuSpeed,
-                textSizeSp = playerUi.danmakuTextSize,
-                area = playerUi.danmakuArea,
-                blockedWords = playerUi.danmakuBlockedWords,
-                maxOnScreen = playerUi.danmakuMaxOnScreen,
+                enabled = playerUi.liveDanmakuEnabled,
+                opacity = playerUi.liveDanmakuOpacity,
+                speed = playerUi.liveDanmakuSpeed,
+                textSizeSp = playerUi.liveDanmakuTextSize,
+                area = playerUi.liveDanmakuArea,
+                // Live has its own smaller settings sheet: no blocked-word or
+                // max-on-screen controls, and VOD filters should not leak here.
+                blockedWords = emptySet(),
+                maxOnScreen = 0,
             )
+            if (liveDelayMs >= LIVE_DELAY_WARN_MS) {
+                LiveDelayBadge(
+                    offsetMs = liveDelayMs,
+                    paused = !playback.isPlaying,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = 22.dp),
+                )
+            }
         }
         if (playback.hasRenderedFrame &&
             playerUi.subtitleEnabled &&
@@ -141,6 +172,36 @@ fun TopScreenHost(
                 modifier = Modifier.fillMaxSize(),
             )
         }
+    }
+}
+
+@Composable
+private fun LiveDelayBadge(
+    offsetMs: Long,
+    paused: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val seconds = (offsetMs / 1000L).coerceAtLeast(1L)
+    val delay = if (seconds < 60L) {
+        "${seconds}s"
+    } else {
+        "${seconds / 60L}分${seconds % 60L}秒"
+    }
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(50))
+            .background(Color.Black.copy(alpha = 0.62f))
+            .padding(horizontal = 11.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(6.dp).clip(CircleShape).background(TopPink))
+        Spacer(Modifier.width(6.dp))
+        Text(
+            text = if (paused) "已暂停 · 延迟 $delay" else "直播延迟 $delay",
+            color = Color.White,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium,
+        )
     }
 }
 

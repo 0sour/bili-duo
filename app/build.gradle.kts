@@ -26,8 +26,8 @@ android {
         applicationId = "cn.xfangfang.biliduo"
         minSdk = 24
         targetSdk = 34
-        versionCode = 55
-        versionName = "0.2.0-rc54"
+        versionCode = 56
+        versionName = "0.2.0-rc55"
     }
 
     signingConfigs {

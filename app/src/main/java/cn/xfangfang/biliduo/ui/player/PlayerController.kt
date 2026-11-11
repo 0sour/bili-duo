@@ -51,6 +51,8 @@ class PlayerController(
         val bufferedMs: Long = 0L,
         val speed: Float = 1f,
         val volume: Float = 1f,
+        /** Milliseconds behind the live edge; 0 for VOD or before the live window is ready. */
+        val liveOffsetMs: Long = 0L,
         val error: String? = null,
         val ended: Boolean = false,
         val hasRenderedFrame: Boolean = false,
@@ -229,13 +231,6 @@ class PlayerController(
     fun seekBy(deltaMs: Long) {
         if (released) return
         seekTo(player.currentPosition + deltaMs)
-    }
-
-    /** Jump back to the live edge (or default window start) and resume. */
-    fun seekToLive() {
-        if (released) return
-        player.seekToDefaultPosition()
-        if (!player.isPlaying) player.play()
     }
 
     fun setSpeed(speed: Float) {
@@ -479,6 +474,9 @@ class PlayerController(
         if (released) return
         val duration = player.duration.let { if (it == C.TIME_UNSET) 0L else it.coerceAtLeast(0L) }
         val buffered = player.bufferedPosition.coerceAtLeast(0L)
+        val liveOffset = player.currentLiveOffset
+            .takeIf { it != C.TIME_UNSET && it > 0L }
+            ?: 0L
         val pending = pendingSeekMs
         if (pending != null && player.playbackState == Player.STATE_READY) {
             player.seekTo(pending)
@@ -494,6 +492,7 @@ class PlayerController(
                 bufferedMs = buffered,
                 speed = player.playbackParameters.speed,
                 volume = player.volume,
+                liveOffsetMs = liveOffset,
             )
         }
     }

@@ -64,8 +64,7 @@ class InputRouter(
             // B closes the modal; the screen may first consume it (e.g. leave an
             // inline editor inside the danmaku settings sheet).
             if (isBack(code)) {
-                if (session.handleImeBack()) return consume(code)
-                if (!session.handleOverlayBack()) session.closeOverlay()
+                session.handleBackKey()
                 return consume(code)
             }
             if (code == KeyEvent.KEYCODE_BUTTON_A) {

@@ -76,6 +76,12 @@ data class PlayerUiState(
     val danmakuBlockedWords: Set<String> = emptySet(),
     /** 0 = unlimited. */
     val danmakuMaxOnScreen: Int = 0,
+    /** Live danmaku has its own appearance; no blocked-word/max settings. */
+    val liveDanmakuEnabled: Boolean = true,
+    val liveDanmakuOpacity: Float = 0.9f,
+    val liveDanmakuSpeed: Float = 1f,
+    val liveDanmakuTextSize: Float = 16f,
+    val liveDanmakuArea: Float = 1f,
     val isPgc: Boolean = false,
     /** null = still checking; false for logged-out or non-VIP. */
     val isVip: Boolean? = null,
@@ -133,6 +139,11 @@ class PlayerViewModel(
             danmakuArea = saved.area,
             danmakuBlockedWords = saved.blockedWords,
             danmakuMaxOnScreen = saved.maxOnScreen,
+            liveDanmakuEnabled = saved.liveEnabled,
+            liveDanmakuOpacity = saved.liveOpacity,
+            liveDanmakuSpeed = saved.liveSpeed,
+            liveDanmakuTextSize = saved.liveTextSizeSp,
+            liveDanmakuArea = saved.liveArea,
             subtitleEnabled = videoDefaults.subtitleEnabled,
             subtitleTextSizeSp = videoDefaults.subtitleTextSizeSp,
             subtitleBackgroundAlpha = videoDefaults.subtitleBackgroundAlpha,
@@ -721,6 +732,11 @@ class PlayerViewModel(
             danmakuArea = current.danmakuArea,
             danmakuBlockedWords = current.danmakuBlockedWords,
             danmakuMaxOnScreen = current.danmakuMaxOnScreen,
+            liveDanmakuEnabled = current.liveDanmakuEnabled,
+            liveDanmakuOpacity = current.liveDanmakuOpacity,
+            liveDanmakuSpeed = current.liveDanmakuSpeed,
+            liveDanmakuTextSize = current.liveDanmakuTextSize,
+            liveDanmakuArea = current.liveDanmakuArea,
         )
     }
 
@@ -757,18 +773,57 @@ class PlayerViewModel(
         updateDanmakuState { it.copy(danmakuMaxOnScreen = value.coerceIn(0, 200)) }
     }
 
+    fun toggleLiveDanmaku() {
+        setLiveDanmakuEnabled(!_uiState.value.liveDanmakuEnabled)
+    }
+
+    fun setLiveDanmakuEnabled(enabled: Boolean) {
+        updateLiveDanmakuState { it.copy(liveDanmakuEnabled = enabled) }
+    }
+
+    fun setLiveDanmakuOpacity(value: Float) {
+        updateLiveDanmakuState { it.copy(liveDanmakuOpacity = value.coerceIn(0.2f, 1f)) }
+    }
+
+    fun setLiveDanmakuSpeed(value: Float) {
+        updateLiveDanmakuState { it.copy(liveDanmakuSpeed = value.coerceIn(0.5f, 2f)) }
+    }
+
+    fun setLiveDanmakuTextSize(value: Float) {
+        updateLiveDanmakuState { it.copy(liveDanmakuTextSize = value.coerceIn(12f, 24f)) }
+    }
+
+    fun setLiveDanmakuArea(value: Float) {
+        updateLiveDanmakuState { it.copy(liveDanmakuArea = value.coerceIn(0.25f, 1f)) }
+    }
+
     private fun updateDanmakuState(transform: (PlayerUiState) -> PlayerUiState) {
         val next = transform(_uiState.value)
         _uiState.value = next
+        saveDanmakuState(next)
+    }
+
+    private fun updateLiveDanmakuState(transform: (PlayerUiState) -> PlayerUiState) {
+        val next = transform(_uiState.value)
+        _uiState.value = next
+        saveDanmakuState(next)
+    }
+
+    private fun saveDanmakuState(state: PlayerUiState) {
         danmakuPreferenceManager.save(
             DanmakuPreference(
-                enabled = next.danmakuEnabled,
-                opacity = next.danmakuOpacity,
-                speed = next.danmakuSpeed,
-                textSizeSp = next.danmakuTextSize,
-                area = next.danmakuArea,
-                blockedWords = next.danmakuBlockedWords,
-                maxOnScreen = next.danmakuMaxOnScreen,
+                enabled = state.danmakuEnabled,
+                opacity = state.danmakuOpacity,
+                speed = state.danmakuSpeed,
+                textSizeSp = state.danmakuTextSize,
+                area = state.danmakuArea,
+                blockedWords = state.danmakuBlockedWords,
+                maxOnScreen = state.danmakuMaxOnScreen,
+                liveEnabled = state.liveDanmakuEnabled,
+                liveOpacity = state.liveDanmakuOpacity,
+                liveSpeed = state.liveDanmakuSpeed,
+                liveTextSizeSp = state.liveDanmakuTextSize,
+                liveArea = state.liveDanmakuArea,
             )
         )
     }

@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
+
 package cn.xfangfang.biliduo.ui.live
 
 import androidx.activity.compose.BackHandler
@@ -5,7 +7,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,6 +41,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -174,13 +176,16 @@ fun LiveConsoleScreen(
 
     val playFocus = remember { FocusRequester() }
     val refreshFocus = remember { FocusRequester() }
-    val liveEdgeFocus = remember { FocusRequester() }
     val qualityFocus = remember { FocusRequester() }
     val volumeFocus = remember { FocusRequester() }
     val tabFocus = remember { List(2) { FocusRequester() } }
     val qualityRowFocus = remember { FocusRequester() }
     val qualityCloseFocus = remember { FocusRequester() }
+    val danmakuSettingsFocus = remember { FocusRequester() }
+    val danmakuSettingsFirstFocus = remember { FocusRequester() }
+    val danmakuSettingsCloseFocus = remember { FocusRequester() }
     var qualityOpener by remember { mutableStateOf<FocusRequester?>(null) }
+    var danmakuSettingsOpener by remember { mutableStateOf<FocusRequester?>(null) }
 
     val detail = ui.liveDetail
     val qualities = ui.liveQualities
@@ -375,9 +380,17 @@ fun LiveConsoleScreen(
                     }
                 }
             }
+            overlay == DuoOverlay.LIVE_DANMAKU_SETTINGS -> {
+                delay(140L)
+                runCatching { danmakuSettingsFirstFocus.requestFocus() }
+            }
             previous == DuoOverlay.QUALITY && overlay == null -> {
                 delay(300L)
                 runCatching { (qualityOpener ?: playFocus).requestFocus() }
+            }
+            previous == DuoOverlay.LIVE_DANMAKU_SETTINGS && overlay == null -> {
+                delay(300L)
+                runCatching { (danmakuSettingsOpener ?: playFocus).requestFocus() }
             }
         }
     }
@@ -398,13 +411,14 @@ fun LiveConsoleScreen(
                         true
                     }
                     android.view.KeyEvent.KEYCODE_BUTTON_X -> {
-                        vm.toggleDanmaku()
+                        vm.toggleLiveDanmaku()
                         true
                     }
                     android.view.KeyEvent.KEYCODE_BUTTON_START,
                     android.view.KeyEvent.KEYCODE_MENU -> {
                         qualityOpener = null
-                        session.openOverlay(DuoOverlay.QUALITY)
+                        danmakuSettingsOpener = null
+                        session.openOverlay(DuoOverlay.LIVE_DANMAKU_SETTINGS)
                         true
                     }
                     else -> false
@@ -425,7 +439,6 @@ fun LiveConsoleScreen(
                 error = ui.error ?: playback.error,
                 playFocus = playFocus,
                 refreshFocus = refreshFocus,
-                liveEdgeFocus = liveEdgeFocus,
                 qualityFocus = qualityFocus,
                 volumeFocus = volumeFocus,
                 tabFocus = tabFocus,
@@ -433,7 +446,6 @@ fun LiveConsoleScreen(
                 onBack = ::leave,
                 onTogglePlay = { controller.togglePlay() },
                 onRefresh = { vm.refreshLive() },
-                onSeekLive = { controller.seekToLive() },
                 onQuality = {
                     qualityOpener = qualityFocus
                     session.openOverlay(DuoOverlay.QUALITY)
@@ -444,7 +456,12 @@ fun LiveConsoleScreen(
                         else (playback.volume + 0.25f).coerceAtMost(1f)
                     )
                 },
-                onToggleDanmaku = { vm.toggleDanmaku() },
+                onToggleDanmaku = { vm.toggleLiveDanmaku() },
+                danmakuSettingsFocus = danmakuSettingsFocus,
+                onDanmakuSettings = {
+                    danmakuSettingsOpener = danmakuSettingsFocus
+                    session.openOverlay(DuoOverlay.LIVE_DANMAKU_SETTINGS)
+                },
                 onRetry = { vm.refreshLive() },
             )
 
@@ -497,6 +514,36 @@ fun LiveConsoleScreen(
                 },
             )
         }
+
+        if (overlay == DuoOverlay.LIVE_DANMAKU_SETTINGS) {
+            LiveDanmakuSettingsOverlay(
+                ui = ui,
+                firstFocus = danmakuSettingsFirstFocus,
+                closeFocus = danmakuSettingsCloseFocus,
+                onDismiss = { session.closeOverlay() },
+                onToggleEnabled = { vm.setLiveDanmakuEnabled(!ui.liveDanmakuEnabled) },
+                onCycleOpacity = {
+                    vm.setLiveDanmakuOpacity(
+                        nextLiveDanmakuValue(ui.liveDanmakuOpacity, liveDanmakuOpacityOptions)
+                    )
+                },
+                onCycleSpeed = {
+                    vm.setLiveDanmakuSpeed(
+                        nextLiveDanmakuValue(ui.liveDanmakuSpeed, liveDanmakuSpeedOptions)
+                    )
+                },
+                onCycleSize = {
+                    vm.setLiveDanmakuTextSize(
+                        nextLiveDanmakuValue(ui.liveDanmakuTextSize, liveDanmakuSizeOptions)
+                    )
+                },
+                onCycleArea = {
+                    vm.setLiveDanmakuArea(
+                        nextLiveDanmakuValue(ui.liveDanmakuArea, liveDanmakuAreaOptions)
+                    )
+                },
+            )
+        }
     }
 }
 
@@ -509,7 +556,6 @@ private fun LiveLeftPane(
     error: String?,
     playFocus: FocusRequester,
     refreshFocus: FocusRequester,
-    liveEdgeFocus: FocusRequester,
     qualityFocus: FocusRequester,
     volumeFocus: FocusRequester,
     tabFocus: List<FocusRequester>,
@@ -517,10 +563,11 @@ private fun LiveLeftPane(
     onBack: () -> Unit,
     onTogglePlay: () -> Unit,
     onRefresh: () -> Unit,
-    onSeekLive: () -> Unit,
     onQuality: () -> Unit,
     onVolume: () -> Unit,
     onToggleDanmaku: () -> Unit,
+    danmakuSettingsFocus: FocusRequester,
+    onDanmakuSettings: () -> Unit,
     onRetry: () -> Unit,
 ) {
     val detail = ui.liveDetail
@@ -596,46 +643,48 @@ private fun LiveLeftPane(
 
         Row(
             modifier = Modifier.fillMaxWidth().height(56.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            LiveTransportButton(
-                icon = Icons.Filled.Refresh,
-                description = "刷新直播",
-                focusRequester = refreshFocus,
-                enabled = !ui.isLoading,
-                onClick = onRefresh,
-            )
-            Box(
-                modifier = Modifier
-                    .size(56.dp)
-                    .duoFocusRing(CircleShape)
-                    .clip(CircleShape)
-                    .background(LivePink)
-                    .focusRequester(playFocus)
-                    .duoClickable { onTogglePlay() },
-                contentAlignment = Alignment.Center,
-            ) {
-                if (isBuffering || ui.isLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(22.dp),
-                        color = LiveOnPink,
-                        strokeWidth = 2.dp,
-                    )
-                } else {
-                    Icon(
-                        imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                        contentDescription = if (isPlaying) "暂停" else "播放",
-                        tint = LiveOnPink,
-                        modifier = Modifier.size(30.dp),
-                    )
+            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                LiveTransportButton(
+                    icon = Icons.Filled.Refresh,
+                    description = "刷新直播",
+                    focusRequester = refreshFocus,
+                    enabled = !ui.isLoading,
+                    onClick = onRefresh,
+                )
+            }
+            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .duoFocusRing(CircleShape)
+                        .clip(CircleShape)
+                        .background(LivePink)
+                        .focusRequester(playFocus)
+                        .duoClickable { onTogglePlay() },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (isBuffering || ui.isLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(22.dp),
+                            color = LiveOnPink,
+                            strokeWidth = 2.dp,
+                        )
+                    } else {
+                        Icon(
+                            imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                            contentDescription = if (isPlaying) "暂停" else "播放",
+                            tint = LiveOnPink,
+                            modifier = Modifier.size(30.dp),
+                        )
+                    }
                 }
             }
-            LiveChip(
-                text = "回到直播",
-                modifier = Modifier.focusRequester(liveEdgeFocus),
-                onClick = onSeekLive,
-            )
+            // Keep the third column empty so the two round buttons above and the
+            // three chips below share one optical grid.
+            Spacer(Modifier.weight(1f))
         }
 
         if (!error.isNullOrBlank()) {
@@ -645,30 +694,62 @@ private fun LiveLeftPane(
 
         Spacer(Modifier.height(6.dp))
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(46.dp)
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.fillMaxWidth().height(46.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Spacer(Modifier.width(10.dp))
             LiveChip(
                 text = selectedQualityText(ui),
-                modifier = chipDown.then(Modifier.focusRequester(qualityFocus)),
+                modifier = Modifier
+                    .weight(1f)
+                    .then(chipDown)
+                    .focusRequester(qualityFocus),
                 onClick = onQuality,
             )
             LiveChip(
                 text = "音量 ${(volume * 100).toInt()}%",
-                modifier = chipDown.then(Modifier.focusRequester(volumeFocus)),
+                modifier = Modifier
+                    .weight(1f)
+                    .then(chipDown)
+                    .focusRequester(volumeFocus),
                 onClick = onVolume,
             )
-            LiveChip(
-                text = if (ui.danmakuEnabled) "弹幕 开" else "弹幕 关",
-                modifier = chipDown,
-                onClick = onToggleDanmaku,
-            )
-            Spacer(Modifier.width(10.dp))
+            Box(Modifier.weight(1f)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    LiveChip(
+                        text = if (ui.liveDanmakuEnabled) "弹幕 开" else "弹幕 关",
+                        modifier = Modifier
+                            .weight(1f)
+                            .focusProperties { down = danmakuSettingsFocus },
+                        onClick = onToggleDanmaku,
+                    )
+                    Box(
+                        modifier = Modifier
+                            .size(26.dp)
+                            .focusRequester(danmakuSettingsFocus)
+                            .focusProperties {
+                                up = playFocus
+                                down = tabFocus[selectedTab]
+                            }
+                            .duoFocusRing(RoundedCornerShape(6.dp))
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(LiveSurfaceHigh)
+                            .duoClickable(onClick = onDanmakuSettings),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Settings,
+                            contentDescription = "直播弹幕设置",
+                            tint = LiveTextSecondary,
+                            modifier = Modifier.size(15.dp),
+                        )
+                    }
+                }
+            }
         }
 
         Spacer(Modifier.height(8.dp))
@@ -1597,6 +1678,125 @@ private fun LiveErrorBanner(message: String, onRetry: () -> Unit) {
 }
 
 @Composable
+private fun LiveDanmakuSettingsOverlay(
+    ui: PlayerUiState,
+    firstFocus: FocusRequester,
+    closeFocus: FocusRequester,
+    onDismiss: () -> Unit,
+    onToggleEnabled: () -> Unit,
+    onCycleOpacity: () -> Unit,
+    onCycleSpeed: () -> Unit,
+    onCycleSize: () -> Unit,
+    onCycleArea: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.72f))
+            .pointerInput(Unit) { detectTapGestures(onTap = { onDismiss() }) },
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            modifier = Modifier
+                .widthIn(min = 300.dp, max = 380.dp)
+                .heightIn(max = 400.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(LiveSurface)
+                .pointerInput(Unit) { detectTapGestures(onTap = {}) }
+                .focusGroup()
+                .padding(12.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "直播弹幕设置",
+                    color = LiveTextPrimary,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                )
+                Spacer(Modifier.weight(1f))
+                Text(
+                    "关闭",
+                    color = LiveTextSecondary,
+                    fontSize = 11.sp,
+                    modifier = Modifier
+                        .focusRequester(closeFocus)
+                        .focusProperties { down = firstFocus }
+                        .duoFocusRing(RoundedCornerShape(4.dp))
+                        .clip(RoundedCornerShape(4.dp))
+                        .duoClickable(onClick = onDismiss)
+                        .padding(horizontal = 6.dp, vertical = 3.dp),
+                )
+            }
+            Spacer(Modifier.height(6.dp))
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(vertical = 7.dp),
+            ) {
+                LiveDanmakuSettingRow(
+                    label = "显示弹幕",
+                    value = if (ui.liveDanmakuEnabled) "开" else "关",
+                    focusRequester = firstFocus,
+                    modifier = Modifier.focusProperties { up = closeFocus },
+                    onClick = onToggleEnabled,
+                )
+                LiveDanmakuSettingRow(
+                    label = "不透明度",
+                    value = "${(ui.liveDanmakuOpacity * 100).toInt()}%",
+                    onClick = onCycleOpacity,
+                )
+                LiveDanmakuSettingRow(
+                    label = "字号",
+                    value = liveDanmakuSizeLabel(ui.liveDanmakuTextSize),
+                    onClick = onCycleSize,
+                )
+                LiveDanmakuSettingRow(
+                    label = "速度",
+                    value = liveDanmakuSpeedLabel(ui.liveDanmakuSpeed),
+                    onClick = onCycleSpeed,
+                )
+                LiveDanmakuSettingRow(
+                    label = "显示区域",
+                    value = liveDanmakuAreaLabel(ui.liveDanmakuArea),
+                    modifier = Modifier.focusProperties { down = FocusRequester.Cancel },
+                    onClick = onCycleArea,
+                )
+            }
+            Text(
+                "B/返回关闭 · 调整立即生效",
+                color = LiveTextTertiary,
+                fontSize = 10.sp,
+                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun LiveDanmakuSettingRow(
+    label: String,
+    value: String,
+    focusRequester: FocusRequester? = null,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
+            .duoFocusRing(RoundedCornerShape(6.dp))
+            .clip(RoundedCornerShape(6.dp))
+            .duoClickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(text = label, color = LiveTextPrimary, fontSize = 12.sp, modifier = Modifier.weight(1f))
+        Text(text = value, color = LivePink, fontSize = 12.sp)
+    }
+}
+
+@Composable
 private fun LiveQualityOverlay(
     qualities: List<QualityOption>,
     selectedQuality: QualityOption?,
@@ -1699,6 +1899,37 @@ private fun LiveQualityRow(
 
 private fun selectedQualityText(ui: PlayerUiState): String =
     ui.currentQuality?.description?.takeIf { it.isNotBlank() } ?: "清晰度"
+
+private val liveDanmakuOpacityOptions = listOf(0.3f, 0.5f, 0.7f, 0.9f, 1f)
+private val liveDanmakuSpeedOptions = listOf(0.7f, 1f, 1.4f, 1.8f)
+private val liveDanmakuSizeOptions = listOf(13f, 16f, 20f, 24f)
+private val liveDanmakuAreaOptions = listOf(0.3f, 0.55f, 0.8f, 1f)
+
+private fun nextLiveDanmakuValue(current: Float, options: List<Float>): Float {
+    val index = options.indexOfFirst { kotlin.math.abs(it - current) < 0.01f }
+    return options[(index + 1).mod(options.size)]
+}
+
+private fun liveDanmakuSizeLabel(value: Float): String = when {
+    value <= 14f -> "小"
+    value <= 18f -> "标准"
+    value <= 22f -> "大"
+    else -> "特大"
+}
+
+private fun liveDanmakuSpeedLabel(value: Float): String = when {
+    value <= 0.8f -> "0.7×"
+    value <= 1.2f -> "1.0×"
+    value <= 1.6f -> "1.4×"
+    else -> "1.8×"
+}
+
+private fun liveDanmakuAreaLabel(value: Float): String = when {
+    value <= 0.4f -> "1/4"
+    value <= 0.65f -> "1/2"
+    value <= 0.9f -> "3/4"
+    else -> "全屏"
+}
 
 private fun formatLiveTime(value: String?): String {
     val text = value.orEmpty()

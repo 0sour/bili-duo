@@ -18,6 +18,7 @@ import androidx.compose.runtime.Composable
 class SecondScreenController(
     private val activity: ComponentActivity,
     private val content: @Composable () -> Unit,
+    private val onBack: () -> Unit = {},
     private val onAvailabilityChanged: (Boolean) -> Unit = {},
     private val onDecorViewChanged: (View?) -> Unit = {},
 ) : DisplayManager.DisplayListener {
@@ -83,7 +84,7 @@ class SecondScreenController(
             onAvailabilityChanged(false)
             return
         }
-        val panel = SecondScreenPresentation(activity, display, content)
+        val panel = SecondScreenPresentation(activity, display, content, onBack)
         try {
             panel.show()
             presentation = panel

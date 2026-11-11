@@ -184,6 +184,7 @@ class MainActivity : ComponentActivity() {
                     onTopIdle = topScreenViewModel::showIdle,
                 )
             },
+            onBack = { duoSession.handleBackKey() },
             onAvailabilityChanged = { secondScreenAvailable = it },
             onDecorViewChanged = { view ->
                 bottomUiBridge.attach(view)
@@ -341,7 +342,7 @@ private fun duoPageHint(route: String?): String? = when (route) {
     Routes.CHANNEL -> "LB/RB 视频/合集 · B 播放/进入"
     Routes.PLAYER, Routes.PLAYER_CID, Routes.DOWNLOAD_PLAY, Routes.PGC_PLAYER ->
         "LB/RB 切 tab · L2/R2 评论排序 · Y 弹幕 · START 弹幕/字幕"
-    Routes.LIVE_PLAYER -> "方向键/B 切换评论与信息"
+    Routes.LIVE_PLAYER -> "方向键/B 切换评论与信息 · X 弹幕 · START 弹幕设置"
     Routes.DETAIL, Routes.NOTE -> "方向键移动 · B 播放/进入"
     else -> null
 }
@@ -371,16 +372,12 @@ fun MainScreen(
 
     val keyboard = LocalSoftwareKeyboardController.current
     val imeVisible = WindowInsets.isImeVisible
-    val imeVisibleState by rememberUpdatedState(imeVisible)
     LaunchedEffect(imeVisible) {
         if (!imeVisible) DuoImeState.shown = false
     }
     DisposableEffect(duoSession) {
-        duoSession.setImeBackHandler(
-            isVisible = { imeVisibleState },
-            hide = { keyboard?.hide() },
-        )
-        onDispose { duoSession.setImeBackHandler(null, null) }
+        duoSession.setImeBackHandler(hide = { keyboard?.hide() })
+        onDispose { duoSession.setImeBackHandler(null) }
     }
 
 
