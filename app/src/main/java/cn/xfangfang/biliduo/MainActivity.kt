@@ -11,6 +11,7 @@ import android.hardware.input.InputManager
 import android.view.InputDevice
 import android.view.KeyEvent
 import android.view.MotionEvent
+import android.view.ViewGroup
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -27,6 +28,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -55,6 +57,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -132,6 +135,13 @@ class MainActivity : ComponentActivity() {
     private lateinit var secondScreen: SecondScreenController
     private var secondScreenAvailable by mutableStateOf(false)
 
+    /**
+     * Bumped when the user swaps the panels. Both MainScreen hosts (Activity and
+     * Presentation) read it; the newly composed one navigates back to Profile
+     * since that is where the swap button lives.
+     */
+    private val swapRestoreSerial = mutableIntStateOf(-1)
+
     private lateinit var inputManager: InputManager
     private val gamepadListener = object : InputManager.InputDeviceListener {
         override fun onInputDeviceAdded(deviceId: Int) = refreshGamepadConnection()
@@ -141,6 +151,12 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Launcher shortcut ("双屏启动 · 上/下屏控制") forces the layout for
+        // this launch and is persisted, so a later normal launch keeps it.
+        if (savedInstanceState == null) {
+            applyDisplayControlIntent(intent)
+            intent?.removeExtra(EXTRA_DISPLAY_CONTROL)
+        }
         window.setBackgroundDrawable(ColorDrawable(android.graphics.Color.BLACK))
         WindowCompat.setDecorFitsSystemWindows(window, false)
         WindowInsetsControllerCompat(window, window.decorView).apply {
@@ -166,32 +182,65 @@ class MainActivity : ComponentActivity() {
         inputManager = getSystemService(InputManager::class.java)
         inputManager.registerInputDeviceListener(gamepadListener, null)
         refreshGamepadConnection()
+
+        fun toggleDisplaySwap() {
+            val next = !AppSettings.displaySwapped
+            AppSettings.displaySwapped = next
+            secondScreen.setVideoOnly(next)
+            bottomUiBridge.setUseLocal(next)
+            swapRestoreSerial.intValue++
+            val serial = swapRestoreSerial.intValue
+            // The Profile page is where the button lives. Both hosts are
+            // recreated, so tell the new one to navigate back there. Clear the
+            // token shortly after so a later window recreation starts at Home.
+            lifecycleScope.launch {
+                delay(2_000)
+                if (swapRestoreSerial.intValue == serial) swapRestoreSerial.intValue = -1
+            }
+        }
+
+        val mainContent: @Composable () -> Unit = {
+            MainScreen(
+                openDownloadsRequest = openDownloadsRequest,
+                dualScreen = true,
+                playerViewModel = playerViewModel,
+                playerController = playerController,
+                duoSession = duoSession,
+                displaySwapped = AppSettings.displaySwapped,
+                displaySwapAvailable = secondScreenAvailable,
+                onToggleDisplaySwap = { toggleDisplaySwap() },
+                restoreProfileSerial = swapRestoreSerial.intValue,
+                onTopVideoFocused = topScreenViewModel::onVideoFocused,
+                onTopFocusCleared = topScreenViewModel::onFocusCleared,
+                onTopPerson = topScreenViewModel::showPerson,
+                onTopPanel = topScreenViewModel::showPanel,
+                onTopAmbient = topScreenViewModel::showAmbient,
+                onTopDynamicReader = topScreenViewModel::showDynamicReader,
+                onTopIdle = topScreenViewModel::showIdle,
+            )
+        }
+        val topContent: @Composable () -> Unit = {
+            TopScreenHost(
+                controller = playerController,
+                viewModel = topScreenViewModel,
+                playerViewModel = playerViewModel,
+            )
+        }
         secondScreen = SecondScreenController(
             activity = this,
             content = {
-                MainScreen(
-                    openDownloadsRequest = openDownloadsRequest,
-                    dualScreen = true,
-                    playerViewModel = playerViewModel,
-                    playerController = playerController,
-                    duoSession = duoSession,
-                    onTopVideoFocused = topScreenViewModel::onVideoFocused,
-                    onTopFocusCleared = topScreenViewModel::onFocusCleared,
-                    onTopPerson = topScreenViewModel::showPerson,
-                    onTopPanel = topScreenViewModel::showPanel,
-                    onTopAmbient = topScreenViewModel::showAmbient,
-                    onTopDynamicReader = topScreenViewModel::showDynamicReader,
-                    onTopIdle = topScreenViewModel::showIdle,
-                )
+                if (AppSettings.displaySwapped) topContent() else mainContent()
             },
             onBack = { duoSession.handleBackKey() },
             onAvailabilityChanged = { secondScreenAvailable = it },
             onDecorViewChanged = { view ->
                 bottomUiBridge.attach(view)
-                if (view != null) duoSession.requestFocus()
+                if (view != null && !AppSettings.displaySwapped) duoSession.requestFocus()
             },
         )
         secondScreenAvailable = secondScreen.hasSecondaryDisplay()
+        secondScreen.setVideoOnly(AppSettings.displaySwapped)
+        bottomUiBridge.setUseLocal(AppSettings.displaySwapped)
         requestNotificationPermissionIfNeeded()
         handleOpenDownloadsIntent(intent)
         lifecycleScope.launch {
@@ -204,13 +253,9 @@ class MainActivity : ComponentActivity() {
                     playerController.setEnabled(secondScreenAvailable)
                 }
                 if (secondScreenAvailable) {
-                    // Top screen shows the read-only preview layer until the
-                    // first video frame is rendered, then becomes surface-only.
-                    TopScreenHost(
-                        controller = playerController,
-                        viewModel = topScreenViewModel,
-                        playerViewModel = playerViewModel,
-                    )
+                    // With a second display the two windows swap roles: video
+                    // on top + UI below by default, or UI on top + video below.
+                    if (AppSettings.displaySwapped) mainContent() else topContent()
                 } else {
                     MainScreen(
                         openDownloadsRequest = openDownloadsRequest,
@@ -218,10 +263,15 @@ class MainActivity : ComponentActivity() {
                         playerViewModel = playerViewModel,
                         playerController = null,
                         duoSession = duoSession,
+                        displaySwapAvailable = false,
                     )
                 }
             }
         }
+        // When the UI runs in the Activity (swapped layout), key events still
+        // pass through InputRouter; point the bridge at the Compose content.
+        val contentRoot = findViewById<ViewGroup>(android.R.id.content)
+        bottomUiBridge.attachLocal(contentRoot?.getChildAt(0) ?: contentRoot)
     }
 
     override fun onStart() {
@@ -262,8 +312,10 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        setIntent(intent)
         handleOpenDownloadsIntent(intent)
+        applyDisplayControlIntent(intent)
+        intent.removeExtra(EXTRA_DISPLAY_CONTROL)
+        setIntent(intent)
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
@@ -310,6 +362,21 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * Static launcher shortcuts pass "display_control=bottom|top". The value is
+     * persisted, so the next normal launch keeps the last chosen layout.
+     */
+    private fun applyDisplayControlIntent(intent: Intent?) {
+        val mode = intent?.getStringExtra(EXTRA_DISPLAY_CONTROL) ?: return
+        val swapped = mode == DISPLAY_CONTROL_TOP
+        if (AppSettings.displaySwapped == swapped) return
+        AppSettings.displaySwapped = swapped
+        if (::secondScreen.isInitialized) {
+            secondScreen.setVideoOnly(swapped)
+            bottomUiBridge.setUseLocal(swapped)
+        }
+    }
+
     private fun requestNotificationPermissionIfNeeded() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
@@ -321,6 +388,11 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_OPEN_DOWNLOADS = "open_downloads"
+
+        /** Must match app/src/main/res/xml/shortcuts.xml. */
+        const val EXTRA_DISPLAY_CONTROL = "display_control"
+        const val DISPLAY_CONTROL_BOTTOM = "bottom"
+        const val DISPLAY_CONTROL_TOP = "top"
     }
 }
 
@@ -355,6 +427,10 @@ fun MainScreen(
     playerViewModel: PlayerViewModel = viewModel(),
     playerController: PlayerController? = null,
     duoSession: DuoSessionViewModel = viewModel(),
+    displaySwapped: Boolean = false,
+    displaySwapAvailable: Boolean = false,
+    onToggleDisplaySwap: () -> Unit = {},
+    restoreProfileSerial: Int = -1,
     onTopVideoFocused: (TopPreviewUi) -> Unit = {},
     onTopFocusCleared: () -> Unit = {},
     onTopPerson: (TopPersonUi) -> Unit = {},
@@ -364,6 +440,19 @@ fun MainScreen(
     onTopIdle: () -> Unit = {},
 ) {
     val navController = rememberNavController()
+    // After a display swap the host is recreated and its fresh NavController
+    // starts at Home. Return to Profile so the swap button stays reachable.
+    var restoredSwapSerial by rememberSaveable { mutableStateOf(-1) }
+    LaunchedEffect(restoreProfileSerial, navController) {
+        if (restoreProfileSerial >= 0 && restoredSwapSerial != restoreProfileSerial) {
+            restoredSwapSerial = restoreProfileSerial
+            // Let NavHost attach its graph before restoring the page.
+            delay(120)
+            runCatching {
+                navController.navigate(Screen.Profile.route) { launchSingleTop = true }
+            }
+        }
+    }
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
     val railFocusState = rememberDuoRailFocusState()
@@ -496,12 +585,28 @@ fun MainScreen(
                             AppSettings.manualDark = !isDarkTheme
                         },
                         onNavigate = { screen ->
-                            navController.navigate(screen.route) {
-                                popUpTo(navController.graph.findStartDestination().id) {
-                                    saveState = true
+                            // Navigating back to the start destination with
+                            // saveState+restoreState can restore the stack we
+                            // just saved (e.g. Profile), so the Home rail item
+                            // only focused without changing pages. Pop instead.
+                            if (screen == Screen.Home) {
+                                val popped = navController.popBackStack(
+                                    Screen.Home.route,
+                                    inclusive = false,
+                                )
+                                if (!popped) {
+                                    navController.navigate(Screen.Home.route) {
+                                        launchSingleTop = true
+                                    }
                                 }
-                                launchSingleTop = true
-                                restoreState = true
+                            } else {
+                                navController.navigate(screen.route) {
+                                    popUpTo(navController.graph.findStartDestination().id) {
+                                        saveState = true
+                                    }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
                             }
                         },
                     )
@@ -576,6 +681,9 @@ fun MainScreen(
                     onTopPerson = onTopPerson,
                     onTopAmbient = onTopAmbient,
                     session = duoSession,
+                    displaySwapped = displaySwapped,
+                    displaySwapAvailable = displaySwapAvailable,
+                    onToggleDisplaySwap = onToggleDisplaySwap,
                 )
             }
 

@@ -27,12 +27,22 @@ class SecondScreenController(
         activity.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
     private var presentation: SecondScreenPresentation? = null
     private var started = false
+    private var videoOnly = false
 
     init {
         displayManager.registerDisplayListener(this, null)
     }
 
     fun hasSecondaryDisplay(): Boolean = findSecondaryDisplay() != null
+
+    /**
+     * Swapped layout: the Presentation renders only video, so its window must
+     * not take key focus away from the Activity UI. Safe to call before show().
+     */
+    fun setVideoOnly(value: Boolean) {
+        videoOnly = value
+        presentation?.setInteractive(!value)
+    }
 
     /** Called from Activity.onStart. */
     fun show() {
@@ -68,6 +78,7 @@ class SecondScreenController(
         if (existing != null) {
             runCatching { existing.show() }
                 .onSuccess {
+                    existing.setInteractive(!videoOnly)
                     existing.window?.decorView?.post { existing.requestComposeFocus() }
                     onDecorViewChanged(existing.window?.decorView)
                     onAvailabilityChanged(true)
@@ -88,6 +99,7 @@ class SecondScreenController(
         try {
             panel.show()
             presentation = panel
+            panel.setInteractive(!videoOnly)
             panel.window?.decorView?.post { panel.requestComposeFocus() }
             onDecorViewChanged(panel.window?.decorView)
             onAvailabilityChanged(true)

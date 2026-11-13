@@ -8,6 +8,7 @@ import android.os.Bundle
 import android.os.SystemClock
 import android.view.Display
 import android.view.KeyEvent
+import android.view.WindowManager
 import android.window.OnBackInvokedCallback
 import android.window.OnBackInvokedDispatcher
 import androidx.activity.ComponentActivity
@@ -73,6 +74,21 @@ class SecondScreenPresentation(
         val root = composeView ?: return
         val target = root.getChildAt(0) ?: root
         target.requestFocus()
+    }
+
+    /**
+     * Swapped layout: this Presentation only renders the video surface. Make its
+     * window non-focusable so hardware keys keep going to the Activity (which
+     * now owns the UI) instead of being captured by an inert video window.
+     */
+    fun setInteractive(interactive: Boolean) {
+        val window = window ?: return
+        if (interactive) {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE)
+            window.decorView.post { requestComposeFocus() }
+        } else {
+            window.addFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE)
+        }
     }
 
     /**

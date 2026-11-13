@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="display_bottom_control"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_bottom_control"
+        android:shortcutShortLabel="@string/shortcut_bottom_control"
+        android:shortcutLongLabel="@string/shortcut_bottom_control_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="cn.xfangfang.biliduo"
+            android:targetClass="cn.xfangfang.biliduo.MainActivity">
+            <extra
+                android:name="display_control"
+                android:value="bottom" />
+        </intent>
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="display_top_control"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_top_control"
+        android:shortcutShortLabel="@string/shortcut_top_control"
+        android:shortcutLongLabel="@string/shortcut_top_control_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="cn.xfangfang.biliduo"
+            android:targetClass="cn.xfangfang.biliduo.MainActivity">
+            <extra
+                android:name="display_control"
+                android:value="top" />
+        </intent>
+    </shortcut>
+</shortcuts>

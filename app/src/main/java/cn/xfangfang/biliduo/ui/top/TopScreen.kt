@@ -49,6 +49,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.Player
 import coil.compose.AsyncImage
+import cn.xfangfang.biliduo.data.local.AppSettings
 import cn.xfangfang.biliduo.data.model.DanmakuItem
 import cn.xfangfang.biliduo.data.model.LiveChatMessage
 import cn.xfangfang.biliduo.data.model.SubtitleCue
@@ -401,7 +402,7 @@ private fun TopIdleScreen() {
                 ) {
                     Box(Modifier.size(5.dp).background(TopPink, CircleShape))
                     Spacer(Modifier.width(6.dp))
-                    Text("待机 · 下屏浏览", color = TopSecondary, fontSize = 8.sp)
+                    Text("待机 · ${controlScreenLabel()}浏览", color = TopSecondary, fontSize = 8.sp)
                 }
             }
 
@@ -419,14 +420,14 @@ private fun TopIdleScreen() {
                     )
                     Spacer(Modifier.height(12.dp))
                     Text(
-                        text = "下屏选视频，",
+                        text = "${controlScreenLabel()}选视频，",
                         color = TopText,
                         fontSize = 36.sp,
                         lineHeight = 41.sp,
                         fontWeight = FontWeight.Bold,
                     )
                     Text(
-                        text = "上屏先预览。",
+                        text = "${videoScreenLabel()}先预览。",
                         color = TopPink,
                         fontSize = 36.sp,
                         lineHeight = 41.sp,
@@ -434,7 +435,7 @@ private fun TopIdleScreen() {
                     )
                     Spacer(Modifier.height(14.dp))
                     Text(
-                        text = "移动焦点或触摸视频卡片，上屏会展示封面、简介和 UP 主信息；开始播放后自动切换为视频画面。",
+                        text = "移动焦点或触摸视频卡片，${videoScreenLabel()}会展示封面、简介和 UP 主信息；开始播放后自动切换为视频画面。",
                         color = TopSecondary,
                         fontSize = 11.sp,
                         lineHeight = 18.sp,
@@ -472,13 +473,13 @@ private fun TopIdleScreen() {
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("上屏只负责显示", color = TopTertiary, fontSize = 8.sp)
+                Text("${videoScreenLabel()}只负责显示", color = TopTertiary, fontSize = 8.sp)
                 Spacer(Modifier.width(10.dp))
                 Box(Modifier.width(22.dp).height(1.dp).background(TopLine))
                 Spacer(Modifier.width(10.dp))
                 Text("不响应触摸或手柄", color = TopTertiary, fontSize = 8.sp)
                 Spacer(Modifier.weight(1f))
-                Text("下屏触摸与手柄共用一套焦点", color = TopTertiary, fontSize = 8.sp)
+                Text("${controlScreenLabel()}触摸与手柄共用一套焦点", color = TopTertiary, fontSize = 8.sp)
             }
         }
     }
@@ -696,18 +697,36 @@ private fun TopSceneHeader(right: String, accent: Color) {
 }
 
 @Composable
+private fun videoScreenLabel(): String =
+    if (AppSettings.displaySwapped) "下屏" else "上屏"
+
+@Composable
+private fun controlScreenLabel(): String =
+    if (AppSettings.displaySwapped) "上屏" else "下屏"
+
+/** The footer copy always means "video screen" for 上屏 and "UI screen" for 下屏. */
+@Composable
+private fun layoutCopy(text: String): String {
+    if (!AppSettings.displaySwapped) return text
+    return text
+        .replace("上屏", "\u0000")
+        .replace("下屏", "上屏")
+        .replace("\u0000", "下屏")
+}
+
+@Composable
 private fun TopSceneFooter(left: String, right: String) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(left, color = TopTertiary, fontSize = 8.sp, maxLines = 1)
+        Text(layoutCopy(left), color = TopTertiary, fontSize = 8.sp, maxLines = 1)
         Spacer(Modifier.width(10.dp))
         Box(Modifier.width(22.dp).height(1.dp).background(TopLine))
         Spacer(Modifier.width(10.dp))
-        Text(right, color = TopTertiary, fontSize = 8.sp, maxLines = 1)
+        Text(layoutCopy(right), color = TopTertiary, fontSize = 8.sp, maxLines = 1)
         Spacer(Modifier.weight(1f))
-        Text("上屏只读", color = TopTertiary, fontSize = 8.sp)
+        Text("${videoScreenLabel()}只读", color = TopTertiary, fontSize = 8.sp)
     }
 }
 
@@ -870,7 +889,7 @@ private fun TopPersonScreen(person: TopPersonUi) {
                         if (person.badge.isNotBlank()) {
                             TopPill(person.badge, accent, filled = true)
                         }
-                        TopPill("下屏焦点联动", accent)
+                        TopPill("${controlScreenLabel()}焦点联动", accent)
                     }
                 }
                 Column(
@@ -1199,7 +1218,7 @@ private fun TopPanelScreen(panel: TopPanelUi) {
                         modifier = Modifier.size(176.dp),
                     )
                     Text(
-                        text = "下屏左右切换分类",
+                        text = "${controlScreenLabel()}左右切换分类",
                         color = TopSecondary,
                         fontSize = 9.sp,
                         modifier = Modifier
@@ -1322,7 +1341,7 @@ private fun TopPreviewScreen(
 ) {
     TopBackdrop(preview.coverUrl, TopPink) {
         Column(Modifier.fillMaxSize().padding(horizontal = 42.dp, vertical = 26.dp)) {
-            TopSceneHeader(right = "PREVIEW · 上屏预览", accent = TopPink)
+            TopSceneHeader(right = "PREVIEW · ${videoScreenLabel()}预览", accent = TopPink)
             Row(
                 modifier = Modifier.weight(1f).fillMaxWidth().padding(top = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -1845,7 +1864,7 @@ private fun TopDynamicTextScreen(reader: TopDynamicReaderUi) {
                     TopEyebrow("NO IMAGES", TopPink)
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        text = "没有配图时，上屏用排版呈现正文，而不是留一块空封面。",
+                        text = "没有配图时，${videoScreenLabel()}用排版呈现正文，而不是留一块空封面。",
                         color = TopSecondary,
                         fontSize = 9.sp,
                         lineHeight = 15.sp,

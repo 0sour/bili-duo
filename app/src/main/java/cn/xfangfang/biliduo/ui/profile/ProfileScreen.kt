@@ -29,6 +29,7 @@ import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.PersonAdd
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.SwapVert
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -46,6 +47,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
@@ -98,13 +100,21 @@ fun ProfileScreen(
     onTopPerson: (TopPersonUi) -> Unit = {},
     onTopAmbient: (TopAmbientUi) -> Unit = {},
     session: DuoSessionViewModel? = null,
+    displaySwapped: Boolean = false,
+    displaySwapAvailable: Boolean = false,
+    onToggleDisplaySwap: () -> Unit = {},
     viewModel: ProfileViewModel = viewModel(),
 ) {
     val state by profileStateWithLifecycleEvents(viewModel)
     var showLogoutConfirm by rememberSaveable { mutableStateOf(false) }
     val menuFocuses = remember { List(5) { FocusRequester() } }
+    val swapFocus = remember { FocusRequester() }
     val logoutFocus = remember { FocusRequester() }
     var restoreLogoutFocus by remember { mutableStateOf(false) }
+    // The preview always lives on the video screen; the lists and forms live
+    // on the control screen. Both swap together with the layout.
+    val videoScreen = if (displaySwapped) "下屏" else "上屏"
+    val controlScreen = if (displaySwapped) "上屏" else "下屏"
 
     LaunchedEffect(
         state.isLoggedIn,
@@ -113,6 +123,7 @@ fun ProfileScreen(
         state.mid,
         state.level,
         state.isVip,
+        displaySwapped,
     ) {
         if (state.isLoggedIn) {
             onTopPerson(
@@ -127,7 +138,7 @@ fun ProfileScreen(
                     description = if (state.error != null) {
                         "资料刷新失败，稍后重试。"
                     } else {
-                        "账号已登录。观看历史、收藏与关注会在下屏同步展示。"
+                        "账号已登录。观看历史、收藏与关注会在${controlScreen}同步展示。"
                     },
                     badge = if (state.isVip) "大会员" else "已登录",
                     avatarUrl = state.face,
@@ -138,8 +149,8 @@ fun ProfileScreen(
             onTopAmbient(
                 TopAmbientUi(
                     eyebrow = "PROFILE / 我的",
-                    title = "登录后，\n上屏就是你的主页。",
-                    subtitle = "头像、昵称、等级与观看数据会显示在这里；二维码、验证码和密码表单都在下屏操作。",
+                    title = "登录后，\n${videoScreen}就是你的主页。",
+                    subtitle = "头像、昵称、等级与观看数据会显示在这里；二维码、验证码和密码表单都在${controlScreen}操作。",
                     glyph = TopGlyph.LOGIN,
                 )
             )
@@ -219,6 +230,18 @@ fun ProfileScreen(
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 8.dp, vertical = 4.dp),
             ) {
+                if (displaySwapAvailable) {
+                    Spacer(Modifier.height(6.dp))
+                    DisplaySwapButton(
+                        swapped = displaySwapped,
+                        focusRequester = swapFocus,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .focusProperties { down = menuFocuses[0] },
+                        onClick = onToggleDisplaySwap,
+                    )
+                    Spacer(Modifier.height(6.dp))
+                }
                 val entries = listOf(
                     ProfileMenuEntry("观看历史", Icons.Outlined.History, onHistoryClick),
                     ProfileMenuEntry("我的收藏", Icons.Outlined.FavoriteBorder, onFavoritesClick),
@@ -229,7 +252,15 @@ fun ProfileScreen(
                 entries.forEachIndexed { index, entry ->
                     ProfileMenuRow(
                         entry = entry,
-                        modifier = Modifier.focusRequester(menuFocuses[index]),
+                        modifier = Modifier
+                            .focusRequester(menuFocuses[index])
+                            .then(
+                                if (index == 0 && displaySwapAvailable) {
+                                    Modifier.focusProperties { up = swapFocus }
+                                } else {
+                                    Modifier
+                                }
+                            ),
                     )
                     if (index != entries.lastIndex) {
                         Box(
@@ -439,6 +470,70 @@ private fun ProfileHeader(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun DisplaySwapButton(
+    swapped: Boolean,
+    focusRequester: FocusRequester,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    var focused by remember { mutableStateOf(false) }
+    Row(
+        modifier = modifier
+            .height(58.dp)
+            .focusRequester(focusRequester)
+            .duoFocusRing(RoundedCornerShape(10.dp))
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (focused) ProfileSurface2 else ProfileSurface)
+            .onFocusChanged { focused = it.isFocused }
+            .duoClickable(onClick = onClick)
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(34.dp)
+                .clip(CircleShape)
+                .background(ProfilePink.copy(alpha = 0.14f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.SwapVert,
+                contentDescription = null,
+                tint = ProfilePink,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = "交换上下屏显示",
+                color = ProfileText,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = if (swapped) {
+                    "当前：上屏操作 · 下屏播放"
+                } else {
+                    "当前：上屏播放 · 下屏操作"
+                },
+                color = ProfileTertiary,
+                fontSize = 10.sp,
+                maxLines = 1,
+            )
+        }
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = "切换",
+            color = ProfilePink,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium,
+        )
     }
 }
 

@@ -14,6 +14,7 @@ object AppSettings {
     private const val KEY_WIFI_ONLY_DOWNLOAD = "wifi_only_download"
     private const val KEY_THEME_MODE = "theme_mode"
     private const val KEY_MANUAL_DARK = "manual_dark"
+    private const val KEY_DISPLAY_SWAPPED = "display_swapped"
     private const val KEY_UPDATE_PROMPTED_TAG = "update_prompted_tag"
 
     private lateinit var prefs: SharedPreferences
@@ -28,10 +29,12 @@ object AppSettings {
         }
         themeModeState = prefs.getInt(KEY_THEME_MODE, 0)
         manualDarkState = prefs.getBoolean(KEY_MANUAL_DARK, true)
+        displaySwappedState = prefs.getBoolean(KEY_DISPLAY_SWAPPED, false)
     }
 
     private var themeModeState by mutableIntStateOf(0)
     private var manualDarkState by androidx.compose.runtime.mutableStateOf(true)
+    private var displaySwappedState by androidx.compose.runtime.mutableStateOf(false)
 
     var themeMode: Int
         get() = themeModeState
@@ -46,6 +49,18 @@ object AppSettings {
         set(value) {
             manualDarkState = value
             prefs.edit().putBoolean(KEY_MANUAL_DARK, value).apply()
+        }
+
+    /**
+     * Dual-screen layout: false = video on the top panel, UI on the bottom;
+     * true = UI on the top panel, video on the bottom. Stored as Compose state
+     * so both window compositions switch together.
+     */
+    var displaySwapped: Boolean
+        get() = displaySwappedState
+        set(value) {
+            displaySwappedState = value
+            prefs.edit().putBoolean(KEY_DISPLAY_SWAPPED, value).apply()
         }
 
     var wifiOnlyPlayback: Boolean

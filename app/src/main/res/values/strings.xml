@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="shortcut_bottom_control">双屏启动（下屏控制）</string>
+    <string name="shortcut_bottom_control_long">双屏启动（下屏控制）</string>
+    <string name="shortcut_top_control">双屏启动（上屏控制）</string>
+    <string name="shortcut_top_control_long">双屏启动（上屏控制）</string>
+</resources>
