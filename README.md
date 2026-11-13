@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc56-FB7299">
+  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc57-FB7299">
   <img alt="status" src="https://img.shields.io/badge/status-test%20build-orange">
   <img alt="Android" src="https://img.shields.io/badge/Android-24%2B-3DDC84?logo=android&logoColor=white">
   <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-1.9.23-7F52FF?logo=kotlin&logoColor=white">
@@ -23,12 +23,14 @@
 上屏只负责视频画面，下屏用一块 `Presentation` 承载完整 UI；手柄和触摸共用同一棵
 Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，也没有上屏 OSD。
 
-> 当前版本：**0.2.0-rc56**（versionCode 57，第四版测试版）
-> 下载：https://github.com/0sour/bili-duo/releases/tag/v0.2.0-rc56
-> 状态：功能完整的 **测试版**，235 个单元测试通过；第四版汇总 rc55–rc56：
+> 当前版本：**0.2.0-rc57**（versionCode 58，第四版测试版）
+> 下载：https://github.com/0sour/bili-duo/releases/tag/v0.2.0-rc57
+> 状态：功能完整的 **测试版**，235 个单元测试通过；第四版汇总 rc55–rc57：
 > 下屏系统返回键、直播控制台精简/延迟提示/独立直播弹幕设置、设置弹幕分栏、
-> **上下屏交换（含布局持久化）**、**启动器「双屏启动（上/下屏控制）」快捷方式**，
-> 以及从下屏 launcher 启动时自动回到上屏双屏布局的修复。rc50–rc54 的侧栏焦点、
+> **上下屏交换（含布局持久化）**、**启动器「双屏启动（上/下屏控制）」快捷方式**、
+> 从下屏 launcher 启动时自动回到上屏双屏布局的修复、稍后再看、播放器分享、
+> 直播历史弹幕；rc57 修复播放页点赞/投币/收藏按钮按下无法进入「稍后再看」行。
+> rc50–rc54 的侧栏焦点、
 > L1/R1 标签、视频默认值、亮暗色主题与图片查看器能力继续保留。
 
 ## 界面预览
@@ -278,12 +280,17 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
     对齐；直播弹幕独立设置（开关/不透明度/字号/速度/显示区域）与齿轮入口；暂停或
     落后实时 ≥5 秒时上屏显示直播延迟；设置 → 弹幕拆成「视频弹幕 / 直播弹幕」
     两个标签页并双向同步；修复设置分类栏聚焦「弹幕」时抢焦到内容 tab。
-  - rc56 第四版测试版：上下屏交换（个人中心按钮、持久化、视频窗口不可聚焦、
+  - rc56 功能（未单独发布，并入 rc57）：上下屏交换（个人中心按钮、持久化、视频窗口不可聚焦、
     InputRouter 转发到 Activity ComposeView）；启动器「双屏启动（下屏/上屏控制）」
     静态快捷方式（`display_control` extra，singleTop + onNewIntent，普通启动保持
     上次布局）；从下屏 launcher 启动时自动 re-home 到上屏双屏布局（修复只显示
     下屏、上屏停在桌面的问题）；新增稍后再看列表、播放页稍后再看/分享链接、
     直播历史弹幕；235 单测通过。
+  - rc57 第四版测试版：修复播放页简介 tab 的焦点链——
+    焦点在点赞/投币/收藏/下载按钮上按 Down 现在会进入「稍后再看 / 分享」行，
+    不再被 `FocusRequester.Cancel` 卡住；分享按钮 Up 回到投币；个人页「交换上下屏
+    显示」焦点环滚动到列表底部后不再被裁切；稍后再看的长合集/PGC 条目不显示
+    聚合时长与无意义的进度条，只保留「共 NP」；235 单测通过。
   - 登录、个人中心、历史/收藏/关注只读浏览；弹幕发送→撤回闭环。
 
 ### 未实现（代码层面）

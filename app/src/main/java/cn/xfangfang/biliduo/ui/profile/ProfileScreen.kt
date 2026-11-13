@@ -484,59 +484,68 @@ private fun DisplaySwapButton(
     onClick: () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
-    Row(
+    // The focus target owns 7dp of transparent vertical margin so the ring is
+    // inside the scroll viewport even when bring-into-view aligns this button
+    // with the top/bottom edge. Same pattern as the home cards.
+    Box(
         modifier = modifier
-            .height(58.dp)
             .focusRequester(focusRequester)
-            .duoFocusRing(RoundedCornerShape(10.dp))
-            .clip(RoundedCornerShape(10.dp))
-            .background(if (focused) ProfileSurface2 else ProfileSurface)
             .onFocusChanged { focused = it.isFocused }
             .duoClickable(onClick = onClick)
-            .padding(horizontal = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .padding(vertical = 7.dp),
     ) {
-        Box(
+        Row(
             modifier = Modifier
-                .size(34.dp)
-                .clip(CircleShape)
-                .background(ProfilePink.copy(alpha = 0.14f)),
-            contentAlignment = Alignment.Center,
+                .fillMaxWidth()
+                .height(58.dp)
+                .duoFocusRing(RoundedCornerShape(10.dp), focused = focused)
+                .clip(RoundedCornerShape(10.dp))
+                .background(if (focused) ProfileSurface2 else ProfileSurface)
+                .padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
-                imageVector = Icons.Outlined.SwapVert,
-                contentDescription = null,
-                tint = ProfilePink,
-                modifier = Modifier.size(20.dp),
-            )
-        }
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(CircleShape)
+                    .background(ProfilePink.copy(alpha = 0.14f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.SwapVert,
+                    contentDescription = null,
+                    tint = ProfilePink,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = "交换上下屏显示",
+                    color = ProfileText,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = if (swapped) {
+                        "当前：上屏操作 · 下屏播放"
+                    } else {
+                        "当前：上屏播放 · 下屏操作"
+                    },
+                    color = ProfileTertiary,
+                    fontSize = 10.sp,
+                    maxLines = 1,
+                )
+            }
+            Spacer(Modifier.width(8.dp))
             Text(
-                text = "交换上下屏显示",
-                color = ProfileText,
-                fontSize = 13.sp,
+                text = "切换",
+                color = ProfilePink,
+                fontSize = 11.sp,
                 fontWeight = FontWeight.Medium,
             )
-            Spacer(Modifier.height(2.dp))
-            Text(
-                text = if (swapped) {
-                    "当前：上屏操作 · 下屏播放"
-                } else {
-                    "当前：上屏播放 · 下屏操作"
-                },
-                color = ProfileTertiary,
-                fontSize = 10.sp,
-                maxLines = 1,
-            )
         }
-        Spacer(Modifier.width(8.dp))
-        Text(
-            text = "切换",
-            color = ProfilePink,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Medium,
-        )
     }
 }
 

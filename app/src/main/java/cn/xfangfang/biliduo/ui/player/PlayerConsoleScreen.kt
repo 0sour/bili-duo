@@ -2916,7 +2916,7 @@ private fun IntroTab(
                     active = isLiked == true,
                     onClick = onLike,
                     focusRequester = likeFocus,
-                    modifier = Modifier.focusProperties { down = FocusRequester.Cancel },
+                    modifier = Modifier.focusProperties { down = watchLaterFocus },
                 )
                 ActionPill(
                     icon = Icons.Filled.MonetizationOn,
@@ -2928,7 +2928,7 @@ private fun IntroTab(
                     active = isCoined,
                     onClick = onCoin,
                     focusRequester = coinFocus,
-                    modifier = Modifier.focusProperties { down = FocusRequester.Cancel },
+                    modifier = Modifier.focusProperties { down = shareFocus },
                 )
                 ActionPill(
                     icon = if (isFavorited == true) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
@@ -2940,7 +2940,7 @@ private fun IntroTab(
                     active = isFavorited == true,
                     onClick = onFavorite,
                     focusRequester = favoriteFocus,
-                    modifier = Modifier.focusProperties { down = FocusRequester.Cancel },
+                    modifier = Modifier.focusProperties { down = shareFocus },
                 )
                 ActionPill(
                     icon = Icons.Filled.FileDownload,
@@ -2948,7 +2948,7 @@ private fun IntroTab(
                     active = false,
                     onClick = onDownload,
                     focusRequester = downloadFocus,
-                    modifier = Modifier.focusProperties { down = watchLaterFocus },
+                    modifier = Modifier.focusProperties { down = shareFocus },
                 )
             }
         }
@@ -2962,7 +2962,7 @@ private fun IntroTab(
                 onClick = onWatchLater,
                 focusRequester = watchLaterFocus,
                 modifier = Modifier.focusProperties {
-                    up = if (isPgc) upFocus else downloadFocus
+                    up = if (isPgc) upFocus else likeFocus
                     right = shareFocus
                     down = FocusRequester.Cancel
                 },
@@ -2974,7 +2974,7 @@ private fun IntroTab(
                 onClick = onShare,
                 focusRequester = shareFocus,
                 modifier = Modifier.focusProperties {
-                    up = if (isPgc) upFocus else downloadFocus
+                    up = if (isPgc) upFocus else coinFocus
                     left = watchLaterFocus
                     down = FocusRequester.Cancel
                 },

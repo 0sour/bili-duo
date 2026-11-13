@@ -297,6 +297,11 @@ private fun WatchLaterRow(
     var actionFocused by remember { mutableStateOf(false) }
     val actionFocus = remember { FocusRequester() }
     val duration = item.duration.coerceAtLeast(0)
+    // PGC seasons come back as one entry whose duration is the sum of every
+    // episode (e.g. 366:40:50) and whose progress is in that aggregate. Showing
+    // it as a normal video makes the row look broken, so treat very long
+    // entries as a season and only show title/owner/added date.
+    val aggregate = duration > AGGREGATE_DURATION_SECONDS
     val progress = item.progress.coerceIn(0L, duration)
     val progressFraction = if (duration > 0) {
         (progress.toFloat() / duration.toFloat()).coerceIn(0f, 1f)
@@ -348,7 +353,7 @@ private fun WatchLaterRow(
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
                 )
-                if (duration > 0) {
+                if (duration > 0 && !aggregate) {
                     Text(
                         text = formatDuration(duration),
                         color = DuoPalette.Text,
@@ -378,8 +383,12 @@ private fun WatchLaterRow(
                 Spacer(Modifier.height(3.dp))
                 Text(
                     text = buildString {
-                        append(item.owner?.name.orEmpty())
-                        if (item.videos > 1) append(" · 共 ${item.videos}P")
+                        val ownerName = item.owner?.name.orEmpty()
+                        if (ownerName.isNotBlank()) append(ownerName)
+                        if (item.videos > 1) {
+                            if (isNotEmpty()) append(" · ")
+                            append("共 ${item.videos}P")
+                        }
                     },
                     color = DuoPalette.Secondary,
                     fontSize = 10.sp,
@@ -387,26 +396,28 @@ private fun WatchLaterRow(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Spacer(Modifier.height(5.dp))
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(2.dp)
-                        .clip(RoundedCornerShape(1.dp))
-                        .background(DuoPalette.SurfaceHighest),
-                ) {
-                    if (progressFraction > 0f) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth(progressFraction)
-                                .height(2.dp)
-                                .background(DuoPalette.Pink),
-                        )
+                if (!aggregate) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(2.dp)
+                            .clip(RoundedCornerShape(1.dp))
+                            .background(DuoPalette.SurfaceHighest),
+                    ) {
+                        if (progressFraction > 0f) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth(progressFraction)
+                                    .height(2.dp)
+                                    .background(DuoPalette.Pink),
+                            )
+                        }
                     }
+                    Spacer(Modifier.height(3.dp))
                 }
-                Spacer(Modifier.height(3.dp))
                 Text(
                     text = buildString {
-                        if (duration > 0) {
+                        if (duration > 0 && !aggregate) {
                             append(formatDuration(progress))
                             append(" / ")
                             append(formatDuration(duration))
@@ -447,7 +458,10 @@ private fun WatchLaterItem.toTopPreview(): TopPreviewUi = TopPreviewUi(
     playCount = stat?.view ?: 0L,
     danmakuCount = stat?.danmaku ?: 0L,
     pubdate = 0L,
-    duration = formatDuration(duration),
+    duration = if (duration > AGGREGATE_DURATION_SECONDS) "" else formatDuration(duration),
     description = "",
     eyebrow = "● 稍后再看 · 即将播放",
 )
+
+/** Longer than a single upload; PGC seasons report the sum of all episodes. */
+private const val AGGREGATE_DURATION_SECONDS = 24L * 60 * 60
