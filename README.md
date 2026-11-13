@@ -37,15 +37,18 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
 
 每张图为上下屏对照：上方是 1920×1080 上屏，下方是 1280×960 下屏。
 
-| 首页 · 排行（焦点预览） | 番剧 / 影视（PGC） |
+| 首页 · 排行（焦点预览） | 推荐 · 亮色主题 |
 | --- | --- |
-| ![首页双屏](docs/images/pairs/home.png) | ![番剧双屏](docs/images/pairs/anime.png) |
-| **直播列表（下滚收起二级行）** | **视频播放 · 弹幕 + 控制台** |
-| ![直播列表双屏](docs/images/pairs/live.png) | ![视频播放双屏](docs/images/pairs/player.png) |
-| **直播播放 · 实时弹幕 / SC** | |
-| ![直播播放双屏](docs/images/pairs/live-console.png) | |
+| ![首页双屏](docs/images/pairs/home.png) | ![亮色首页双屏](docs/images/pairs/light.png) |
+| **视频播放 · 弹幕 + 控制台** | **稍后再看（上屏预览）** |
+| ![视频播放双屏](docs/images/pairs/player.png) | ![稍后再看双屏](docs/images/pairs/watchlater.png) |
+| **直播列表 · 关注主播 / 分区** | **直播播放 · 历史弹幕 + 实时弹幕** |
+| ![直播列表双屏](docs/images/pairs/live.png) | ![直播播放双屏](docs/images/pairs/live-console.png) |
+| **番剧 / 影视（PGC）** | **关注动态** |
+| ![番剧双屏](docs/images/pairs/anime.png) | ![动态双屏](docs/images/pairs/dynamic.png) |
 
-截图使用公开推荐 / 直播流，不包含账号资料。
+截图来自 Retroid Pocket Duo 实机，只使用公开推荐、直播和动态内容，不包含账号
+UID、昵称或头像。
 
 ---
 
@@ -140,7 +143,7 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
 | 图片 | Coil 2.6（含 GIF）、telephoto-zoomable |
 | 登录 | ZXing 二维码、极验 Geetest WebView |
 | 构建 | Gradle 8.7、AGP 8.4.0、JDK 17、R8 |
-| 测试 | JUnit4，228 个单元测试 |
+| 测试 | JUnit4，235 个单元测试 |
 | 架构 | Activity + Presentation、MVVM + StateFlow、单一 `PlayerController` |
 | 界面语言 | 简体中文（当前未做多语言资源） |
 
@@ -150,7 +153,7 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
 
 ### 已验证
 
-- **单元测试**：232 个用例通过（`./gradlew testDebugUnitTest`）。
+- **单元测试**：235 个用例通过（`./gradlew testDebugUnitTest`）。
 - **MuMu（1280×960 / 320dpi）**：双屏壳层、首页、搜索、播放控制台、直播列表与
   HLS 播放、动态空态/登录态、单屏回退提示、签名包安装与冷启动。
 - **Retroid Pocket Duo 真机**：
@@ -297,26 +300,19 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
 
 - **动态转发 / 发布**：点赞已实现；转发和图文/纯文本发布仍只读（需要创作者向
   payload、图片上传与更完整的发布 UI，暂不纳入本 RC）。
-- **PGC 大会员 / 付费集**：选集已显示 badge，播放失败会提示确认大会员状态；
-  没有内嵌购买/开通引导，VIP 专享集仍需大会员账号验证。
+- **PGC 大会员 / 付费集**：选集已显示 badge、试看与大会员提示；没有内嵌购买/
+  开通引导。
 - **单屏直播 / PGC**：目标设备始终双屏；无下屏时 VOD 走旧 `PlayerScreen`，
   直播/PGC 显示「此内容需要下屏控制台」提示，不进入播放。**非本 RC 目标**。
 
 ### 待验证（已实现，缺真机/账号验证）
 
-- **PGC 云端续播**：PGC 复用同一套 `last_play_time` 读取，尚未在真实剧集上验证。
-- **PGC 选集 badge**：代码已渲染 `PgcEpisode.badge`；当前账号无大会员，
-  VIP 季在无权限时返回 0 集，无法看到带 badge 的选集。
-- **非视频收藏取消**：已按 `type` 提交音频/合集取消请求，未在真实非视频条目验证。
-- **直播真实发送与关注**：UI、校验和 API 已接，但未在公开直播间留下测试消息；
-  需要明确授权后在无人直播间补测。
-- **PGC VIP 集**：未登录/无权限时整季显示「该番剧暂无可播放剧集，可能需要大会员」
-  （Duo 实测）；大会员账号的实际播放路径仍需补测。
 - **短信 / 密码 / 极验登录**：代码已接，目前只实际验证过扫码登录。
+- **系统返回键边界**：overlay 或输入法打开时 Return 的优先级仍需逐项复测。
+- **上屏直播弹幕**：是否严格按独立的「直播弹幕」设置渲染（真实直播间亮度/密度）。
 - **完整真机回归**：真实手柄长按 repeat、断连/热插拔、锁屏/休眠唤醒、
   120Hz/HDR、弱网/断网矩阵尚未系统覆盖。
 - **UP 主空间 / 搜索肩键**：代码已接同一套 `duoTabCycling`，尚未单独做真机点验。
-- **部分登录态路径**：收藏/关注真实卡片预览待补测。
 
 ### 已知限制
 
@@ -439,7 +435,7 @@ keyPassword=CHANGE_ME
 ### 测试产物
 
 `dist/` 只保留构建说明；APK 通过 GitHub Releases 或本地构建分发，不进入 Git 历史。
-当前 rc19 的哈希与说明见 [`dist/README.md`](dist/README.md)。
+当前 rc57 的哈希与说明见 [`dist/README.md`](dist/README.md)。
 
 ---
 
@@ -458,6 +454,7 @@ app/src/main/java/cn/xfangfang/biliduo/
 │   ├── player/                  // 控制台、PlayerController、弹幕、字幕
 │   ├── live/                    // 直播控制台、HLS、实时弹幕/SC
 │   ├── dynamic/                 // 动态流、详情、画册、文字阅读
+│   ├── watchlater/              // 稍后再看列表、进度/移除/上屏预览
 │   ├── top/                     // 上屏只读场景 + 弹幕/字幕层
 │   ├── channel/                 // UP 主空间
 │   ├── profile/ login/          // 个人中心、扫码/短信/密码登录

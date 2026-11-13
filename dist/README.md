@@ -4,6 +4,28 @@
 `*.apk`），需要时本地 `./gradlew assembleDebug` / `assembleRelease` 生成，或从
 GitHub Releases 下载。
 
+## 0.2.0-rc57（2026-11-13，第四版测试版，已发布）
+
+- `bili-duo-0.2.0-rc57-release.apk`
+  - R8 minify，正式 release keystore 签名；可覆盖安装同 key 的 rc55。
+  - APK SHA-256：`4465b7f59d8d78f69e1979d63c649ba96e9e8b92d54e7dd28022c44067b77cb9`
+- `bili-duo-0.2.0-rc57-debug.apk`
+  - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
+  - SHA-256：`78cb1b686ed47c360b6edcd853ebb8726d587954fee1091594b37f2ebcf08ffc`
+
+rc57 变更（在 rc56 功能基础上修复）：
+- 播放页简介 tab 焦点链：点赞/投币/收藏/下载按 Down 进入「稍后再看 / 分享」行；
+  分享 Up 回投币，稍后再看 Up 回点赞，不再跳到最右侧下载。
+- 个人页「交换上下屏显示」：焦点目标外层加 7dp 透明容器，滚动到底部不再裁环。
+- 稍后再看长合集/PGC：`duration > 24h` 的条目隐藏聚合时长、封面时长角标和
+  进度条，保留「共 NP」；owner 为空时不再出现前导「·」。
+- 235 单测通过。Duo 已验证焦点链、交换按钮环、长条目显示、移除与返回。
+- main 提交 `4714391`，tag `v0.2.0-rc57`，Pre-release：
+  https://github.com/0sour/bili-duo/releases/tag/v0.2.0-rc57
+
+> rc56 未发布（Release 已由用户撤销，tag 已删除），其功能全部包含在 rc57。
+> rc55 第三版见 https://github.com/0sour/bili-duo/releases/tag/v0.2.0-rc55
+
 ## 0.2.0-rc54（2026-11-09，第二版测试版）
 
 - `bili-duo-0.2.0-rc54-release.apk`
