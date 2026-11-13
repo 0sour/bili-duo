@@ -47,8 +47,8 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
 | **番剧 / 影视（PGC）** | **关注动态** |
 | ![番剧双屏](docs/images/pairs/anime.png) | ![动态双屏](docs/images/pairs/dynamic.png) |
 
-截图来自 Retroid Pocket Duo 实机，只使用公开推荐、直播和动态内容，不包含账号
-UID、昵称或头像。
+截图来自 Retroid Pocket Duo 实机，使用公开推荐、直播、动态与稍后再看中的视频
+内容，不包含账号 UID、昵称或头像。
 
 ---
 
