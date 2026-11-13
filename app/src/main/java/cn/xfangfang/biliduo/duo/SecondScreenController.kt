@@ -2,6 +2,7 @@ package cn.xfangfang.biliduo.duo
 
 import android.content.Context
 import android.hardware.display.DisplayManager
+import android.os.Build
 import android.util.Log
 import android.view.Display
 import android.view.View
@@ -125,12 +126,28 @@ class SecondScreenController(
     }
 
     private fun findSecondaryDisplay(): Display? {
+        val ownDisplayId = activityDisplayId()
         return displayManager.displays.firstOrNull { display ->
             display.displayId != Display.DEFAULT_DISPLAY &&
+                display.displayId != ownDisplayId &&
                 display.state != Display.STATE_OFF &&
                 (display.flags and Display.FLAG_PRESENTATION) != 0
         }
     }
+
+    /**
+     * When the bottom-panel launcher starts the Activity on Display 2, the
+     * Presentation must not be created on that same panel (it would cover the
+     * Activity or fail). MainActivity normally re-homes to Display 0; this keeps
+     * the fallback path from picking the Activity's own display as "secondary".
+     */
+    private fun activityDisplayId(): Int =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            activity.display?.displayId ?: Display.DEFAULT_DISPLAY
+        } else {
+            @Suppress("DEPRECATION")
+            activity.windowManager.defaultDisplay.displayId
+        }
 
     override fun onDisplayAdded(displayId: Int) {
         if (started) showIfPossible()

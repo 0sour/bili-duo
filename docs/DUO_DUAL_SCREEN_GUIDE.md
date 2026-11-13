@@ -161,8 +161,10 @@ else MainScreen(...)                                  // UI 在下
 配套点：
 
 1. Manifest 给 Activity 挂 `android.app.shortcuts` meta-data；Activity 用
-   `launchMode="singleTask"`，这样快捷方式点击落在已有实例上时走
-   `onNewIntent`，不会新建第二个 Activity。
+   `launchMode="singleTop"`，这样快捷方式点击落在已有实例上时走
+   `onNewIntent`，不会新建第二个 Activity。**不要用 `singleTask`**：副屏
+   launcher 的 re-home 需要新建任务，singleTask 会把 re-home intent 发回原实例
+   （详见 2.3）。
 2. `onCreate` 只在 `savedInstanceState == null` 时读 extra（避免配置变更/
    进程恢复时重复应用）；`onNewIntent` 读同一个函数。读完 `removeExtra`，
    避免后续重建又按旧值覆盖。
@@ -171,6 +173,52 @@ else MainScreen(...)                                  // UI 在下
    会保持上次选择的布局**。
 4. 快捷方式只是入口，布局本身仍由 2.1 的 host 角色交换实现，不要另写一套
    双屏逻辑。
+
+### 2.3 从副屏 launcher 启动：re-home 到默认屏
+
+RP Duo 的下屏跑的是 AOSP `SecondaryDisplayLauncher`。它点图标/长按快捷方式时
+会**以 Display 2 作为 launch display** 启动 Activity（`dumpsys` 里 Task 的
+`displayId=2`）。这时 `getDisplays(DISPLAY_CATEGORY_PRESENTATION)` 只会返回
+Display 2 自己，如果直接拿它建 Presentation，就会在 Activity 同一块屏上再盖
+一层窗口，上屏则停在桌面。
+
+正确做法是**把 Activity 送回默认屏**，而不是尝试在本屏双屏化：
+
+```kotlin
+// MainActivity.onCreate / onNewIntent 最前面
+if (currentDisplayId() != Display.DEFAULT_DISPLAY) {
+    val options = ActivityOptions.makeBasic()
+        .setLaunchDisplayId(Display.DEFAULT_DISPLAY).toBundle()
+    startActivity(
+        Intent(intent).apply {
+            // 必须是新任务；否则 singleTask/singleTop 可能复用当前任务
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or
+                Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
+            putExtra(EXTRA_REHOMED, true)      // 防循环
+        },
+        options,
+    )
+    finish()
+    return
+}
+```
+
+配套点：
+
+1. **`launchMode` 用 `singleTop`**。`singleTask` 会把上面的 startActivity 当作
+   `LAUNCH_SINGLE_TASK` 发回同一个实例（logcat 里是 `result code=3`），
+   Display 0 不会出现新任务；`singleTop` 既允许 `MULTIPLE_TASK` 建新任务，
+   又保留运行中/后台点快捷方式走 `onNewIntent`。
+2. **复制原 intent**，这样 `display_control`、`open_downloads` 等 extra 会带到
+   新实例；`EXTRA_REHOMED` 是内部幂等标记，设备忽略 launch display 时停在
+   单屏回退，不要无限重启。
+3. **提前 return 后要保护 lateinit**：`onStart/onStop/onDestroy` 用
+   `if (::secondScreen.isInitialized)` 包住，否则第一版会在 `onDestroy`
+   崩 `lateinit property secondScreen has not been initialized`。
+4. `SecondScreenController.findSecondaryDisplay()` 再加一条
+   `display.displayId != activityDisplayId()`，双保险，避免同屏 Presentation。
+5. 这个 re-home 只在 Activity 不在默认屏时发生；正常上屏启动、交换布局、
+   运行中从下屏点图标（系统只投递 `onNewIntent`，不搬任务）都不受影响。
 
 ---
 

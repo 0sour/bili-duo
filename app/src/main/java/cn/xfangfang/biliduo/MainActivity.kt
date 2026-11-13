@@ -1,6 +1,7 @@
 package cn.xfangfang.biliduo
 
 import android.Manifest
+import android.app.ActivityOptions
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.drawable.ColorDrawable
@@ -8,6 +9,8 @@ import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
 import android.hardware.input.InputManager
+import android.util.Log
+import android.view.Display
 import android.view.InputDevice
 import android.view.KeyEvent
 import android.view.MotionEvent
@@ -151,6 +154,11 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // The stock launcher on the bottom panel starts activities on Display 2.
+        // The dual-screen layout needs the Activity on Display 0 (only the
+        // secondary panel can host the Presentation), so move to the default
+        // display and drop this bottom-panel instance. See rehomeToDefaultDisplay.
+        if (rehomeToDefaultDisplay()) return
         // Launcher shortcut ("双屏启动 · 上/下屏控制") forces the layout for
         // this launch and is persisted, so a later normal launch keeps it.
         if (savedInstanceState == null) {
@@ -276,12 +284,13 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
-        secondScreen.show()
+        // onCreate may have bailed out after re-homing to the default display.
+        if (::secondScreen.isInitialized) secondScreen.show()
     }
 
     override fun onStop() {
         if (::playerController.isInitialized) playerController.onHostStop()
-        secondScreen.hide()
+        if (::secondScreen.isInitialized) secondScreen.hide()
         super.onStop()
     }
 
@@ -289,7 +298,7 @@ class MainActivity : ComponentActivity() {
         if (::inputManager.isInitialized) {
             inputManager.unregisterInputDeviceListener(gamepadListener)
         }
-        secondScreen.release()
+        if (::secondScreen.isInitialized) secondScreen.release()
         if (::playerController.isInitialized) playerController.release()
         super.onDestroy()
     }
@@ -312,6 +321,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        // A launcher tap on the bottom panel can move/deliver the task to
+        // Display 2; send the UI back to the default display in that case.
+        if (rehomeToDefaultDisplay(intent)) return
         handleOpenDownloadsIntent(intent)
         applyDisplayControlIntent(intent)
         intent.removeExtra(EXTRA_DISPLAY_CONTROL)
@@ -377,6 +389,50 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * RP Duo's bottom-panel launcher starts our task on Display 2. The
+     * dual-screen design needs the Activity on the default display so the
+     * secondary panel can host the UI Presentation, so relaunch on Display 0 and
+     * finish this instance. EXTRA_REHOMED prevents a relaunch loop if the device
+     * still places us on the secondary display; in that case the app falls back
+     * to the single-screen UI there instead of showing a Presentation on the
+     * same panel.
+     */
+    private fun rehomeToDefaultDisplay(source: Intent? = intent): Boolean {
+        val current = currentDisplayId()
+        if (current == Display.DEFAULT_DISPLAY) return false
+        val base = source ?: intent ?: return false
+        if (base.getBooleanExtra(EXTRA_REHOMED, false)) {
+            Log.w(TAG, "Still on display $current after re-home; single-screen fallback")
+            return false
+        }
+        val relaunch = Intent(base).apply {
+            // Force a fresh task. Reusing the task that lives on Display 2 would
+            // just deliver the intent back to this instance (and singleTask
+            // cannot create the new task at all), leaving the UI on the panel.
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
+            putExtra(EXTRA_REHOMED, true)
+        }
+        val options = ActivityOptions.makeBasic()
+            .setLaunchDisplayId(Display.DEFAULT_DISPLAY)
+            .toBundle()
+        return runCatching {
+            startActivity(relaunch, options)
+            finish()
+            true
+        }.onFailure {
+            Log.w(TAG, "Unable to re-home from display $current", it)
+        }.getOrDefault(false)
+    }
+
+    private fun currentDisplayId(): Int =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            display?.displayId ?: Display.DEFAULT_DISPLAY
+        } else {
+            @Suppress("DEPRECATION")
+            windowManager.defaultDisplay.displayId
+        }
+
     private fun requestNotificationPermissionIfNeeded() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
@@ -387,12 +443,17 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
+        private const val TAG = "BiliDuo/MainActivity"
+
         const val EXTRA_OPEN_DOWNLOADS = "open_downloads"
 
         /** Must match app/src/main/res/xml/shortcuts.xml. */
         const val EXTRA_DISPLAY_CONTROL = "display_control"
         const val DISPLAY_CONTROL_BOTTOM = "bottom"
         const val DISPLAY_CONTROL_TOP = "top"
+
+        /** Internal guard so a failed display re-home cannot loop. */
+        private const val EXTRA_REHOMED = "rehomed_to_default_display"
     }
 }
 
