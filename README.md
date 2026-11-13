@@ -10,25 +10,26 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc54-FB7299">
+  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc56-FB7299">
   <img alt="status" src="https://img.shields.io/badge/status-test%20build-orange">
   <img alt="Android" src="https://img.shields.io/badge/Android-24%2B-3DDC84?logo=android&logoColor=white">
   <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-1.9.23-7F52FF?logo=kotlin&logoColor=white">
   <img alt="Compose" src="https://img.shields.io/badge/Jetpack%20Compose-2024.04-4285F4?logo=jetpackcompose&logoColor=white">
   <img alt="Media3" src="https://img.shields.io/badge/Media3-1.4.1-FF6D00">
-  <img alt="tests" src="https://img.shields.io/badge/tests-231%20passing-brightgreen">
+  <img alt="tests" src="https://img.shields.io/badge/tests-235%20passing-brightgreen">
   <img alt="license" src="https://img.shields.io/badge/license-MIT-blue">
 </p>
 
 上屏只负责视频画面，下屏用一块 `Presentation` 承载完整 UI；手柄和触摸共用同一棵
 Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，也没有上屏 OSD。
 
-> 当前版本：**0.2.0-rc54**（versionCode 55，第二版测试版）
-> 下载：https://github.com/0sour/bili-duo/releases/tag/v0.2.0-rc54
-> 状态：功能完整的 **测试版**，231 个单元测试通过；第二版汇总 rc51–rc53：
-> 手柄风格与独立手柄设置、切页焦点残影/起播优化、上下双屏亮暗色主题与自动切换、
-> 纸感灰亮色、上屏封面背景和亮色 Logo。rc50 的侧栏焦点、L1/R1 标签、视频默认值、
-> 物理输入和图片查看器能力继续保留。
+> 当前版本：**0.2.0-rc56**（versionCode 57，第四版测试版）
+> 下载：https://github.com/0sour/bili-duo/releases/tag/v0.2.0-rc56
+> 状态：功能完整的 **测试版**，235 个单元测试通过；第四版汇总 rc55–rc56：
+> 下屏系统返回键、直播控制台精简/延迟提示/独立直播弹幕设置、设置弹幕分栏、
+> **上下屏交换（含布局持久化）**、**启动器「双屏启动（上/下屏控制）」快捷方式**，
+> 以及从下屏 launcher 启动时自动回到上屏双屏布局的修复。rc50–rc54 的侧栏焦点、
+> L1/R1 标签、视频默认值、亮暗色主题与图片查看器能力继续保留。
 
 ## 界面预览
 
@@ -54,6 +55,11 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
   控件；无视频时显示待机 / 预览 / 人物卡 / 设置面板 / 登录引导等只读场景。
 - **下屏完整 UI**：首页、搜索、播放控制台、评论、动态、直播、个人中心、设置都在
   下屏 `Presentation` 中；`canHostTasks=false` 的设备也能正常显示。
+- **上下屏交换**：个人中心「交换上下屏显示」把 UI 搬到上屏、视频/预览搬到下屏；
+  `AppSettings.display_swapped` 持久化，重启保持。交换后视频窗口设为不可聚焦，
+  按键仍由同一套 `InputRouter` 转发，不新增第二套焦点逻辑。
+- **启动器快捷方式**：长按桌面图标可选「双屏启动（下屏控制）/（上屏控制）」，
+  以指定布局直接启动并记住选择；从下屏 launcher 启动会自动 re-home 到上屏双屏布局。
 - **单焦点模型**：`BROWSE / PLAYER / OVERLAY` 三种状态，不再有
   `TOP_PLAYER ↔ BOTTOM_UI` 双模式和 Y 键切换。
 - **键位**：屏幕提示使用实体丝印：D-pad 移动焦点，**B 确认，A 逐级返回，Y 刷新/
@@ -79,7 +85,8 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
 - **播放**：DASH 多清晰度、倍速、音量、进度 seek、分P/选集、相关推荐、UP 主空间
   入口；PGC 番剧/影视复用同一控制台。打开视频时优先恢复本机分P进度，本机没有记录
   则读取账号云端进度（`x/player/wbi/v2` 的 `last_play_time`），历史/收藏点击可直接
-  续播；接近结尾或不足 5 秒的进度会从头播放。
+  续播；接近结尾或不足 5 秒的进度会从头播放。简介页可加入「稍后再看」，或复制
+  当前视频/剧集的分享链接。
 - **评论**：分页、热门/最新排序、楼中楼回复分页、评论/回复点赞与点踩、长评论
   展开、评论图片缩略图与全屏查看器；登录后可发布评论/回复，并可删除自己的评论。
 - **弹幕**：按 cid 拉取 XML（手动解 raw deflate）、上屏 Canvas 渲染、滚动/顶部/
@@ -89,6 +96,9 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
   背景/位置，播放页修改只作用于当前视频；默认值在 设置 → 播放。
 - **直播**：分区 chips（一级 + 子分区）、关注主播行、双列房间、HLS 播放、
   双栏控制台、实时弹幕/SC、清晰度/音量、直播信息；网格下滚时收起二级筛选行。
+  进入直播间会先拉取最近的历史弹幕补满下屏聊天列表，上屏只显示实时消息。
+- **稍后再看**：个人中心新增「稍后再看」列表，支持封面/UP/时长/观看进度、
+  聚焦上屏预览、单条移除确认；播放控制台简介页可加入稍后再看。
 - **动态**：关注动态流、全部/视频/图文筛选、UP 主筛选、视频直达播放、图文详情/
   画册/纯文字阅读，上屏同步只读场景；卡片头部显示点赞状态与数量，B/触摸可点赞，
   手柄 Y 直接点赞/取消（优化请求、失败回滚）；转发/发布仍只读。
@@ -263,6 +273,17 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
   - rc54 第二版测试版：公开打包 rc51–rc53 的全部改动，231 单测通过；上屏预览
     长标题/长简介改为 2/3 行截断，避免信息卡底部按钮被裁切；Duo 完成亮色首页/
     搜索/个人/设置/动态/上屏场景与暗色回归，release APK 可直接覆盖安装。
+  - rc55 第三版测试版：下屏系统返回键（Presentation 捕获 Return/ESC，优先级与
+    手柄 B 一致）；直播控制台精简为刷新/暂停两圆钮，清晰度/音量/弹幕行按三列网格
+    对齐；直播弹幕独立设置（开关/不透明度/字号/速度/显示区域）与齿轮入口；暂停或
+    落后实时 ≥5 秒时上屏显示直播延迟；设置 → 弹幕拆成「视频弹幕 / 直播弹幕」
+    两个标签页并双向同步；修复设置分类栏聚焦「弹幕」时抢焦到内容 tab。
+  - rc56 第四版测试版：上下屏交换（个人中心按钮、持久化、视频窗口不可聚焦、
+    InputRouter 转发到 Activity ComposeView）；启动器「双屏启动（下屏/上屏控制）」
+    静态快捷方式（`display_control` extra，singleTop + onNewIntent，普通启动保持
+    上次布局）；从下屏 launcher 启动时自动 re-home 到上屏双屏布局（修复只显示
+    下屏、上屏停在桌面的问题）；新增稍后再看列表、播放页稍后再看/分享链接、
+    直播历史弹幕；235 单测通过。
   - 登录、个人中心、历史/收藏/关注只读浏览；弹幕发送→撤回闭环。
 
 ### 未实现（代码层面）
@@ -297,6 +318,8 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
   普通单屏手机不是验收目标。
 - 直播清晰度/线路由服务端返回决定；VIP/付费内容受账号权限限制。
 - 动态发布、完整二级分区树等长尾功能未实现。
+- 上下屏交换后，少数二级页（搜索/登录/下载等）的空态说明仍写死「上屏/下屏」，
+  后续统一为随布局切换的文案。
 
 ---
 

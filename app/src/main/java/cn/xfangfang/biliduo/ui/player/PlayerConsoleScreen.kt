@@ -2,6 +2,8 @@
 
 package cn.xfangfang.biliduo.ui.player
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
@@ -56,6 +58,8 @@ import androidx.compose.material.icons.filled.ThumbDown
 import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material.icons.outlined.ThumbDown
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.outlined.WatchLater
 import androidx.compose.material.icons.outlined.ThumbUp
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -199,6 +203,9 @@ fun PlayerConsoleScreen(
     val likeFocus = remember { FocusRequester() }
     val coinFocus = remember { FocusRequester() }
     val favoriteFocus = remember { FocusRequester() }
+    val watchLaterFocus = remember { FocusRequester() }
+    val shareFocus = remember { FocusRequester() }
+    val downloadFocus = remember { FocusRequester() }
     val uploaderFocus = remember { FocusRequester() }
     val followFocus = remember { FocusRequester() }
     var playFocused by remember { mutableStateOf(false) }
@@ -237,6 +244,8 @@ fun PlayerConsoleScreen(
     var favFolders by remember { mutableStateOf<List<FavFolder>>(emptyList()) }
     var favFoldersLoading by remember { mutableStateOf(false) }
     var favFoldersError by remember { mutableStateOf<String?>(null) }
+
+    var watchLaterBusy by remember(aid) { mutableStateOf(false) }
 
     var comments by remember(aid) { mutableStateOf<List<CommentItem>>(emptyList()) }
     var commentsLoading by remember(aid) { mutableStateOf(false) }
@@ -290,6 +299,40 @@ fun PlayerConsoleScreen(
 
     fun toast(message: String) {
         Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+    }
+
+    fun addToWatchLater() {
+        if (watchLaterBusy) return
+        val videoAid = aid ?: return
+        if (selfMid == null) {
+            toast("请先登录")
+            return
+        }
+        watchLaterBusy = true
+        scope.launch {
+            repository.addWatchLater(videoAid)
+                .onSuccess {
+                    watchLaterBusy = false
+                    toast("已加入稍后再看")
+                }
+                .onFailure {
+                    watchLaterBusy = false
+                    toast(it.message ?: "加入稍后再看失败")
+                }
+        }
+    }
+
+    /** A Presentation cannot host a share chooser, so copy the link like the
+     *  dynamic reader does. */
+    fun shareVideo() {
+        val url = ui.shareUrl
+        if (url.isBlank()) {
+            toast("暂无可分享链接")
+            return
+        }
+        val clipboard = context.getSystemService(ClipboardManager::class.java)
+        clipboard?.setPrimaryClip(ClipData.newPlainText("Bili-Duo", url))
+        toast("链接已复制")
     }
 
     fun recallLastDanmaku() {
@@ -1670,6 +1713,12 @@ fun PlayerConsoleScreen(
                             likeFocus = likeFocus,
                             coinFocus = coinFocus,
                             favoriteFocus = favoriteFocus,
+                            watchLaterBusy = watchLaterBusy,
+                            onWatchLater = { addToWatchLater() },
+                            onShare = { shareVideo() },
+                            watchLaterFocus = watchLaterFocus,
+                            shareFocus = shareFocus,
+                            downloadFocus = downloadFocus,
                             onDownload = { startDownload() },
                             onPlay = { controller.togglePlay() },
                             onUploaderClick = { ownerMid?.let(onUploaderClick) },
@@ -2668,6 +2717,12 @@ private fun IntroTab(
     likeFocus: FocusRequester,
     coinFocus: FocusRequester,
     favoriteFocus: FocusRequester,
+    watchLaterBusy: Boolean,
+    onWatchLater: () -> Unit,
+    onShare: () -> Unit,
+    watchLaterFocus: FocusRequester,
+    shareFocus: FocusRequester,
+    downloadFocus: FocusRequester,
     onDownload: () -> Unit,
     onPlay: () -> Unit,
     onUploaderClick: () -> Unit = {},
@@ -2892,9 +2947,38 @@ private fun IntroTab(
                     text = "下载",
                     active = false,
                     onClick = onDownload,
-                    modifier = Modifier.focusProperties { down = FocusRequester.Cancel },
+                    focusRequester = downloadFocus,
+                    modifier = Modifier.focusProperties { down = watchLaterFocus },
                 )
             }
+        }
+
+        Spacer(Modifier.height(6.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            ActionPill(
+                icon = Icons.Outlined.WatchLater,
+                text = if (watchLaterBusy) "处理中" else "稍后再看",
+                active = false,
+                onClick = onWatchLater,
+                focusRequester = watchLaterFocus,
+                modifier = Modifier.focusProperties {
+                    up = if (isPgc) upFocus else downloadFocus
+                    right = shareFocus
+                    down = FocusRequester.Cancel
+                },
+            )
+            ActionPill(
+                icon = Icons.Outlined.Share,
+                text = "分享",
+                active = false,
+                onClick = onShare,
+                focusRequester = shareFocus,
+                modifier = Modifier.focusProperties {
+                    up = if (isPgc) upFocus else downloadFocus
+                    left = watchLaterFocus
+                    down = FocusRequester.Cancel
+                },
+            )
         }
 
         Spacer(Modifier.height(8.dp))

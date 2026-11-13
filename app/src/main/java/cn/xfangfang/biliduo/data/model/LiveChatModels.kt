@@ -53,6 +53,44 @@ sealed interface LiveChatEvent {
     data class DeleteSuperChat(val id: Long) : LiveChatEvent
 }
 
+/**
+ * `xlive/web-room/v1/dM/gethistory` response. Fields are nullable because Gson
+ * does not run Kotlin defaults and the endpoint has changed shape before.
+ */
+data class LiveHistoryDanmakuData(
+    val room: List<LiveHistoryDanmakuItem>? = null,
+    val admin: List<LiveHistoryDanmakuItem>? = null,
+)
+
+data class LiveHistoryDanmakuItem(
+    val text: String? = null,
+    val uid: Long = 0,
+    val nickname: String? = null,
+    @SerializedName("isadmin") val isAdmin: Int = 0,
+    /** [level, medalName, anchorName, ..., color] */
+    val medal: List<JsonElement>? = null,
+    val ctime: Long = 0,
+    val timeline: String? = null,
+)
+
+fun LiveHistoryDanmakuItem.toLiveChatMessage(index: Int): LiveChatMessage {
+    val level = medal?.getOrNull(0)?.let { runCatching { it.asInt }.getOrNull() } ?: 0
+    val name = medal?.getOrNull(1)?.let { runCatching { it.asString }.getOrNull() }.orEmpty()
+    return LiveChatMessage(
+        // Historical entries load once, but keep ids unique against the WS
+        // counter (which starts at 1) for the LazyColumn keys.
+        id = -(index + 1L),
+        uid = uid,
+        uname = nickname.orEmpty().ifBlank { "匿名用户" },
+        text = text.orEmpty(),
+        medal = name.takeIf { it.isNotBlank() }?.let {
+            if (level > 0) "$it $level" else it
+        },
+        isAdmin = isAdmin == 1,
+        timestampSec = ctime,
+    )
+}
+
 /** Live danmaku is capped at 20 characters by Bilibili. */
 fun validateLiveChatText(text: String): String? {
     val trimmed = text.trim()

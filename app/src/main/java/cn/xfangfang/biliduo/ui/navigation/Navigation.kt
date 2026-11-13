@@ -27,6 +27,7 @@ object Routes {
     const val LIVE_PLAYER = "live/{roomId}"
     const val LOGIN = "login"
     const val HISTORY = "history"
+    const val WATCH_LATER = "watch_later"
     const val CHANNEL = "channel/{mid}"
     const val FAVORITES = "favorites"
     const val FOLLOWING = "following"

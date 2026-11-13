@@ -50,6 +50,8 @@ data class PlayerUiState(
     val currentPage: VideoPage? = null,
     val pages: List<VideoPage> = emptyList(),
     val title: String = "",
+    /** Canonical share link for the current video/episode; empty when unknown. */
+    val shareUrl: String = "",
     val resumePositionMs: Long = 0L,
     val availableQualities: List<QualityOption> = emptyList(),
     val currentQuality: QualityOption? = null,
@@ -249,6 +251,7 @@ class PlayerViewModel(
                         pages = pages,
                         currentPage = currentPage,
                         title = completed.first().title,
+                        shareUrl = "https://www.bilibili.com/video/$bvid",
                         isDash = false,
                         localFiles = localFiles,
                         localAid = aid,
@@ -297,6 +300,7 @@ class PlayerViewModel(
                     pages = pages,
                     currentPage = startPage,
                     title = info.title,
+                    shareUrl = "https://www.bilibili.com/video/${info.bvid}",
                     resumePositionMs = resumeMs,
                     localFiles = emptyMap()
                 )
@@ -501,6 +505,7 @@ class PlayerViewModel(
                             pages = pages,
                             currentPage = page,
                             title = detail.title.ifBlank { episode.longTitle },
+                            shareUrl = "https://www.bilibili.com/bangumi/play/ep${episode.epId}",
                             resumePositionMs = resumeMs,
                         ).withVideoDefaults()
                     )
@@ -594,6 +599,7 @@ class PlayerViewModel(
                 isPreview = false,
                 previewToast = "",
                 danmaku = emptyList(),
+                shareUrl = "https://www.bilibili.com/bangumi/play/ep${episode.epId}",
                 videoInfo = info?.copy(
                     bvid = episode.bvid,
                     aid = episode.aid,

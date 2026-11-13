@@ -447,6 +447,26 @@ class BilibiliRepository(
         }.onFailure { Log.e(BilibiliApp.TAG, "getLiveDanmakuConfig failed", it) }
     }
 
+    /**
+     * Recent room chat fetched over HTTP before the WebSocket connects. The
+     * console shows it only in the bottom chat list; it must not be published
+     * to [cn.xfangfang.biliduo.ui.live.LiveChatStore], or the top overlay would
+     * replay old messages as if they had just arrived.
+     */
+    suspend fun getLiveHistoryDanmaku(roomId: Long): Result<List<LiveChatMessage>> {
+        return runCatching {
+            val response = api.getLiveHistoryDanmaku(roomId)
+            if (response.code != 0) throw Exception(response.message)
+            val data = response.data
+            val room = data?.room.orEmpty()
+            val source = room.ifEmpty { data?.admin.orEmpty() }
+            source
+                .filter { !it.text.isNullOrBlank() }
+                .mapIndexed { index, item -> item.toLiveChatMessage(index) }
+                .also { Log.d(BilibiliApp.TAG, "getLiveHistoryDanmaku: ${it.size} messages") }
+        }.onFailure { Log.e(BilibiliApp.TAG, "getLiveHistoryDanmaku failed", it) }
+    }
+
     suspend fun sendLiveDanmaku(roomId: Long, message: String): Result<Unit> {
         val text = message.trim()
         validateLiveChatText(text)?.let { return Result.failure(IllegalArgumentException(it)) }
@@ -563,6 +583,45 @@ class BilibiliRepository(
             if (BuildConfig.DEBUG) Log.d(BilibiliApp.TAG, "deleteHistory response: code=${response.code}")
             if (response.code == 0) Unit else throw Exception(response.message)
         }.onFailure { Log.e(BilibiliApp.TAG, "deleteHistory failed", it) }
+    }
+
+    suspend fun getWatchLater(): Result<Pair<List<WatchLaterItem>, Int>> {
+        if (BilibiliApi.loginCookies.isBlank()) return Result.failure(Exception("请先登录"))
+        return runCatching {
+            val response = api.getWatchLater()
+            if (response.code == 0) {
+                val data = response.data ?: throw Exception("稍后再看为空")
+                Pair(data.list.orEmpty(), data.count)
+            } else {
+                throw Exception(response.message)
+            }
+        }.onFailure { Log.e(BilibiliApp.TAG, "getWatchLater failed", it) }
+    }
+
+    suspend fun addWatchLater(aid: Long): Result<Unit> {
+        if (BuildConfig.DEBUG) Log.d(BilibiliApp.TAG, "addWatchLater: aid=$aid")
+        return runCatching {
+            if (BilibiliApi.loginCookies.isBlank() || BilibiliApi.biliJct.isBlank()) {
+                throw Exception("请先登录")
+            }
+            if (aid <= 0L) throw Exception("无法加入稍后再看")
+            val response = api.addWatchLater(aid = aid, csrf = BilibiliApi.biliJct)
+            if (BuildConfig.DEBUG) Log.d(BilibiliApp.TAG, "addWatchLater response: code=${response.code}")
+            if (response.code == 0) Unit else throw Exception(response.message)
+        }.onFailure { Log.e(BilibiliApp.TAG, "addWatchLater failed", it) }
+    }
+
+    suspend fun removeWatchLater(aid: Long): Result<Unit> {
+        if (BuildConfig.DEBUG) Log.d(BilibiliApp.TAG, "removeWatchLater: aid=$aid")
+        return runCatching {
+            if (BilibiliApi.loginCookies.isBlank() || BilibiliApi.biliJct.isBlank()) {
+                throw Exception("请先登录")
+            }
+            if (aid <= 0L) throw Exception("无法移除这条记录")
+            val response = api.removeWatchLater(aid = aid, csrf = BilibiliApi.biliJct)
+            if (BuildConfig.DEBUG) Log.d(BilibiliApp.TAG, "removeWatchLater response: code=${response.code}")
+            if (response.code == 0) Unit else throw Exception(response.message)
+        }.onFailure { Log.e(BilibiliApp.TAG, "removeWatchLater failed", it) }
     }
 
     /**

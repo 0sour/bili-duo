@@ -87,6 +87,7 @@ import cn.xfangfang.biliduo.ui.duo.rememberDuoRailFocusState
 import cn.xfangfang.biliduo.ui.favorites.FavoritesScreen
 import cn.xfangfang.biliduo.ui.following.FollowingListScreen
 import cn.xfangfang.biliduo.ui.history.HistoryScreen
+import cn.xfangfang.biliduo.ui.watchlater.WatchLaterScreen
 import cn.xfangfang.biliduo.ui.home.HomeScreen
 import cn.xfangfang.biliduo.ui.live.LiveConsoleScreen
 import cn.xfangfang.biliduo.ui.login.LoginScreen
@@ -466,6 +467,7 @@ private fun duoPageHint(route: String?): String? = when (route) {
         "LB/RB 全部/视频/图文 · L2/R2 UP 筛选 · Y 点赞/复制"
     Screen.Profile.route -> "B 进入"
     Routes.HISTORY -> "B 播放"
+    Routes.WATCH_LATER -> "B 播放 · 移除按钮"
     Routes.FAVORITES -> "B 打开/播放"
     Routes.FOLLOWING -> "B 进入 UP 主空间"
     Routes.DOWNLOADS -> "LB/RB 切筛选 · B 播放/展开"
@@ -735,6 +737,7 @@ fun MainScreen(
                 ProfileScreen(
                     onLoginClick = { navController.navigate(Routes.LOGIN) },
                     onHistoryClick = { navController.navigate(Routes.HISTORY) },
+                    onWatchLaterClick = { navController.navigate(Routes.WATCH_LATER) },
                     onFavoritesClick = { navController.navigate(Routes.FAVORITES) },
                     onFollowingClick = { navController.navigate(Routes.FOLLOWING) },
                     onDownloadsClick = { navController.navigate(Routes.DOWNLOADS) },
@@ -926,6 +929,23 @@ fun MainScreen(
                         navController.navigate(Routes.player(bvid))
                     },
                     onLogin = { navController.navigate(Routes.LOGIN) },
+                    onVideoFocused = onTopVideoFocused,
+                    onFocusCleared = onTopFocusCleared,
+                    onTopAmbient = onTopAmbient,
+                    session = duoSession,
+                )
+            }
+
+            composable(route = Routes.WATCH_LATER) {
+                WatchLaterScreen(
+                    onBack = { navController.popBackStack() },
+                    onVideoClick = { bvid ->
+                        if (bvid.isNotBlank()) navController.navigate(Routes.player(bvid))
+                    },
+                    onLogin = { navController.navigate(Routes.LOGIN) },
+                    onHome = {
+                        navController.popBackStack(Screen.Home.route, inclusive = false)
+                    },
                     onVideoFocused = onTopVideoFocused,
                     onFocusCleared = onTopFocusCleared,
                     onTopAmbient = onTopAmbient,

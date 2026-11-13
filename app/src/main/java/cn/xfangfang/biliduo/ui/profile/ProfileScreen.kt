@@ -30,6 +30,7 @@ import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.PersonAdd
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.SwapVert
+import androidx.compose.material.icons.outlined.WatchLater
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -93,6 +94,7 @@ private val ProfileError: Color @Composable get() = DuoTheme.colors.error
 fun ProfileScreen(
     onLoginClick: () -> Unit = {},
     onHistoryClick: () -> Unit = {},
+    onWatchLaterClick: () -> Unit = {},
     onFavoritesClick: () -> Unit = {},
     onFollowingClick: () -> Unit = {},
     onDownloadsClick: () -> Unit = {},
@@ -107,7 +109,7 @@ fun ProfileScreen(
 ) {
     val state by profileStateWithLifecycleEvents(viewModel)
     var showLogoutConfirm by rememberSaveable { mutableStateOf(false) }
-    val menuFocuses = remember { List(5) { FocusRequester() } }
+    val menuFocuses = remember { List(6) { FocusRequester() } }
     val swapFocus = remember { FocusRequester() }
     val logoutFocus = remember { FocusRequester() }
     var restoreLogoutFocus by remember { mutableStateOf(false) }
@@ -244,6 +246,7 @@ fun ProfileScreen(
                 }
                 val entries = listOf(
                     ProfileMenuEntry("观看历史", Icons.Outlined.History, onHistoryClick),
+                    ProfileMenuEntry("稍后再看", Icons.Outlined.WatchLater, onWatchLaterClick),
                     ProfileMenuEntry("我的收藏", Icons.Outlined.FavoriteBorder, onFavoritesClick),
                     ProfileMenuEntry("我的关注", Icons.Outlined.PersonAdd, onFollowingClick),
                     ProfileMenuEntry("我的下载", Icons.Outlined.FileDownload, onDownloadsClick),

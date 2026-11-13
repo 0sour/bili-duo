@@ -187,6 +187,11 @@ interface BilibiliApi {
         @Query("player") player: String = "web"
     ): ApiResponse<LiveDanmakuConfData>
 
+    @GET("https://api.live.bilibili.com/xlive/web-room/v1/dM/gethistory")
+    suspend fun getLiveHistoryDanmaku(
+        @Query("roomid") roomId: Long
+    ): ApiResponse<LiveHistoryDanmakuData>
+
     @FormUrlEncoded
     @POST("https://api.live.bilibili.com/msg/send")
     suspend fun sendLiveDanmaku(
@@ -337,6 +342,23 @@ interface BilibiliApi {
         @Query("pn") page: Int = 1,
         @Query("business") business: String = "all"
     ): ApiResponse<HistorySearchData>
+
+    @GET("x/v2/history/toview/web")
+    suspend fun getWatchLater(): ApiResponse<WatchLaterData>
+
+    @FormUrlEncoded
+    @POST("x/v2/history/toview/add")
+    suspend fun addWatchLater(
+        @Field("aid") aid: Long,
+        @Field("csrf") csrf: String,
+    ): ApiResponse<Any>
+
+    @FormUrlEncoded
+    @POST("x/v2/history/toview/del")
+    suspend fun removeWatchLater(
+        @Field("aid") aid: Long,
+        @Field("csrf") csrf: String,
+    ): ApiResponse<Any>
 
     @GET("x/space/wbi/arc/search")
     suspend fun getUserVideos(

@@ -161,6 +161,10 @@ fun LiveConsoleScreen(
     var selectedTab by remember { mutableIntStateOf(CHAT_TAB) }
     var unread by remember { mutableIntStateOf(0) }
     var messages by remember(roomId) { mutableStateOf<List<LiveChatMessage>>(emptyList()) }
+    // Fetched once over HTTP; kept out of LiveChatStore so the top-screen
+    // overlay never replays old messages as if they just arrived.
+    var historyMessages by remember(roomId) { mutableStateOf<List<LiveChatMessage>>(emptyList()) }
+    val visibleMessages = remember(historyMessages, messages) { historyMessages + messages }
     var chatState by remember(roomId) { mutableStateOf(LiveChatState.CONNECTING) }
     var draft by remember(roomId) { mutableStateOf("") }
     var sending by remember(roomId) { mutableStateOf(false) }
@@ -225,6 +229,12 @@ fun LiveConsoleScreen(
 
     LaunchedEffect(roomId) {
         LiveChatStore.publish(roomId, messages)
+    }
+    LaunchedEffect(roomId) {
+        repository.getLiveHistoryDanmaku(roomId)
+            .onSuccess { history ->
+                if (history.isNotEmpty()) historyMessages = history
+            }
     }
     DisposableEffect(roomId) {
         onDispose { LiveChatStore.clear(roomId) }
@@ -471,7 +481,7 @@ fun LiveConsoleScreen(
                 detail = detail,
                 isLoading = ui.isLoading,
                 chatState = chatState,
-                messages = messages,
+                messages = visibleMessages,
                 draft = draft,
                 sending = sending,
                 sendError = sendError,
