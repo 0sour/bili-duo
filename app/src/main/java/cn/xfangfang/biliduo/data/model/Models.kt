@@ -29,6 +29,33 @@ data class SearchUserResult(
     @SerializedName("numPages") val totalPages: Int = 0
 )
 
+/** `search/type` with `search_type=media_bangumi` or `media_ft`. */
+data class SearchPgcResult(
+    val result: List<SearchPgcItem>?,
+    val page: Int = 1,
+    val pagesize: Int = 20,
+    @SerializedName("numResults") val totalResults: Int = 0,
+    @SerializedName("numPages") val totalPages: Int = 0
+)
+
+data class SearchPgcItem(
+    @SerializedName("season_id") val seasonId: Long = 0,
+    @SerializedName("media_id") val mediaId: Long = 0,
+    val title: String? = null,
+    val cover: String? = null,
+    val areas: String? = null,
+    val staff: String? = null,
+    val score: Double = 0.0,
+    @SerializedName("index_show") val indexShow: String? = null,
+    @SerializedName("season_type_name") val seasonTypeName: String? = null,
+    val badge: String? = null,
+    val type: String? = null,
+)
+
+/** Some movie results only carry media_id. */
+val SearchPgcItem.seasonKey: Long
+    get() = seasonId.takeIf { it > 0 } ?: mediaId
+
 data class SearchUserItem(
     val mid: Long = 0,
     val uname: String = "",
@@ -92,6 +119,10 @@ data class DanmakuItem(
     val fontSize: Float,
     val color: Int,
     val text: String,
+    /** 9th field of the XML `p` attribute; official "shield level" weight 0–10. */
+    val weight: Int = 0,
+    /** 7th field of the XML `p` attribute: hashed sender id, not a numeric mid. */
+    val uidHash: String = "",
 )
 
 data class SearchVideoItem(
@@ -422,7 +453,9 @@ data class DownloadInfo(
     val part: String = "",
     val aid: Long = 0,
     /** Private subtitle JSON paths saved for this task; null for legacy rows. */
-    val subtitleUris: List<String>? = null
+    val subtitleUris: List<String>? = null,
+    /** Private danmaku XML path saved for offline playback; null for legacy rows. */
+    val danmakuUri: String? = null
 ) {
     companion object {
         const val STATUS_PENDING = 0

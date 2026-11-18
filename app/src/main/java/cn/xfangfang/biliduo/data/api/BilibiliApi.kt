@@ -47,6 +47,13 @@ interface BilibiliApi {
         @Query("page") page: Int = 1
     ): ApiResponse<SearchUserResult>
 
+    @GET("x/web-interface/search/type")
+    suspend fun searchPgc(
+        @Query("search_type") searchType: String,
+        @Query("keyword") keyword: String,
+        @Query("page") page: Int = 1
+    ): ApiResponse<SearchPgcResult>
+
     @GET("https://s.search.bilibili.com/main/suggest")
     suspend fun suggestSearch(
         @Query("term") term: String,
@@ -99,6 +106,34 @@ interface BilibiliApi {
     suspend fun getPgcSeason(
         @Query("season_id") seasonId: Long
     ): PgcApiResponse<PgcSeasonDetail>
+
+    @GET("pgc/view/web/season/user/status")
+    suspend fun getPgcFollowStatus(
+        @Query("season_id") seasonId: Long
+    ): PgcApiResponse<PgcFollowStatusData>
+
+    @FormUrlEncoded
+    @POST("pgc/app/follow/add")
+    suspend fun addPgcFollow(
+        @Field("season_id") seasonId: Long,
+        @Field("csrf") csrf: String,
+    ): PgcApiResponse<Any>
+
+    @FormUrlEncoded
+    @POST("pgc/app/follow/del")
+    suspend fun removePgcFollow(
+        @Field("season_id") seasonId: Long,
+        @Field("csrf") csrf: String,
+    ): PgcApiResponse<Any>
+
+    @GET("x/space/bangumi/follow/list")
+    suspend fun getPgcFollowList(
+        @Query("vmid") vmid: Long,
+        @Query("type") type: Int,
+        @Query("follow_status") followStatus: Int = 0,
+        @Query("pn") page: Int = 1,
+        @Query("ps") pageSize: Int = 30,
+    ): ApiResponse<PgcFollowListData>
 
     @GET("pgc/player/web/playurl")
     suspend fun getPgcPlayUrl(

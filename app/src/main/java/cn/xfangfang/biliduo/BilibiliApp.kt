@@ -1,18 +1,24 @@
 package cn.xfangfang.biliduo
 
 import android.app.Application
+import android.net.Uri
 import android.os.Build
 import android.util.Log
 import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.disk.DiskCache
+import coil.intercept.Interceptor
 import coil.memory.MemoryCache
 import coil.decode.GifDecoder
 import coil.decode.ImageDecoderDecoder
+import coil.request.ImageResult
+import coil.size.Dimension
+import okhttp3.HttpUrl
 import cn.xfangfang.biliduo.data.api.BilibiliApi
 import cn.xfangfang.biliduo.data.download.DownloadManager
 import cn.xfangfang.biliduo.data.local.AppSettings
 import cn.xfangfang.biliduo.data.local.WifiMonitor
+import cn.xfangfang.biliduo.util.bilibiliThumbnailUrl
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -61,6 +67,9 @@ class BilibiliApp : Application(), ImageLoaderFactory {
                     .build()
             }
             .components {
+                // Ask the image CDN for a width-appropriate WebP instead of
+                // downloading multi-hundred-KB originals for small cards.
+                add(BilibiliImageResizeInterceptor())
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                     add(ImageDecoderDecoder.Factory())
                 } else {
@@ -76,6 +85,30 @@ class BilibiliApp : Application(), ImageLoaderFactory {
         const val TAG = "bili-duo"
         lateinit var instance: BilibiliApp
             private set
+    }
+
+    private class BilibiliImageResizeInterceptor : Interceptor {
+        override suspend fun intercept(chain: Interceptor.Chain): ImageResult {
+            val request = chain.request
+            val data = when (val value = request.data) {
+                is String -> value
+                is Uri -> value.toString()
+                is HttpUrl -> value.toString()
+                else -> null
+            }
+            val targetWidth = (chain.size.width as? Dimension.Pixels)?.px ?: 0
+            val resized = data?.let { bilibiliThumbnailUrl(it, targetWidth) }
+                ?: return chain.proceed(request)
+            return chain.proceed(
+                request.newBuilder()
+                    .data(resized)
+                    // Cache under the rewritten URL; otherwise an old full-size
+                    // entry could be reused for the same original URL.
+                    .memoryCacheKey(resized)
+                    .diskCacheKey(resized)
+                    .build()
+            )
+        }
     }
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)

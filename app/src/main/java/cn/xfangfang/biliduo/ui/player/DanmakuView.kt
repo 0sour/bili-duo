@@ -43,6 +43,12 @@ class DanmakuView @JvmOverloads constructor(
     private var sourceItems: List<DanmakuItem> = emptyList()
     private var items: List<DanmakuItem> = emptyList()
     private var blockedWords: Set<String> = emptySet()
+    private var blockedRegex: String = ""
+    private var shieldLevel: Int = 0
+    private var showScroll: Boolean = true
+    private var showTop: Boolean = true
+    private var showBottom: Boolean = true
+    private var blockedUidHashes: Set<String> = emptySet()
     private var maxOnScreen: Int = 0
     private var opacity: Float = 0.9f
     private var speed: Float = 1f
@@ -101,6 +107,12 @@ class DanmakuView @JvmOverloads constructor(
         textSizeSp: Float = 16f,
         area: Float = 1f,
         blockedWords: Set<String> = emptySet(),
+        blockedRegex: String = "",
+        shieldLevel: Int = 0,
+        showScroll: Boolean = true,
+        showTop: Boolean = true,
+        showBottom: Boolean = true,
+        blockedUidHashes: Set<String> = emptySet(),
         maxOnScreen: Int = 0,
     ) {
         val nextOpacity = opacity.coerceIn(0.2f, 1f)
@@ -108,10 +120,19 @@ class DanmakuView @JvmOverloads constructor(
         val nextSize = textSizeSp.coerceIn(12f, 24f)
         val nextArea = area.coerceIn(0.25f, 1f)
         val nextWords = blockedWords.map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+        val nextRegex = blockedRegex.trim()
+        val nextLevel = shieldLevel.coerceIn(0, 10)
+        val nextBlockedUids = blockedUidHashes.filter { it.isNotBlank() }.toSet()
         val nextMax = maxOnScreen.coerceIn(0, 200)
         val unchanged = this.player === player &&
             this.sourceItems === items &&
             this.blockedWords == nextWords &&
+            this.blockedRegex == nextRegex &&
+            this.shieldLevel == nextLevel &&
+            this.showScroll == showScroll &&
+            this.showTop == showTop &&
+            this.showBottom == showBottom &&
+            this.blockedUidHashes == nextBlockedUids &&
             this.maxOnScreen == nextMax &&
             this.opacity == nextOpacity &&
             this.speed == nextSpeed &&
@@ -124,7 +145,22 @@ class DanmakuView @JvmOverloads constructor(
         this.player = player
         this.sourceItems = items
         this.blockedWords = nextWords
-        this.items = filterBlockedDanmaku(items, nextWords)
+        this.blockedRegex = nextRegex
+        this.shieldLevel = nextLevel
+        this.showScroll = showScroll
+        this.showTop = showTop
+        this.showBottom = showBottom
+        this.blockedUidHashes = nextBlockedUids
+        this.items = filterDanmaku(
+            items = items,
+            blockedWords = nextWords,
+            blockedRegex = compileDanmakuRegex(nextRegex),
+            shieldLevel = nextLevel,
+            showScroll = showScroll,
+            showTop = showTop,
+            showBottom = showBottom,
+            blockedUidHashes = nextBlockedUids,
+        )
         this.maxOnScreen = nextMax
         this.opacity = nextOpacity
         this.speed = nextSpeed

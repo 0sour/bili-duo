@@ -49,7 +49,7 @@ fun GamepadStyleSetupOverlay(
 
     DisposableEffect(session) {
         session?.setBackInterceptor { true }
-        session?.setHintOverride("方向键选择 · B 确认 · A 返回")
+        session?.setHintOverride("方向键选择 · 底部确认 · 右侧返回")
         onDispose {
             session?.setBackInterceptor(null)
             session?.setHintOverride(null)
@@ -86,8 +86,8 @@ fun GamepadStyleSetupOverlay(
             )
             Spacer(Modifier.height(6.dp))
             Text(
-                text = "实体按钮功能不变：B 确认 · A 返回 · Y 刷新。\n" +
-                    "请按 RP Duo 当前的手柄风格选择；之后可在 设置 → 播放 修改。",
+                text = "按钮位置固定：底部确认 · 右侧返回 · 左侧刷新。\n" +
+                    "请选择与 RP Duo 系统设置一致的布局；之后可在 设置 → 手柄 修改。",
                 color = DuoPalette.Secondary,
                 fontSize = 11.sp,
                 lineHeight = 16.sp,
@@ -130,7 +130,7 @@ fun GamepadStyleSetupOverlay(
             }
             Spacer(Modifier.height(8.dp))
             Text(
-                text = "方向键选择 · B 确认 · A 返回",
+                text = "方向键选择 · 底部确认 · 右侧返回",
                 color = DuoPalette.Tertiary,
                 fontSize = 9.sp,
             )

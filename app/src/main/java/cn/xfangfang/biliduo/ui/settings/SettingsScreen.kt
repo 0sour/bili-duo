@@ -235,7 +235,8 @@ fun SettingsScreen(
             0 -> "默认 ${videoQualityLabel(videoPreference.quality)} · " +
                 "${videoSpeedLabel(videoPreference.speed)} · " +
                 "字幕${if (videoPreference.subtitleEnabled) "开" else "关"}"
-            1 -> "${gamepadStyle.label} · B 确认 / A 返回 / Y 刷新"
+            1 -> "${gamepadStyle.label} · ${gamepadStyle.confirmLabel} 确认 / " +
+                "${gamepadStyle.backLabel} 返回 / ${gamepadStyle.actionLabel} 刷新"
             2 -> "仅 WiFi 下载：${if (wifiOnlyDownload) "开" else "关"} · 当前 ${if (wifi) "WiFi" else "移动网络"}"
             3 -> "${themeModeLabels[AppSettings.themeMode] ?: "不自动切换"} · ${if (AppSettings.manualDark) "深色" else "浅色"}"
             4 -> if (playerUi == null) {
@@ -513,6 +514,10 @@ fun SettingsScreen(
                         onSize = { playerViewModel?.setDanmakuTextSize(it) },
                         onArea = { playerViewModel?.setDanmakuArea(it) },
                         onMax = { playerViewModel?.setDanmakuMaxOnScreen(it) },
+                        onShieldLevel = { playerViewModel?.setDanmakuShieldLevel(it) },
+                        onShowScroll = { playerViewModel?.setDanmakuShowScroll(it) },
+                        onShowTop = { playerViewModel?.setDanmakuShowTop(it) },
+                        onShowBottom = { playerViewModel?.setDanmakuShowBottom(it) },
                         onLiveEnabled = { playerViewModel?.setLiveDanmakuEnabled(it) },
                         onLiveOpacity = { playerViewModel?.setLiveDanmakuOpacity(it) },
                         onLiveSpeed = { playerViewModel?.setLiveDanmakuSpeed(it) },
@@ -860,8 +865,8 @@ private fun GamepadSettings(
         },
     )
     Text(
-        text = "请与 RP Duo 系统设置里的「手柄风格」保持一致。实体位置固定，" +
-            "功能不随风格变化；屏幕提示始终按丝印标注。切换后立即生效，无需重启。",
+        text = "请与 RP Duo 系统设置里的「手柄风格」保持一致。按钮位置固定：" +
+            "底部确认、右侧返回、左侧刷新；字母随所选风格变化。切换后立即生效，无需重启。",
         color = DuoPalette.Tertiary,
         fontSize = 10.sp,
         lineHeight = 14.sp,
@@ -869,11 +874,20 @@ private fun GamepadSettings(
     )
     Spacer(Modifier.height(6.dp))
     SettingsSection("实体按键")
-    SettingsInfoRow(title = "下 · B", value = "确认 / 播放 / 输入")
-    SettingsInfoRow(title = "右 · A", value = "返回 / 关闭 / 收键盘")
-    SettingsInfoRow(title = "左 · Y", value = "刷新 / 点赞 / 弹幕开关")
     SettingsInfoRow(
-        title = "上 · X",
+        title = "下 · ${gamepadStyle.confirmLabel}",
+        value = "确认 / 播放 / 输入",
+    )
+    SettingsInfoRow(
+        title = "右 · ${gamepadStyle.backLabel}",
+        value = "返回 / 关闭 / 收键盘",
+    )
+    SettingsInfoRow(
+        title = "左 · ${gamepadStyle.actionLabel}",
+        value = "刷新 / 点赞 / 弹幕开关",
+    )
+    SettingsInfoRow(
+        title = "上 · ${gamepadStyle.unboundLabel}",
         value = "未绑定",
         modifier = bottomModifier,
     )
@@ -970,6 +984,10 @@ private fun DanmakuSettings(
     onSize: (Float) -> Unit,
     onArea: (Float) -> Unit,
     onMax: (Int) -> Unit,
+    onShieldLevel: (Int) -> Unit,
+    onShowScroll: (Boolean) -> Unit,
+    onShowTop: (Boolean) -> Unit,
+    onShowBottom: (Boolean) -> Unit,
     onLiveEnabled: (Boolean) -> Unit,
     onLiveOpacity: (Float) -> Unit,
     onLiveSpeed: (Float) -> Unit,
@@ -988,6 +1006,10 @@ private fun DanmakuSettings(
     val size = ui?.danmakuTextSize ?: 16f
     val area = ui?.danmakuArea ?: 1f
     val max = ui?.danmakuMaxOnScreen ?: 0
+    val shieldLevel = ui?.danmakuShieldLevel ?: 0
+    val showScroll = ui?.danmakuShowScroll ?: true
+    val showTop = ui?.danmakuShowTop ?: true
+    val showBottom = ui?.danmakuShowBottom ?: true
     val liveEnabled = ui?.liveDanmakuEnabled ?: true
     val liveOpacity = ui?.liveDanmakuOpacity ?: 0.9f
     val liveSpeed = ui?.liveDanmakuSpeed ?: 1f
@@ -1068,6 +1090,33 @@ private fun DanmakuSettings(
             onClick = { onArea(nextValue(area, danmakuAreaOptions)) },
         )
         SettingsValueRow(
+            title = "屏蔽等级",
+            value = if (shieldLevel <= 0) "不过滤" else "等级 $shieldLevel",
+            modifier = noRight,
+            onClick = { onShieldLevel(if (shieldLevel >= 10) 0 else shieldLevel + 1) },
+        )
+        SettingsSwitchRow(
+            title = "滚动弹幕",
+            subtitle = "横向滚动",
+            checked = showScroll,
+            modifier = noRight,
+            onToggle = { onShowScroll(!showScroll) },
+        )
+        SettingsSwitchRow(
+            title = "顶部弹幕",
+            subtitle = "固定在顶部",
+            checked = showTop,
+            modifier = noRight,
+            onToggle = { onShowTop(!showTop) },
+        )
+        SettingsSwitchRow(
+            title = "底部弹幕",
+            subtitle = "固定在底部",
+            checked = showBottom,
+            modifier = noRight,
+            onToggle = { onShowBottom(!showBottom) },
+        )
+        SettingsValueRow(
             title = "同屏上限",
             value = if (max <= 0) "不限" else "$max",
             modifier = noRight,
@@ -1079,6 +1128,16 @@ private fun DanmakuSettings(
         SettingsInfoRow(
             title = "屏蔽词",
             value = "播放控制台 · 播放设置内编辑",
+            modifier = noRight,
+        )
+        SettingsInfoRow(
+            title = "正则屏蔽",
+            value = "播放控制台 · 弹幕过滤内编辑",
+            modifier = noRight,
+        )
+        SettingsInfoRow(
+            title = "屏蔽用户",
+            value = "播放控制台 · 弹幕过滤内编辑",
             modifier = noRight,
         )
         Spacer(Modifier.height(10.dp))

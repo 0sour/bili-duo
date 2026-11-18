@@ -5,8 +5,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import cn.xfangfang.biliduo.BilibiliApp
 import cn.xfangfang.biliduo.data.local.SearchHistoryManager
+import cn.xfangfang.biliduo.data.model.SearchPgcItem
 import cn.xfangfang.biliduo.data.model.SearchUserItem
 import cn.xfangfang.biliduo.data.model.SearchVideoItem
+import cn.xfangfang.biliduo.data.model.seasonKey
 import cn.xfangfang.biliduo.data.repository.BilibiliRepository
 import cn.xfangfang.biliduo.util.cleanHtmlText
 import cn.xfangfang.biliduo.util.formatDuration
@@ -35,13 +37,19 @@ object SearchSort {
 enum class SearchType(val value: String, val label: String) {
     VIDEO("video", "视频"),
     USER("bili_user", "用户"),
+    BANGUMI("media_bangumi", "番剧"),
+    MOVIE("media_ft", "影视"),
 }
+
+private val SearchType.isPgc: Boolean
+    get() = this == SearchType.BANGUMI || this == SearchType.MOVIE
 
 data class SearchUiState(
     val query: String = "",
     val searchType: SearchType = SearchType.VIDEO,
     val results: List<SearchVideoItem> = emptyList(),
     val users: List<SearchUserItem> = emptyList(),
+    val pgc: List<SearchPgcItem> = emptyList(),
     val isLoading: Boolean = false,
     val isLoadingMore: Boolean = false,
     val error: String? = null,
@@ -142,6 +150,7 @@ class SearchViewModel(
             searchType = type,
             results = emptyList(),
             users = emptyList(),
+            pgc = emptyList(),
             isLoading = shouldSearch,
             isLoadingMore = false,
             error = null,
@@ -186,6 +195,7 @@ class SearchViewModel(
                 hasSearched = true,
                 results = emptyList(),
                 users = emptyList(),
+                pgc = emptyList(),
                 currentPage = 1
             )
             if (type == SearchType.USER) {
@@ -202,6 +212,31 @@ class SearchViewModel(
                     }
                     .onFailure { e ->
                         Log.e(BilibiliApp.TAG, "searchUsers error: ${e.message}")
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            error = e.message ?: "未知错误"
+                        )
+                    }
+            } else if (type.isPgc) {
+                repository.searchPgc(query, type.value, page = 1)
+                    .onSuccess { (items, totalPages) ->
+                        Log.d(BilibiliApp.TAG, "searchPgc success: ${items.size} items, pages=$totalPages")
+                        _uiState.value = _uiState.value.copy(
+                            pgc = items.filter { it.seasonId > 0 || it.mediaId > 0 }
+                                .distinctBy { it.seasonKey }
+                                .map {
+                                    it.copy(
+                                        title = cleanHtmlText(it.title.orEmpty()),
+                                        staff = cleanHtmlText(it.staff.orEmpty()),
+                                    )
+                                },
+                            isLoading = false,
+                            currentPage = 1,
+                            hasMore = totalPages > 1
+                        )
+                    }
+                    .onFailure { e ->
+                        Log.e(BilibiliApp.TAG, "searchPgc error: ${e.message}")
                         _uiState.value = _uiState.value.copy(
                             isLoading = false,
                             error = e.message ?: "未知错误"
@@ -278,6 +313,35 @@ class SearchViewModel(
                     .onFailure { e ->
                         if (_uiState.value.searchType != state.searchType) return@onFailure
                         Log.e(BilibiliApp.TAG, "loadMore users error: ${e.message}")
+                        _uiState.value = _uiState.value.copy(
+                            isLoadingMore = false,
+                            moreError = e.message ?: "加载失败"
+                        )
+                    }
+            } else if (state.searchType.isPgc) {
+                repository.searchPgc(state.query, state.searchType.value, page = nextPage)
+                    .onSuccess { (items, totalPages) ->
+                        if (_uiState.value.searchType != state.searchType) return@onSuccess
+                        val existing = _uiState.value.pgc.map { it.seasonKey }.toSet()
+                        val deduped = items.filter { it.seasonKey > 0 && it.seasonKey !in existing }
+                            .distinctBy { it.seasonKey }
+                            .map {
+                                it.copy(
+                                    title = cleanHtmlText(it.title.orEmpty()),
+                                    staff = cleanHtmlText(it.staff.orEmpty()),
+                                )
+                            }
+                        _uiState.value = _uiState.value.copy(
+                            pgc = _uiState.value.pgc + deduped,
+                            isLoadingMore = false,
+                            moreError = null,
+                            currentPage = nextPage,
+                            hasMore = nextPage < totalPages
+                        )
+                    }
+                    .onFailure { e ->
+                        if (_uiState.value.searchType != state.searchType) return@onFailure
+                        Log.e(BilibiliApp.TAG, "loadMore pgc error: ${e.message}")
                         _uiState.value = _uiState.value.copy(
                             isLoadingMore = false,
                             moreError = e.message ?: "加载失败"

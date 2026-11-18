@@ -28,6 +28,7 @@ object Routes {
     const val LOGIN = "login"
     const val HISTORY = "history"
     const val WATCH_LATER = "watch_later"
+    const val MY_FOLLOWS = "my_follows"
     const val CHANNEL = "channel/{mid}"
     const val FAVORITES = "favorites"
     const val FOLLOWING = "following"

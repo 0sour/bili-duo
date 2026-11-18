@@ -54,6 +54,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.SoftwareKeyboardController
 import androidx.compose.ui.text.style.TextOverflow
+import cn.xfangfang.biliduo.data.local.GamepadStyleStore
 import cn.xfangfang.biliduo.ui.theme.DuoTheme
 import cn.xfangfang.biliduo.duo.DuoImeState
 import androidx.compose.ui.unit.dp
@@ -478,6 +479,7 @@ fun DuoModeBar(
     val hintOverride by session.hintOverride.collectAsState()
     val playerActive by session.playerActive.collectAsState()
     val gamepadConnected by session.gamepadConnected.collectAsState()
+    val gamepadStyle by GamepadStyleStore.style.collectAsState()
 
     val label = when {
         !enabled -> "单屏模式 · 触摸操作"
@@ -488,15 +490,15 @@ fun DuoModeBar(
     }
     val middle = when {
         !enabled || !gamepadConnected -> null
-        overlay != null -> "A 关闭 · 方向键选择"
-        !playerActive -> "A 返回"
-        else -> "A 返回"
+        overlay != null -> "${gamepadStyle.backLabel} 关闭 · 方向键选择"
+        !playerActive -> "${gamepadStyle.backLabel} 返回"
+        else -> "${gamepadStyle.backLabel} 返回"
     }
     val right = when {
         !enabled || !gamepadConnected -> null
-        overlay != null -> "B 确认"
-        !playerActive -> "B 确认"
-        else -> "B 确认"
+        overlay != null -> "${gamepadStyle.confirmLabel} 确认"
+        !playerActive -> "${gamepadStyle.confirmLabel} 确认"
+        else -> "${gamepadStyle.confirmLabel} 确认"
     }
     val dotColor = when {
         !enabled || !gamepadConnected -> Muted

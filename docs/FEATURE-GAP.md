@@ -15,8 +15,8 @@
    - 稍后再看、我的追番/追剧、番剧/影视索引、搜索番剧/影视；
    - 消息中心（回复/@/赞）、私信；
    - PGC 详情页目前没有收藏/追番操作（简介页对 PGC 隐藏了关注/收藏/下载）。
-3. **第二梯队**：视频合集（UGC season）在播放器内切换、直播历史弹幕、离线弹幕、
-   播放器增强（音轨/连播开关/片头尾/睡眠/PiP）、动态发布转发。
+3. **第二梯队**：播放器增强（音轨/连播开关/片头尾/睡眠/PiP）、动态发布转发。
+   rc58 已完成视频合集、直播历史弹幕、离线弹幕与弹幕过滤。
 4. 按「一个开发 + 现有架构」估算，P0 全部做完约 **2–3 周**，P1 约 **3–4 周**，
    P2 可按版本穿插。
 
@@ -47,15 +47,15 @@
 
 | # | 功能 | 现状 | 参考实现 / 接口 | 工作量 |
 | --- | --- | --- | --- | --- |
-| A1 | **稍后再看** | — | wiliwili `mine_later`；`GET /x/v2/history/toview/web`，加入/移除 `toview/add`、`toview/del` | S–M |
-| A2 | **我的追番 / 追剧** | — | wiliwili `mine_bangumi`；`GET /x/space/bangumi/follow/list`，追/取消 `pgc/app/follow/add|del`，状态 `pgc/view/web/season/user/status` | M |
+| A1 | **稍后再看** | ✅ rc56 | wiliwili `mine_later`；`GET /x/v2/history/toview/web`，加入/移除 `toview/add`、`toview/del` | S–M |
+| A2 | **我的追番 / 追剧** | ✅ rc58 | wiliwili `mine_bangumi`；`GET /x/space/bangumi/follow/list`，追/取消 `pgc/app/follow/add|del`，状态 `pgc/view/web/season/user/status` | M |
 | A3 | **番剧 / 影视索引** | — | wiliwili `PGCIndexActivity`；`/pgc/page/index/condition` + `/pgc/page/index/result` | M |
-| A4 | **搜索番剧 / 影视** | — | `search/type?search_type=media_bangumi` / `media_ft`；搜索页加 type chip | S |
-| A5 | **PGC 详情页追番/收藏** | ◐ | 当前 PGC 简介隐藏关注/收藏/下载，没有追番入口；A2 的前置 | S |
-| A6 | **视频合集（UGC season）** | ◐ | UP 空间已有合集列表；播放器右栏没有「合集」切换。`x/polymer/web-space/seasons_archives_list` 已有 | S–M |
+| A4 | **搜索番剧 / 影视** | ✅ rc58 | `search/type?search_type=media_bangumi` / `media_ft`；搜索页加 type chip | S |
+| A5 | **PGC 详情页追番/收藏** | ✅ rc58 | 播放控制台简介「追番/已追番」pill | S |
+| A6 | **视频合集（UGC season）** | ✅ rc58 | `view.ugc_season` → 右栏「合集 N」tab；切集走 `vm.load(bvid,cid)` | S–M |
 | A7 | **消息中心（回复/@/赞）** | — | `x/msgfeed/reply`、`/at`、`/like`、`/unread`；wiliwili `InboxFeed` | M |
 | A8 | **私信** | — | wiliwili `InboxChat`；`api.vc.bilibili.com` session/fetch/send 三件套 | L |
-| A9 | **直播历史弹幕** | — | wiliwili `LiveHistoryDanmaku`；`api.live.bilibili.com/xlive/web-room/v1/dM/gethistory` | S |
+| A9 | **直播历史弹幕** | ✅ rc56 | `api.live.bilibili.com/xlive/web-room/v1/dM/gethistory` | S |
 | A10 | **热门子分类（每周必看/入站必刷/历史）** | ◐ | 我们只有热门 feed + 排行；wiliwili HomeHots 四档 | S–M |
 | A11 | **DLNA 投屏** | — | wiliwili `DLNAActivity` / `api/dlna`；掌机场景优先级低 | M |
 | A12 | **自定义字体 / 图标** | — | wiliwili 主题配置；掌机 UI 优先级低 | M |
@@ -64,9 +64,9 @@
 
 | # | 功能 | 现状 | 说明 | 工作量 |
 | --- | --- | --- | --- | --- |
-| B1 | 播放器内分享 / 复制链接 | — | 仅基座 `DetailScreen`（主流程不再进入）有系统分享；播放控制台没有 | S |
-| B2 | 离线弹幕 | — | 下载只存字幕，没有把弹幕 XML 存进下载目录 | S–M |
-| B3 | 弹幕类型过滤 / 正则屏蔽 / 按用户屏蔽 | ◐ | 已有屏蔽词、同屏上限；没有顶部/底部/滚动开关、正则、用户屏蔽 | S–M |
+| B1 | 播放器内分享 / 复制链接 | ✅ rc56 | 播放控制台「分享」复制链接 | S |
+| B2 | 离线弹幕 | ✅ rc58 | 下载完成保存弹幕 XML 到私有目录，本地播放按 `danmakuUri` 解析 | S–M |
+| B3 | 弹幕类型过滤 / 正则屏蔽 / 按用户屏蔽 | ✅ rc58 | 播放设置「弹幕过滤」页：屏蔽等级 0–10、滚动/顶部/底部开关、正则、按 `uidHash` 屏蔽；设置页视频弹幕同步 | S–M |
 | B4 | 杜比全景声 / 无损音轨 | ◐ | `dash.dolby`、`dash.flac` 已解析但只取普通 `audio.first()`；没有音轨选择 | S |
 | B5 | 播放器增强 | ◐ | 已有自动连播、倍速、字幕；缺「自动连播开关、片头片尾跳过、播放列表、睡眠定时、后台音频/PiP、截图/GIF」 | M |
 | B6 | 动态发布 / 转发 | — | 目前只读 + 点赞/评论；发布需要编辑器、图片上传、@/话题 | L |
@@ -94,19 +94,19 @@
 
 ### v0.3.0（功能对等，2–3 周）
 
-1. A1 稍后再看（列表 + 播放器加入/移除 + 个人中心入口）。
-2. A2/A5 追番/追剧 + PGC 详情页追番/收藏按钮。
-3. A3/A4 番剧/影视索引 + 搜索番剧/影视。
-4. A6 视频合集在播放器内切换。
-5. A9 直播历史弹幕。
-6. B1 播放器分享/复制链接。
-7. B2 离线弹幕（下载时保存 XML，离线播放加载）。
+1. ✅ A1 稍后再看（列表 + 播放器加入/移除 + 个人中心入口）。
+2. ✅ A2/A5 追番/追剧 + PGC 详情页追番按钮。
+3. ◐ A4 ✅ 搜索番剧/影视；A3 番剧/影视索引仍待做（rc59）。
+4. ✅ A6 视频合集在播放器内切换。
+5. ✅ A9 直播历史弹幕。
+6. ✅ B1 播放器分享/复制链接。
+7. ✅ B2 离线弹幕（下载时保存 XML，离线播放加载）。
 
 ### v0.3.x（账号/社交，3–4 周）
 
 8. A7 消息中心；A8 私信单独排期。
 9. B7 用户空间扩展（先动态/收藏夹，再粉丝关注）。
-10. B3/B4 弹幕过滤 + 音轨选择。
+10. ✅ B3 弹幕过滤（等级/类型/正则/作者）；B4 音轨选择仍待做。
 11. B5 播放器增强（先连播开关/片头尾/睡眠定时）。
 12. B9/B10 收藏夹批量、评论 @/举报。
 

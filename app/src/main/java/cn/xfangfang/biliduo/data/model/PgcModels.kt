@@ -65,3 +65,40 @@ data class PgcUpInfo(
     val uname: String = "",
     val avatar: String = "",
 )
+
+/** `pgc/view/web/season/user/status` result. */
+data class PgcFollowStatusData(
+    val status: Int = 0,
+    val follow: Int = 0,
+    @SerializedName("follow_status") val followStatus: Int = 0,
+)
+
+/** `x/space/bangumi/follow/list` result. */
+data class PgcFollowListData(
+    val list: List<PgcFollowItem>? = null,
+    val total: Int = 0,
+    val pn: Int = 0,
+    val ps: Int = 0,
+)
+
+data class PgcFollowItem(
+    @SerializedName("season_id") val seasonId: Long = 0,
+    val title: String? = null,
+    val cover: String? = null,
+    /** e.g. "看到第 3 话"; "-" when nothing watched. */
+    val progress: String? = null,
+    @SerializedName("new_ep") val newEp: PgcNewEp? = null,
+    @SerializedName("total_count") val totalCount: Int = 0,
+    @SerializedName("follow_status") val followStatus: Int = 0,
+    @SerializedName("season_type_name") val seasonTypeName: String? = null,
+    val badge: String? = null,
+    val rating: PgcFollowRating? = null,
+)
+
+data class PgcNewEp(
+    @SerializedName("index_show") val indexShow: String? = null,
+)
+
+data class PgcFollowRating(
+    val score: Float = 0f,
+)

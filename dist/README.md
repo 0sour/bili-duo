@@ -4,6 +4,28 @@
 `*.apk`），需要时本地 `./gradlew assembleDebug` / `assembleRelease` 生成，或从
 GitHub Releases 下载。
 
+## 0.2.0-rc58（2026-11-18，第五版测试版）
+
+- `bili-duo-0.2.0-rc58-release.apk`
+  - R8 minify，正式 release keystore 签名；可覆盖安装同 key 的 rc57。
+  - APK SHA-256：`475e34f57e29018d650a35cd2200d8b337f611011d1972482ec4a61cf81be468`
+- `bili-duo-0.2.0-rc58-debug.apk`
+  - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
+  - SHA-256：`050aa49ca861ef53b5d6957c6e6d622d438c4624552478ac86cf787b1ec2b177`
+
+rc58 变更（在 rc57 基础上）：
+- PGC 播放页追番/取消追番；个人中心「追番追剧」番剧/影视两 tab；搜索新增番剧/
+  影视两种结果；UGC 视频右栏新增「合集 N」tab 与切集。
+- 弹幕过滤：播放设置「弹幕过滤」页支持官方屏蔽等级 0–10、滚动/顶部/底部类型、
+  正则屏蔽、按作者 `uidHash` 屏蔽/恢复；设置 → 弹幕视频页同步等级与类型开关。
+- 离线弹幕：下载完成保存 XML 到私有目录，本地播放直接解析，断网也有弹幕；
+  删除下载同时删除 XML。
+- 性能：Coil 按目标宽度请求 `@<width>w.webp`（封面 452KB→30KB，头像 474KB→5KB）；
+  `getVideoInfo` 16 条/60s LRU + 在途请求合并。
+- 手柄提示字母随 Xbox/Retro 风格即时更新；未开播季错误提示优化。
+- 252 单测通过。Duo 自主验收 + 用户复测无 FATAL/ANR；测试下载与本地屏蔽设置已还原。
+- main 提交与 tag 见发布页：https://github.com/0sour/bili-duo/releases/tag/v0.2.0-rc58
+
 ## 0.2.0-rc57（2026-11-13，第四版测试版，已发布）
 
 - `bili-duo-0.2.0-rc57-release.apk`

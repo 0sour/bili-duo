@@ -118,10 +118,12 @@ import coil.compose.AsyncImage
 import cn.xfangfang.biliduo.BilibiliApp
 import cn.xfangfang.biliduo.BuildConfig
 import cn.xfangfang.biliduo.data.api.BilibiliApi
+import cn.xfangfang.biliduo.data.local.GamepadStyleStore
 import cn.xfangfang.biliduo.data.local.VideoPreferenceManager
 import cn.xfangfang.biliduo.data.download.DownloadManager
 import cn.xfangfang.biliduo.data.local.AppSettings
 import cn.xfangfang.biliduo.data.model.CommentItem
+import cn.xfangfang.biliduo.data.model.DanmakuItem
 import cn.xfangfang.biliduo.data.model.FavFolder
 import cn.xfangfang.biliduo.data.model.CommentPicture
 import cn.xfangfang.biliduo.data.model.QualityOption
@@ -162,6 +164,7 @@ private const val TAB_INTRO = 0
 private const val TAB_COMMENTS = 1
 private const val TAB_PARTS = 2
 private const val TAB_RELATED = 3
+private const val TAB_SEASON = 4
 
 @Composable
 fun PlayerConsoleScreen(
@@ -176,6 +179,7 @@ fun PlayerConsoleScreen(
     onUploaderClick: (Long) -> Unit = {},
 ) {
     val ui by vm.uiState.collectAsState()
+    val gamepadStyle by GamepadStyleStore.style.collectAsState()
     val playback by controller.state.collectAsState()
     val overlay by session.overlay.collectAsState()
     val focusEpoch by session.focusEpoch.collectAsState()
@@ -194,7 +198,13 @@ fun PlayerConsoleScreen(
     val playFocus = remember { FocusRequester() }
     val backFocus = remember { FocusRequester() }
     val sliderFocus = remember { FocusRequester() }
-    val tabFocus = remember { List(4) { FocusRequester() } }
+    val tabFocus = remember { List(5) { FocusRequester() } }
+    val seasonFirstFocus = remember { FocusRequester() }
+    val seasonEpisodes = remember(ui.videoInfo?.ugcSeason) {
+        ui.videoInfo?.ugcSeason.episodeItems()
+    }
+    val hasSeason = seasonEpisodes.isNotEmpty()
+    val tabCount = if (hasSeason) 5 else 4
     val nextPageFocus = remember { FocusRequester() }
     val qualityFocus = remember { FocusRequester() }
     val speedFocus = remember { FocusRequester() }
@@ -246,6 +256,9 @@ fun PlayerConsoleScreen(
     var favFoldersError by remember { mutableStateOf<String?>(null) }
 
     var watchLaterBusy by remember(aid) { mutableStateOf(false) }
+    val pgcFollowFocus = remember { FocusRequester() }
+    var pgcFollowed by remember(pgcSeasonId) { mutableStateOf<Boolean?>(null) }
+    var pgcFollowBusy by remember(pgcSeasonId) { mutableStateOf(false) }
 
     var comments by remember(aid) { mutableStateOf<List<CommentItem>>(emptyList()) }
     var commentsLoading by remember(aid) { mutableStateOf(false) }
@@ -318,6 +331,37 @@ fun PlayerConsoleScreen(
                 .onFailure {
                     watchLaterBusy = false
                     toast(it.message ?: "加入稍后再看失败")
+                }
+        }
+    }
+
+    LaunchedEffect(pgcSeasonId, selfMid, ui.isPgc) {
+        val seasonId = pgcSeasonId ?: return@LaunchedEffect
+        if (!ui.isPgc) return@LaunchedEffect
+        repository.getPgcFollowStatus(seasonId).onSuccess { pgcFollowed = it }
+    }
+
+    fun togglePgcFollow() {
+        val seasonId = pgcSeasonId ?: return
+        if (pgcFollowBusy) return
+        if (selfMid == null) {
+            toast("请先登录")
+            return
+        }
+        val target = pgcFollowed != true
+        val previous = pgcFollowed
+        pgcFollowed = target
+        pgcFollowBusy = true
+        scope.launch {
+            repository.setPgcFollow(seasonId, target)
+                .onSuccess {
+                    pgcFollowBusy = false
+                    toast(if (target) "已追番" else "已取消追番")
+                }
+                .onFailure {
+                    pgcFollowBusy = false
+                    pgcFollowed = previous
+                    toast(it.message ?: "追番操作失败")
                 }
         }
     }
@@ -1045,12 +1089,16 @@ fun PlayerConsoleScreen(
     }
 
     fun cycleTab(step: Int) {
-        val next = (selectedTab + step + 4) % 4
+        val next = (selectedTab + step + tabCount) % tabCount
         selectedTab = next
         scope.launch {
             delay(80L)
             runCatching { tabFocus[next].requestFocus() }
         }
+    }
+
+    LaunchedEffect(ui.videoInfo?.bvid, hasSeason) {
+        if (!hasSeason && selectedTab == TAB_SEASON) selectedTab = TAB_INTRO
     }
 
     val currentIndex = ui.pages.indexOfFirst { it.cid == ui.currentPage?.cid }
@@ -1573,11 +1621,13 @@ fun PlayerConsoleScreen(
 
                 Spacer(Modifier.weight(1f))
                 Text(
-                    text = "方向键选择 · B 确认 · A 返回\n" +
+                    text = "方向键选择 · ${gamepadStyle.confirmLabel} 确认 · " +
+                        "${gamepadStyle.backLabel} 返回\n" +
                         if (selectedTab == TAB_COMMENTS) {
-                            "LB/RB 切 tab · L2/R2 评论排序 · Y 弹幕 · START 弹幕/字幕"
+                            "LB/RB 切 tab · L2/R2 评论排序 · " +
+                                "${gamepadStyle.actionLabel} 弹幕 · START 弹幕/字幕"
                         } else {
-                            "LB/RB 切换 tab · Y 弹幕 · START 弹幕/字幕"
+                            "LB/RB 切换 tab · ${gamepadStyle.actionLabel} 弹幕 · START 弹幕/字幕"
                         },
                     color = DuoTextTertiary,
                     fontSize = 9.5.sp,
@@ -1641,6 +1691,19 @@ fun PlayerConsoleScreen(
                         focusRequester = tabFocus[TAB_RELATED],
                         onClick = { selectedTab = TAB_RELATED },
                     )
+                    if (hasSeason) {
+                        ConsoleTab(
+                            text = "合集",
+                            count = seasonEpisodes.size.toLong(),
+                            selected = selectedTab == TAB_SEASON,
+                            modifier = Modifier.focusProperties {
+                                up = FocusRequester.Cancel
+                                down = seasonFirstFocus
+                            },
+                            focusRequester = tabFocus[TAB_SEASON],
+                            onClick = { selectedTab = TAB_SEASON },
+                        )
+                    }
                 }
                 Box(Modifier.fillMaxWidth().height(1.dp).background(DuoDivider))
 
@@ -1719,6 +1782,10 @@ fun PlayerConsoleScreen(
                             watchLaterFocus = watchLaterFocus,
                             shareFocus = shareFocus,
                             downloadFocus = downloadFocus,
+                            pgcFollowed = pgcFollowed,
+                            pgcFollowBusy = pgcFollowBusy,
+                            onPgcFollow = { togglePgcFollow() },
+                            pgcFollowFocus = pgcFollowFocus,
                             onDownload = { startDownload() },
                             onPlay = { controller.togglePlay() },
                             onUploaderClick = { ownerMid?.let(onUploaderClick) },
@@ -1731,6 +1798,18 @@ fun PlayerConsoleScreen(
                             isPgc = ui.isPgc,
                             currentCid = ui.currentPage?.cid,
                             onSelect = { switchPage(it) },
+                        )
+                        TAB_SEASON -> SeasonTab(
+                            episodes = seasonEpisodes,
+                            currentBvid = ui.videoInfo?.bvid.orEmpty(),
+                            currentCid = ui.currentPage?.cid ?: 0L,
+                            firstFocus = seasonFirstFocus,
+                            tabFocus = tabFocus[TAB_SEASON],
+                            onPlay = { episode ->
+                                controller.reportNow()
+                                selectedTab = TAB_INTRO
+                                vm.load(episode.bvid, episode.cid.takeIf { it > 0L })
+                            },
                         )
                     }
                 }
@@ -2282,17 +2361,30 @@ fun PlayerConsoleScreen(
     if (overlay == DuoOverlay.SETTINGS) {
         val danmakuFirstFocus = remember { FocusRequester() }
         val subtitleFirstFocus = remember { FocusRequester() }
+        val filterFirstFocus = remember { FocusRequester() }
         val sectionTabFocus = remember { List(2) { FocusRequester() } }
         val blockedFieldFocus = remember { FocusRequester() }
+        val regexFieldFocus = remember { FocusRequester() }
+        val authorFirstFocus = remember { FocusRequester() }
         var settingsSection by remember { mutableIntStateOf(0) }
-        var editingBlocked by remember { mutableStateOf(false) }
+        // 0 main, 1 filter page, 2 blocked words, 3 regex, 4 blocked authors.
+        var settingsPage by remember { mutableIntStateOf(0) }
+        val editingBlocked = settingsPage == 2
+        val editingRegex = settingsPage == 3
         var blockedDraft by remember { mutableStateOf("") }
+        var regexDraft by remember { mutableStateOf("") }
         val keyboard = LocalSoftwareKeyboardController.current
         val hasSubtitles = ui.availableSubtitles.isNotEmpty()
 
         fun applyBlockedWords() {
             vm.setDanmakuBlockedWords(parseBlockedDanmakuWords(blockedDraft))
-            editingBlocked = false
+            settingsPage = 0
+            keyboard?.hide()
+        }
+
+        fun applyRegex() {
+            vm.setDanmakuBlockedRegex(regexDraft.trim())
+            settingsPage = 1
             keyboard?.hide()
         }
 
@@ -2343,41 +2435,66 @@ fun PlayerConsoleScreen(
             }
         }
 
-        LaunchedEffect(focusEpoch, editingBlocked) {
+        LaunchedEffect(focusEpoch, settingsPage) {
             delay(120L)
-            if (editingBlocked) {
-                runCatching { blockedFieldFocus.requestFocus() }
-                delay(60L)
-                DuoImeState.onShown()
-                keyboard?.show()
-            } else {
-                runCatching { danmakuFirstFocus.requestFocus() }
+            when (settingsPage) {
+                2 -> {
+                    runCatching { blockedFieldFocus.requestFocus() }
+                    delay(60L)
+                    DuoImeState.onShown()
+                    keyboard?.show()
+                }
+                3 -> {
+                    runCatching { regexFieldFocus.requestFocus() }
+                    delay(60L)
+                    DuoImeState.onShown()
+                    keyboard?.show()
+                }
+                1 -> runCatching { filterFirstFocus.requestFocus() }
+                4 -> runCatching { authorFirstFocus.requestFocus() }
+                else -> runCatching { danmakuFirstFocus.requestFocus() }
             }
         }
-        LaunchedEffect(editingBlocked) {
-            if (editingBlocked) {
-                blockedDraft = ui.danmakuBlockedWords.joinToString(",")
-            } else {
+        LaunchedEffect(settingsPage) {
+            when (settingsPage) {
+                2 -> blockedDraft = ui.danmakuBlockedWords.joinToString(",")
+                3 -> regexDraft = ui.danmakuBlockedRegex
+            }
+            if (settingsPage != 2 && settingsPage != 3) {
                 keyboard?.hide()
             }
         }
-        DisposableEffect(editingBlocked) {
-            if (editingBlocked) {
-                session.setOverlayBackInterceptor {
-                    editingBlocked = false
+        DisposableEffect(settingsPage) {
+            when (settingsPage) {
+                1, 2 -> session.setOverlayBackInterceptor {
+                    settingsPage = 0
                     true
                 }
+                3 -> session.setOverlayBackInterceptor {
+                    settingsPage = 1
+                    true
+                }
+                4 -> session.setOverlayBackInterceptor {
+                    settingsPage = 1
+                    true
+                }
+                else -> session.setOverlayBackInterceptor(null)
             }
             onDispose { session.setOverlayBackInterceptor(null) }
         }
 
         OverlayCard(
-            title = if (editingBlocked) "屏蔽词" else "播放设置",
+            title = when (settingsPage) {
+                1 -> "弹幕过滤"
+                2 -> "屏蔽词"
+                3 -> "正则屏蔽"
+                4 -> "屏蔽用户"
+                else -> "播放设置"
+            },
             onDismiss = { session.closeOverlay() },
-            // The settings menu is a single column; Left/Right must not move
-            // focus to the console behind the scrim. The section tabs handle
-            // their own Left/Right first (preview key).
-            modifier = if (editingBlocked) {
+            // Single-column pages swallow Left/Right so focus cannot leak to
+            // the console behind the scrim. Text editors keep them for the caret.
+            modifier = if (editingBlocked || editingRegex) {
                 Modifier
             } else {
                 Modifier.onKeyEvent { event ->
@@ -2388,46 +2505,13 @@ fun PlayerConsoleScreen(
         ) {
             if (editingBlocked) {
                 Column(Modifier.fillMaxWidth()) {
-                    val blockedFieldState = rememberDuoTextFieldState(initiallyEditing = true)
-                    DuoTextFieldGate(
-                        state = blockedFieldState,
+                    DanmakuFilterTextField(
+                        value = blockedDraft,
+                        onValueChange = { blockedDraft = it },
+                        label = "用逗号或空格分隔",
                         focusRequester = blockedFieldFocus,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) { editing, gateFocused, fieldModifier ->
-                        OutlinedTextField(
-                            value = blockedDraft,
-                            onValueChange = { blockedDraft = it },
-                            enabled = editing,
-                            label = { Text("用逗号或空格分隔", fontSize = 11.sp) },
-                            singleLine = true,
-                            textStyle = androidx.compose.ui.text.TextStyle(
-                                color = DuoTextPrimary,
-                                fontSize = 12.sp,
-                            ),
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                            keyboardActions = KeyboardActions(onDone = { applyBlockedWords() }),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = DuoTextPrimary,
-                                unfocusedTextColor = DuoTextPrimary,
-                                disabledTextColor = DuoTextPrimary,
-                                focusedContainerColor = DuoSurfaceHigh,
-                                unfocusedContainerColor = DuoSurfaceHigh,
-                                disabledContainerColor = DuoSurfaceHigh,
-                                focusedBorderColor = DuoPink,
-                                unfocusedBorderColor = DuoDivider,
-                                disabledBorderColor = if (gateFocused) DuoPink else DuoDivider,
-                                focusedLabelColor = DuoPink,
-                                unfocusedLabelColor = DuoTextSecondary,
-                                disabledLabelColor = if (gateFocused) DuoPink else DuoTextSecondary,
-                                cursorColor = DuoPink,
-                            ),
-                            shape = RoundedCornerShape(6.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .then(fieldModifier)
-                                .then(if (editing) Modifier.duoTextFieldNavigation() else Modifier),
-                        )
-                    }
+                        onDone = { applyBlockedWords() },
+                    )
                     Spacer(Modifier.height(8.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OverlayActionButton(
@@ -2435,7 +2519,7 @@ fun PlayerConsoleScreen(
                             primary = false,
                             modifier = Modifier.weight(1f),
                             onClick = {
-                                editingBlocked = false
+                                settingsPage = 0
                                 keyboard?.hide()
                             },
                         )
@@ -2452,6 +2536,169 @@ fun PlayerConsoleScreen(
                         color = DuoTextTertiary,
                         fontSize = 10.sp,
                     )
+                }
+            } else if (editingRegex) {
+                Column(Modifier.fillMaxWidth()) {
+                    DanmakuFilterTextField(
+                        value = regexDraft,
+                        onValueChange = { regexDraft = it },
+                        label = "例如 ^\\d+$|广告",
+                        focusRequester = regexFieldFocus,
+                        onDone = { applyRegex() },
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OverlayActionButton(
+                            text = "取消",
+                            primary = false,
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                settingsPage = 1
+                                keyboard?.hide()
+                            },
+                        )
+                        OverlayActionButton(
+                            text = "保存",
+                            primary = true,
+                            modifier = Modifier.weight(1f),
+                            onClick = { applyRegex() },
+                        )
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = "留空表示不启用；无效表达式会被忽略",
+                        color = DuoTextTertiary,
+                        fontSize = 10.sp,
+                    )
+                }
+            } else if (settingsPage == 1) {
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                ) {
+                    DanmakuSettingRow(
+                        label = "屏蔽等级",
+                        value = danmakuShieldLevelLabel(ui.danmakuShieldLevel),
+                        focusRequester = filterFirstFocus,
+                        modifier = Modifier
+                            .focusProperties { up = FocusRequester.Cancel }
+                            .onPreviewKeyEvent { event ->
+                                if (event.type != KeyEventType.KeyDown) {
+                                    false
+                                } else {
+                                    when (event.key) {
+                                        Key.DirectionLeft -> {
+                                            vm.setDanmakuShieldLevel(
+                                                (ui.danmakuShieldLevel - 1).coerceAtLeast(0)
+                                            )
+                                            true
+                                        }
+                                        Key.DirectionRight -> {
+                                            vm.setDanmakuShieldLevel(
+                                                (ui.danmakuShieldLevel + 1).coerceAtMost(10)
+                                            )
+                                            true
+                                        }
+                                        else -> false
+                                    }
+                                }
+                            },
+                        onClick = {
+                            vm.setDanmakuShieldLevel(nextDanmakuShieldLevel(ui.danmakuShieldLevel))
+                        },
+                    )
+                    DanmakuSettingRow(
+                        label = "滚动弹幕",
+                        value = if (ui.danmakuShowScroll) "开" else "关",
+                        onClick = { vm.setDanmakuShowScroll(!ui.danmakuShowScroll) },
+                    )
+                    DanmakuSettingRow(
+                        label = "顶部弹幕",
+                        value = if (ui.danmakuShowTop) "开" else "关",
+                        onClick = { vm.setDanmakuShowTop(!ui.danmakuShowTop) },
+                    )
+                    DanmakuSettingRow(
+                        label = "底部弹幕",
+                        value = if (ui.danmakuShowBottom) "开" else "关",
+                        onClick = { vm.setDanmakuShowBottom(!ui.danmakuShowBottom) },
+                    )
+                    DanmakuSettingRow(
+                        label = "正则屏蔽",
+                        value = if (ui.danmakuBlockedRegex.isBlank()) "未设置" else "已设置",
+                        onClick = {
+                            regexDraft = ui.danmakuBlockedRegex
+                            settingsPage = 3
+                        },
+                    )
+                    DanmakuSettingRow(
+                        label = "屏蔽用户",
+                        value = if (ui.danmakuBlockedUidHashes.isEmpty()) {
+                            "未设置"
+                        } else {
+                            "${ui.danmakuBlockedUidHashes.size} 人"
+                        },
+                        modifier = Modifier.focusProperties { down = FocusRequester.Cancel },
+                        onClick = { settingsPage = 4 },
+                    )
+                    Text(
+                        text = "←/→ 调等级 · 等级 0 不过滤，数值越高保留越少",
+                        color = DuoTextTertiary,
+                        fontSize = 9.sp,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                    )
+                }
+            } else if (settingsPage == 4) {
+                val authorScroll = rememberScrollState()
+                val authors = remember(ui.danmaku, ui.danmakuBlockedUidHashes) {
+                    buildDanmakuAuthorList(ui.danmaku, ui.danmakuBlockedUidHashes)
+                }
+                Column(Modifier.fillMaxWidth()) {
+                    if (authors.isEmpty()) {
+                        Text(
+                            text = "当前视频暂无可选弹幕\n看完一段后再打开可列出弹幕作者",
+                            color = DuoTextSecondary,
+                            fontSize = 12.sp,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .focusRequester(authorFirstFocus)
+                                .focusProperties {
+                                    up = FocusRequester.Cancel
+                                    down = FocusRequester.Cancel
+                                }
+                                .duoFocusRing(RoundedCornerShape(6.dp))
+                                .focusable()
+                                .padding(horizontal = 10.dp, vertical = 12.dp),
+                        )
+                    } else {
+                        Column(
+                            Modifier
+                                .fillMaxWidth()
+                                .verticalScroll(authorScroll)
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                        ) {
+                            authors.forEachIndexed { index, author ->
+                                val edgeModifier = when {
+                                    index == 0 && index == authors.lastIndex ->
+                                        Modifier.focusProperties {
+                                            up = FocusRequester.Cancel
+                                            down = FocusRequester.Cancel
+                                        }
+                                    index == 0 ->
+                                        Modifier.focusProperties { up = FocusRequester.Cancel }
+                                    index == authors.lastIndex ->
+                                        Modifier.focusProperties { down = FocusRequester.Cancel }
+                                    else -> Modifier
+                                }
+                                DanmakuAuthorRow(
+                                    author = author,
+                                    focusRequester = if (index == 0) authorFirstFocus else null,
+                                    modifier = edgeModifier,
+                                    onClick = { vm.toggleDanmakuBlockedUid(author.uidHash) },
+                                )
+                            }
+                        }
+                    }
                 }
             } else {
                 Column(
@@ -2511,7 +2758,7 @@ fun PlayerConsoleScreen(
                         )
                     }
                     Text(
-                        text = "L1/R1 切标签 · 方向键选择 · A 关闭",
+                        text = "L1/R1 切标签 · 方向键选择 · ${gamepadStyle.backLabel} 关闭",
                         color = DuoTextTertiary,
                         fontSize = 9.sp,
                         modifier = Modifier.padding(top = 2.dp, bottom = 2.dp),
@@ -2568,17 +2815,28 @@ fun PlayerConsoleScreen(
                             } else {
                                 "${ui.danmakuBlockedWords.size} 个"
                             },
-                            onClick = { editingBlocked = true },
+                            onClick = { settingsPage = 2 },
                         )
                         DanmakuSettingRow(
                             label = "同屏上限",
                             value = danmakuMaxOnScreenLabel(ui.danmakuMaxOnScreen),
-                            modifier = Modifier.focusProperties { down = FocusRequester.Cancel },
                             onClick = {
                                 vm.setDanmakuMaxOnScreen(
                                     nextDanmakuMaxOnScreen(ui.danmakuMaxOnScreen)
                                 )
                             },
+                        )
+                        DanmakuSettingRow(
+                            label = "弹幕过滤",
+                            value = danmakuFilterSummary(
+                                shieldLevel = ui.danmakuShieldLevel,
+                                showScroll = ui.danmakuShowScroll,
+                                showTop = ui.danmakuShowTop,
+                                showBottom = ui.danmakuShowBottom,
+                                hasRegex = ui.danmakuBlockedRegex.isNotBlank(),
+                            ),
+                            modifier = Modifier.focusProperties { down = FocusRequester.Cancel },
+                            onClick = { settingsPage = 1 },
                         )
                     } else if (!hasSubtitles) {
                         Text(
@@ -2723,6 +2981,10 @@ private fun IntroTab(
     watchLaterFocus: FocusRequester,
     shareFocus: FocusRequester,
     downloadFocus: FocusRequester,
+    pgcFollowed: Boolean?,
+    pgcFollowBusy: Boolean,
+    onPgcFollow: () -> Unit,
+    pgcFollowFocus: FocusRequester,
     onDownload: () -> Unit,
     onPlay: () -> Unit,
     onUploaderClick: () -> Unit = {},
@@ -2739,19 +3001,25 @@ private fun IntroTab(
     ) {
         if (info == null) {
             Text(
-                text = uiState.title.ifBlank { "本地视频" },
+                text = uiState.title.ifBlank { if (isPgc) "番剧" else "本地视频" },
                 color = DuoTextPrimary,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                text = "本地下载播放 · 暂无在线简介",
+                text = if (isPgc) {
+                    "该番剧暂无可播放剧集"
+                } else {
+                    "本地下载播放 · 暂无在线简介"
+                },
                 color = DuoTextSecondary,
                 fontSize = 11.sp,
             )
-            Spacer(Modifier.height(8.dp))
-            TextButton(onClick = onPlay) { Text("播放 / 暂停", color = DuoPink) }
+            if (!isPgc) {
+                Spacer(Modifier.height(8.dp))
+                TextButton(onClick = onPlay) { Text("播放 / 暂停", color = DuoPink) }
+            }
         } else {
             Row(verticalAlignment = Alignment.Top) {
             AsyncImage(
@@ -2955,6 +3223,24 @@ private fun IntroTab(
 
         Spacer(Modifier.height(6.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            if (isPgc) {
+                ActionPill(
+                    icon = if (pgcFollowed == true) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                    text = when {
+                        pgcFollowBusy -> "处理中"
+                        pgcFollowed == true -> "已追番"
+                        else -> "追番"
+                    },
+                    active = pgcFollowed == true,
+                    onClick = onPgcFollow,
+                    focusRequester = pgcFollowFocus,
+                    modifier = Modifier.focusProperties {
+                        up = upFocus
+                        right = watchLaterFocus
+                        down = FocusRequester.Cancel
+                    },
+                )
+            }
             ActionPill(
                 icon = Icons.Outlined.WatchLater,
                 text = if (watchLaterBusy) "处理中" else "稍后再看",
@@ -2963,6 +3249,7 @@ private fun IntroTab(
                 focusRequester = watchLaterFocus,
                 modifier = Modifier.focusProperties {
                     up = if (isPgc) upFocus else likeFocus
+                    left = if (isPgc) pgcFollowFocus else FocusRequester.Cancel
                     right = shareFocus
                     down = FocusRequester.Cancel
                 },
@@ -3721,6 +4008,99 @@ private fun PartsTab(
 }
 
 @Composable
+private fun SeasonTab(
+    episodes: List<SeasonEpisodeUi>,
+    currentBvid: String,
+    currentCid: Long,
+    firstFocus: FocusRequester,
+    tabFocus: FocusRequester,
+    onPlay: (SeasonEpisodeUi) -> Unit,
+) {
+    if (episodes.isEmpty()) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text("暂无合集", color = DuoTextSecondary, fontSize = 11.sp)
+        }
+        return
+    }
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp),
+        contentPadding = PaddingValues(top = 8.dp, bottom = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        episodes.forEachIndexed { index, episode ->
+            val previousSection = episodes.getOrNull(index - 1)?.sectionTitle.orEmpty()
+            if (index == 0 || episode.sectionTitle != previousSection) {
+                item(key = "season_header_${index}_${episode.sectionTitle}") {
+                    Text(
+                        text = episode.sectionTitle.ifBlank { "合集" },
+                        color = DuoTextPrimary,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp),
+                    )
+                }
+            }
+            item(key = "season_${episode.bvid}_${episode.cid}_$index") {
+                var focused by remember { mutableStateOf(false) }
+                val current = episode.bvid == currentBvid &&
+                    (currentCid <= 0L || episode.cid == currentCid)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .then(
+                            if (index == 0) Modifier.focusRequester(firstFocus) else Modifier
+                        )
+                        .onFocusChanged { focused = it.isFocused }
+                        .focusProperties {
+                            if (index == 0) up = tabFocus
+                            if (index == episodes.lastIndex) down = FocusRequester.Cancel
+                        }
+                        .duoFocusRing(RoundedCornerShape(6.dp), focused = focused)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(
+                            if (current) DuoPink.copy(alpha = 0.14f) else Color.Transparent
+                        )
+                        .duoClickable { onPlay(episode) }
+                        .padding(horizontal = 8.dp, vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "${index + 1}",
+                        color = if (current) DuoPink else DuoTextSecondary,
+                        fontSize = 9.sp,
+                        modifier = Modifier.width(24.dp),
+                    )
+                    Text(
+                        text = episode.title,
+                        color = if (current) DuoTheme.colors.pinkInk else DuoTextSecondary,
+                        fontSize = 11.sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (current) {
+                        Text(
+                            text = "播放中",
+                            color = DuoPink,
+                            fontSize = 8.sp,
+                            modifier = Modifier.padding(start = 6.dp),
+                        )
+                    }
+                    if (episode.durationSeconds > 0) {
+                        Text(
+                            text = formatTime(episode.durationSeconds * 1000L),
+                            color = DuoTextSecondary,
+                            fontSize = 9.sp,
+                            modifier = Modifier.padding(start = 6.dp),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun CommentPicturesRow(
     pictures: List<CommentPicture>,
     onOpenImages: (List<CommentPicture>, Int) -> Unit,
@@ -3763,6 +4143,7 @@ private fun CommentImageViewerOverlay(
     var index by remember(pictures) {
         mutableIntStateOf(initialIndex.coerceIn(0, pictures.lastIndex.coerceAtLeast(0)))
     }
+    val gamepadStyle by GamepadStyleStore.style.collectAsState()
     val zoom = rememberImageZoomState()
     LaunchedEffect(index) { zoom.reset() }
     val focus = remember { FocusRequester() }
@@ -3860,7 +4241,8 @@ private fun CommentImageViewerOverlay(
             )
         }
         Text(
-            text = "方向键切换 · R2/L2 缩放 · 左摇杆/拖动移动 · 双指缩放 · A 关闭",
+            text = "方向键切换 · R2/L2 缩放 · 左摇杆/拖动移动 · 双指缩放 · " +
+                "${gamepadStyle.backLabel} 关闭",
             color = DuoTextTertiary,
             fontSize = 9.sp,
             modifier = Modifier
@@ -4187,7 +4569,7 @@ private fun OverlayCard(
         Column(
             modifier = Modifier
                 .width(380.dp)
-                .heightIn(max = 400.dp)
+                .heightIn(max = 440.dp)
                 .clip(RoundedCornerShape(10.dp))
                 .background(DuoSurface)
                 .clickable { /* consume */ }
@@ -4418,6 +4800,99 @@ private fun ConsoleIconChip(
 }
 
 @Composable
+private fun DanmakuFilterTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    focusRequester: FocusRequester,
+    onDone: () -> Unit,
+) {
+    val fieldState = rememberDuoTextFieldState(initiallyEditing = true)
+    DuoTextFieldGate(
+        state = fieldState,
+        focusRequester = focusRequester,
+        modifier = Modifier.fillMaxWidth(),
+    ) { editing, gateFocused, fieldModifier ->
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            enabled = editing,
+            label = { Text(label, fontSize = 11.sp) },
+            singleLine = true,
+            textStyle = androidx.compose.ui.text.TextStyle(
+                color = DuoTextPrimary,
+                fontSize = 12.sp,
+            ),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { onDone() }),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = DuoTextPrimary,
+                unfocusedTextColor = DuoTextPrimary,
+                disabledTextColor = DuoTextPrimary,
+                focusedContainerColor = DuoSurfaceHigh,
+                unfocusedContainerColor = DuoSurfaceHigh,
+                disabledContainerColor = DuoSurfaceHigh,
+                focusedBorderColor = DuoPink,
+                unfocusedBorderColor = DuoDivider,
+                disabledBorderColor = if (gateFocused) DuoPink else DuoDivider,
+                focusedLabelColor = DuoPink,
+                unfocusedLabelColor = DuoTextSecondary,
+                disabledLabelColor = if (gateFocused) DuoPink else DuoTextSecondary,
+                cursorColor = DuoPink,
+            ),
+            shape = RoundedCornerShape(6.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .then(fieldModifier)
+                .then(if (editing) Modifier.duoTextFieldNavigation() else Modifier),
+        )
+    }
+}
+
+@Composable
+private fun DanmakuAuthorRow(
+    author: DanmakuAuthorUi,
+    focusRequester: FocusRequester?,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .duoFocusRing(RoundedCornerShape(6.dp))
+            .clip(RoundedCornerShape(6.dp))
+            .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
+            .duoClickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = if (author.blocked) "已屏蔽 · 用户 …${author.shortId}" else "用户 …${author.shortId}",
+                color = if (author.blocked) DuoPink else DuoTextPrimary,
+                fontSize = 12.sp,
+            )
+            Text(
+                text = when {
+                    author.sample.isNotBlank() -> "「${author.sample}」"
+                    author.count == 0 -> "不在当前弹幕中"
+                    else -> "共 ${author.count} 条弹幕"
+                },
+                color = DuoTextTertiary,
+                fontSize = 10.sp,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            )
+        }
+        Text(
+            text = if (author.blocked) "恢复" else "屏蔽",
+            color = if (author.blocked) DuoPink else DuoTextSecondary,
+            fontSize = 11.sp,
+        )
+    }
+}
+
+@Composable
 private fun DanmakuSettingRow(
     label: String,
     value: String,
@@ -4432,7 +4907,7 @@ private fun DanmakuSettingRow(
             .clip(RoundedCornerShape(6.dp))
             .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
             .duoClickable(onClick = onClick)
-            .padding(horizontal = 10.dp, vertical = 9.dp),
+            .padding(horizontal = 10.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -4453,6 +4928,64 @@ private val danmakuMaxOnScreenOptions = listOf(0, 30, 60, 100)
 private val subtitleTextSizeOptions = listOf(18f, 22f, 26f, 30f)
 private val subtitleBackgroundOptions = listOf(0f, 0.35f, 0.55f, 0.8f)
 private val subtitleBottomPaddingOptions = listOf(32, 58, 90)
+
+private fun danmakuShieldLevelLabel(level: Int): String =
+    if (level <= 0) "不过滤" else "等级 $level"
+
+private data class DanmakuAuthorUi(
+    val uidHash: String,
+    val sample: String,
+    val count: Int,
+    val blocked: Boolean,
+) {
+    /** The hash is already one-way; show its tail so authors stay distinguishable. */
+    val shortId: String get() = uidHash.takeLast(4)
+}
+
+/**
+ * Builds the author list for the user-block page. Authors with current danmaku
+ * come first; hashes blocked in earlier videos stay listed so they can be restored.
+ */
+private fun buildDanmakuAuthorList(
+    items: List<DanmakuItem>,
+    blockedHashes: Set<String>,
+    limit: Int = 60,
+): List<DanmakuAuthorUi> {
+    val grouped = LinkedHashMap<String, MutableList<DanmakuItem>>()
+    for (item in items) {
+        if (item.uidHash.isBlank()) continue
+        grouped.getOrPut(item.uidHash) { mutableListOf() }.add(item)
+    }
+    val active = grouped.entries
+        .map { (hash, list) ->
+            DanmakuAuthorUi(hash, list.first().text.take(24), list.size, hash in blockedHashes)
+        }
+        .sortedByDescending { it.count }
+        .take(limit)
+    val missing = blockedHashes
+        .filter { it !in grouped }
+        .map { DanmakuAuthorUi(it, "", 0, true) }
+        .sortedBy { it.shortId }
+    return active + missing
+}
+
+private fun nextDanmakuShieldLevel(current: Int): Int =
+    if (current >= 10) 0 else current + 1
+
+private fun danmakuFilterSummary(
+    shieldLevel: Int,
+    showScroll: Boolean,
+    showTop: Boolean,
+    showBottom: Boolean,
+    hasRegex: Boolean,
+): String {
+    val parts = buildList {
+        if (shieldLevel > 0) add("等级 $shieldLevel")
+        if (!showScroll || !showTop || !showBottom) add("类型")
+        if (hasRegex) add("正则")
+    }
+    return if (parts.isEmpty()) "未设置" else parts.joinToString(" · ")
+}
 
 @Composable
 private fun OverlayActionButton(

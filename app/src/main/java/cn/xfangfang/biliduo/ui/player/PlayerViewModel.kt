@@ -22,6 +22,7 @@ import cn.xfangfang.biliduo.data.repository.PlaybackMeta
 import com.google.gson.Gson
 import java.io.File
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
@@ -76,6 +77,14 @@ data class PlayerUiState(
     val danmakuTextSize: Float = 16f,
     val danmakuArea: Float = 1f,
     val danmakuBlockedWords: Set<String> = emptySet(),
+    val danmakuBlockedRegex: String = "",
+    /** Official-style shield level 0–10; keeps weight >= level (0 = off). */
+    val danmakuShieldLevel: Int = 0,
+    val danmakuShowScroll: Boolean = true,
+    val danmakuShowTop: Boolean = true,
+    val danmakuShowBottom: Boolean = true,
+    /** Per-author hash from the danmaku XML; never a real uid. */
+    val danmakuBlockedUidHashes: Set<String> = emptySet(),
     /** 0 = unlimited. */
     val danmakuMaxOnScreen: Int = 0,
     /** Live danmaku has its own appearance; no blocked-word/max settings. */
@@ -140,6 +149,12 @@ class PlayerViewModel(
             danmakuTextSize = saved.textSizeSp,
             danmakuArea = saved.area,
             danmakuBlockedWords = saved.blockedWords,
+            danmakuBlockedRegex = saved.blockedRegex,
+            danmakuShieldLevel = saved.shieldLevel,
+            danmakuShowScroll = saved.showScroll,
+            danmakuShowTop = saved.showTop,
+            danmakuShowBottom = saved.showBottom,
+            danmakuBlockedUidHashes = saved.blockedUidHashes,
             danmakuMaxOnScreen = saved.maxOnScreen,
             liveDanmakuEnabled = saved.liveEnabled,
             liveDanmakuOpacity = saved.liveOpacity,
@@ -210,6 +225,7 @@ class PlayerViewModel(
         playUrlJob?.cancel()
         metaJob?.cancel()
         metaJob = null
+        danmakuJob?.cancel()
         liveJob?.cancel()
         cachedDashData = null
         loadJob = viewModelScope.launch {
@@ -235,6 +251,7 @@ class PlayerViewModel(
                     subtitleUris = current.subtitleUris,
                     videoPath = current.filePath,
                 )
+                val localDanmaku = loadLocalDanmaku(current.danmakuUri)
 
                 val aid = current.aid
                 val resumeMs = (playbackProgressManager.load(aid, current.cid) ?: 0L) * 1000L
@@ -264,7 +281,8 @@ class PlayerViewModel(
                         subtitleTextSizeSp = videoDefaults.subtitleTextSizeSp,
                         subtitleBackgroundAlpha = videoDefaults.subtitleBackgroundAlpha,
                         subtitleBottomPaddingDp = videoDefaults.subtitleBottomPaddingDp,
-                        resumePositionMs = resumeMs
+                        resumePositionMs = resumeMs,
+                        danmaku = localDanmaku,
                     )
                 )
                 Log.d(BilibiliApp.TAG, "LOCAL load result: enabled=$enabled currentSub=${currentSub?.lan} subtitleEnabled=$enabled subTracks=${subTracks.size}")
@@ -479,7 +497,8 @@ class PlayerViewModel(
                     if (episodes.isEmpty()) {
                         _uiState.value = _uiState.value.copy(
                             isLoading = false,
-                            error = "该番剧暂无可播放剧集，可能需要大会员",
+                            title = detail.title,
+                            error = "该番剧暂无可播放剧集（可能尚未开播或需要大会员）",
                         )
                         return@onSuccess
                     }
@@ -645,6 +664,7 @@ class PlayerViewModel(
                 subtitleOffsetY = 0f,
                 danmaku = emptyList()
             )
+            loadLocalDanmakuAsync(downloadInfo?.danmakuUri)
             Log.d(BilibiliApp.TAG, "selectPage LOCAL result: enabled=$enabled currentSub=${currentSub?.lan} subtitleEnabled=$enabled subTracks=${subTracks.size}")
             return
         }
@@ -728,6 +748,30 @@ class PlayerViewModel(
         return tracks to cues
     }
 
+    private suspend fun loadLocalDanmaku(path: String?): List<DanmakuItem> {
+        if (path.isNullOrBlank()) return emptyList()
+        return withContext(Dispatchers.IO) {
+            runCatching {
+                val file = File(path)
+                if (!file.exists()) emptyList() else repository.parseDanmakuXmlText(file.readText())
+            }.getOrElse {
+                Log.w(BilibiliApp.TAG, "Local danmaku parse failed: ${it.message}")
+                emptyList()
+            }
+        }
+    }
+
+    private fun loadLocalDanmakuAsync(path: String?) {
+        danmakuJob?.cancel()
+        if (path.isNullOrBlank()) return
+        danmakuJob = viewModelScope.launch {
+            val items = loadLocalDanmaku(path)
+            if (items.isNotEmpty()) {
+                _uiState.value = _uiState.value.copy(danmaku = items)
+            }
+        }
+    }
+
     private fun withCurrentDanmakuSettings(state: PlayerUiState): PlayerUiState {
         val current = _uiState.value
         return state.copy(
@@ -737,6 +781,12 @@ class PlayerViewModel(
             danmakuTextSize = current.danmakuTextSize,
             danmakuArea = current.danmakuArea,
             danmakuBlockedWords = current.danmakuBlockedWords,
+            danmakuBlockedRegex = current.danmakuBlockedRegex,
+            danmakuShieldLevel = current.danmakuShieldLevel,
+            danmakuShowScroll = current.danmakuShowScroll,
+            danmakuShowTop = current.danmakuShowTop,
+            danmakuShowBottom = current.danmakuShowBottom,
+            danmakuBlockedUidHashes = current.danmakuBlockedUidHashes,
             danmakuMaxOnScreen = current.danmakuMaxOnScreen,
             liveDanmakuEnabled = current.liveDanmakuEnabled,
             liveDanmakuOpacity = current.liveDanmakuOpacity,
@@ -773,6 +823,34 @@ class PlayerViewModel(
     fun setDanmakuBlockedWords(words: Set<String>) {
         val sanitized = words.map { it.trim() }.filter { it.isNotEmpty() }.take(50).toSet()
         updateDanmakuState { it.copy(danmakuBlockedWords = sanitized) }
+    }
+
+    fun setDanmakuBlockedRegex(raw: String) {
+        updateDanmakuState { it.copy(danmakuBlockedRegex = raw.take(500)) }
+    }
+
+    fun setDanmakuShieldLevel(value: Int) {
+        updateDanmakuState { it.copy(danmakuShieldLevel = value.coerceIn(0, 10)) }
+    }
+
+    fun setDanmakuShowScroll(enabled: Boolean) {
+        updateDanmakuState { it.copy(danmakuShowScroll = enabled) }
+    }
+
+    fun setDanmakuShowTop(enabled: Boolean) {
+        updateDanmakuState { it.copy(danmakuShowTop = enabled) }
+    }
+
+    fun setDanmakuShowBottom(enabled: Boolean) {
+        updateDanmakuState { it.copy(danmakuShowBottom = enabled) }
+    }
+
+    fun toggleDanmakuBlockedUid(uidHash: String) {
+        val hash = uidHash.trim()
+        if (hash.isEmpty()) return
+        val current = _uiState.value.danmakuBlockedUidHashes
+        val next = if (hash in current) current - hash else current + hash
+        updateDanmakuState { it.copy(danmakuBlockedUidHashes = next.take(200).toSet()) }
     }
 
     fun setDanmakuMaxOnScreen(value: Int) {
@@ -824,6 +902,12 @@ class PlayerViewModel(
                 textSizeSp = state.danmakuTextSize,
                 area = state.danmakuArea,
                 blockedWords = state.danmakuBlockedWords,
+                blockedRegex = state.danmakuBlockedRegex,
+                shieldLevel = state.danmakuShieldLevel,
+                showScroll = state.danmakuShowScroll,
+                showTop = state.danmakuShowTop,
+                showBottom = state.danmakuShowBottom,
+                blockedUidHashes = state.danmakuBlockedUidHashes,
                 maxOnScreen = state.danmakuMaxOnScreen,
                 liveEnabled = state.liveDanmakuEnabled,
                 liveOpacity = state.liveDanmakuOpacity,

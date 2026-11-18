@@ -73,4 +73,18 @@ class GamepadStyleTest {
         assertNull(GamepadStyle.fromStorage(null))
         assertNull(GamepadStyle.fromStorage("switch"))
     }
+
+    @Test
+    fun `screen labels follow the physical face buttons`() {
+        // The device's printed face layout is X top / B bottom / Y left / A right.
+        assertEquals("B", GamepadStyle.XBOX.confirmLabel)
+        assertEquals("A", GamepadStyle.XBOX.backLabel)
+        assertEquals("Y", GamepadStyle.XBOX.actionLabel)
+        assertEquals("X", GamepadStyle.XBOX.unboundLabel)
+
+        assertEquals("A", GamepadStyle.RETRO.confirmLabel)
+        assertEquals("B", GamepadStyle.RETRO.backLabel)
+        assertEquals("X", GamepadStyle.RETRO.actionLabel)
+        assertEquals("Y", GamepadStyle.RETRO.unboundLabel)
+    }
 }

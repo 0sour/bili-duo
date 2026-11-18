@@ -24,6 +24,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.outlined.Bookmarks
 import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.History
@@ -95,6 +96,7 @@ fun ProfileScreen(
     onLoginClick: () -> Unit = {},
     onHistoryClick: () -> Unit = {},
     onWatchLaterClick: () -> Unit = {},
+    onMyFollowsClick: () -> Unit = {},
     onFavoritesClick: () -> Unit = {},
     onFollowingClick: () -> Unit = {},
     onDownloadsClick: () -> Unit = {},
@@ -109,7 +111,7 @@ fun ProfileScreen(
 ) {
     val state by profileStateWithLifecycleEvents(viewModel)
     var showLogoutConfirm by rememberSaveable { mutableStateOf(false) }
-    val menuFocuses = remember { List(6) { FocusRequester() } }
+    val menuFocuses = remember { List(7) { FocusRequester() } }
     val swapFocus = remember { FocusRequester() }
     val logoutFocus = remember { FocusRequester() }
     var restoreLogoutFocus by remember { mutableStateOf(false) }
@@ -247,6 +249,7 @@ fun ProfileScreen(
                 val entries = listOf(
                     ProfileMenuEntry("观看历史", Icons.Outlined.History, onHistoryClick),
                     ProfileMenuEntry("稍后再看", Icons.Outlined.WatchLater, onWatchLaterClick),
+                    ProfileMenuEntry("追番追剧", Icons.Outlined.Bookmarks, onMyFollowsClick),
                     ProfileMenuEntry("我的收藏", Icons.Outlined.FavoriteBorder, onFavoritesClick),
                     ProfileMenuEntry("我的关注", Icons.Outlined.PersonAdd, onFollowingClick),
                     ProfileMenuEntry("我的下载", Icons.Outlined.FileDownload, onDownloadsClick),

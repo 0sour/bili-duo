@@ -11,7 +11,11 @@ import cn.xfangfang.biliduo.data.local.PendingReportManager
 import cn.xfangfang.biliduo.data.model.*
 import cn.xfangfang.biliduo.util.cleanHtmlText
 import cn.xfangfang.biliduo.util.formatDuration
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
@@ -66,6 +70,24 @@ class BilibiliRepository(
         }.onFailure { Log.e(BilibiliApp.TAG, "searchUsers failed", it) }
     }
 
+    suspend fun searchPgc(
+        keyword: String,
+        searchType: String,
+        page: Int = 1,
+    ): Result<Pair<List<SearchPgcItem>, Int>> {
+        if (BuildConfig.DEBUG) Log.d(BilibiliApp.TAG, "searchPgc: keyword=$keyword type=$searchType page=$page")
+        return runCatching<Pair<List<SearchPgcItem>, Int>> {
+            val response = api.searchPgc(searchType = searchType, keyword = keyword, page = page)
+            if (BuildConfig.DEBUG) Log.d(BilibiliApp.TAG, "searchPgc response: code=${response.code} msg=${response.message}")
+            if (response.code == 0) {
+                val data = response.data
+                Pair(data?.result.orEmpty(), data?.totalPages ?: 1)
+            } else {
+                throw Exception(response.message)
+            }
+        }.onFailure { Log.e(BilibiliApp.TAG, "searchPgc failed", it) }
+    }
+
     suspend fun getHotSearches(limit: Int = 20): Result<List<String>> {
         return runCatching {
             val response = api.getSearchSquare(limit = limit)
@@ -84,15 +106,43 @@ class BilibiliRepository(
 
     suspend fun getVideoInfo(bvid: String): Result<VideoInfo> {
         if (BuildConfig.DEBUG) Log.d(BilibiliApp.TAG, "getVideoInfo: bvid=$bvid")
-        return runCatching {
-            val response = api.getVideoInfo(bvid)
-            if (BuildConfig.DEBUG) Log.d(BilibiliApp.TAG, "getVideoInfo response: code=${response.code} msg=${response.message}")
-            if (response.code == 0) {
-                response.data ?: throw Exception("Video not found")
-            } else {
-                throw Exception(response.message)
+        val cached = synchronized(videoInfoLock) {
+            videoInfoCache[bvid]
+                ?.takeIf { System.currentTimeMillis() - it.first < VIDEO_INFO_TTL_MS }
+                ?.second
+        }
+        if (cached != null) return Result.success(cached)
+
+        // The top-screen preview fetches the same detail ~250 ms after a card
+        // gains focus. Share that request/result with the player so pressing
+        // confirm does not start a second view round trip.
+        val deferred = synchronized(videoInfoLock) {
+            videoInfoInFlight[bvid] ?: videoInfoScope.async(start = CoroutineStart.LAZY) {
+                runCatching {
+                    val response = api.getVideoInfo(bvid)
+                    if (BuildConfig.DEBUG) Log.d(BilibiliApp.TAG, "getVideoInfo response: code=${response.code} msg=${response.message}")
+                    if (response.code == 0) {
+                        response.data ?: throw Exception("Video not found")
+                    } else {
+                        throw Exception(response.message)
+                    }
+                }.onFailure { Log.e(BilibiliApp.TAG, "getVideoInfo failed", it) }
+                    .onSuccess { info ->
+                        synchronized(videoInfoLock) {
+                            videoInfoCache[bvid] = System.currentTimeMillis() to info
+                        }
+                    }
+            }.also { job ->
+                videoInfoInFlight[bvid] = job
+                job.invokeOnCompletion {
+                    synchronized(videoInfoLock) {
+                        if (videoInfoInFlight[bvid] === job) videoInfoInFlight.remove(bvid)
+                    }
+                }
+                job.start()
             }
-        }.onFailure { Log.e(BilibiliApp.TAG, "getVideoInfo failed", it) }
+        }
+        return deferred.await()
     }
 
     suspend fun getRelatedVideos(bvid: String): Result<List<UserVideoItem>> {
@@ -124,28 +174,37 @@ class BilibiliRepository(
 
     suspend fun getDanmaku(cid: Long): Result<List<DanmakuItem>> {
         if (BuildConfig.DEBUG) Log.d(BilibiliApp.TAG, "getDanmaku: cid=$cid")
-        return runCatching {
-            val response = api.getDanmakuXml(cid)
-            if (!response.isSuccessful) throw Exception("弹幕 HTTP ${response.code()}")
-            val body = response.body() ?: throw Exception("弹幕为空")
-            val raw = body.bytes()
-            val encoding = response.headers()["Content-Encoding"].orEmpty().lowercase()
-            val bytes = when (encoding) {
-                "deflate" -> {
-                    // B 站 dm/list.so 返回 raw deflate（无 zlib 头），个别 CDN 节点
-                    // 仍带 zlib 头，所以先按 raw 解，失败再退回带头的解一次。
-                    val inflated = runCatching { inflate(raw, nowrap = true) }
-                        .getOrDefault(ByteArray(0))
-                    if (inflated.isNotEmpty()) inflated else inflate(raw, nowrap = false)
-                }
-                "gzip" -> GZIPInputStream(raw.inputStream()).use { it.readBytes() }
-                else -> raw
+        return getDanmakuXmlText(cid)
+            .map { xml -> parseDanmakuXml(xml) }
+            .onSuccess { items ->
+                if (BuildConfig.DEBUG) Log.d(BilibiliApp.TAG, "getDanmaku: ${items.size} items")
             }
-            val items = parseDanmakuXml(String(bytes, Charsets.UTF_8))
-            if (BuildConfig.DEBUG) Log.d(BilibiliApp.TAG, "getDanmaku: ${items.size} items")
-            items
-        }.onFailure { Log.e(BilibiliApp.TAG, "getDanmaku failed", it) }
+            .onFailure { Log.e(BilibiliApp.TAG, "getDanmaku failed", it) }
     }
+
+    /** Decompressed XML for offline downloads; parsed later by [parseDanmakuXmlText]. */
+    suspend fun getDanmakuXmlText(cid: Long): Result<String> = runCatching {
+        val response = api.getDanmakuXml(cid)
+        if (!response.isSuccessful) throw Exception("弹幕 HTTP ${response.code()}")
+        val body = response.body() ?: throw Exception("弹幕为空")
+        val raw = body.bytes()
+        val encoding = response.headers()["Content-Encoding"].orEmpty().lowercase()
+        val bytes = when (encoding) {
+            "deflate" -> {
+                // B 站 dm/list.so 返回 raw deflate（无 zlib 头），个别 CDN 节点
+                // 仍带 zlib 头，所以先按 raw 解，失败再退回带头的解一次。
+                val inflated = runCatching { inflate(raw, nowrap = true) }
+                    .getOrDefault(ByteArray(0))
+                if (inflated.isNotEmpty()) inflated else inflate(raw, nowrap = false)
+            }
+            "gzip" -> GZIPInputStream(raw.inputStream()).use { it.readBytes() }
+            else -> raw
+        }
+        String(bytes, Charsets.UTF_8)
+    }
+
+    /** Parses a saved danmaku XML file (offline playback). */
+    fun parseDanmakuXmlText(xml: String): List<DanmakuItem> = parseDanmakuXml(xml)
 
     private fun inflate(data: ByteArray, nowrap: Boolean): ByteArray {
         val inflater = Inflater(nowrap)
@@ -186,6 +245,8 @@ class BilibiliRepository(
                             fontSize = parts.getOrNull(2)?.toFloatOrNull() ?: 25f,
                             color = (parts.getOrNull(3)?.toLongOrNull() ?: 0xFFFFFFL).toInt() and 0xFFFFFF,
                             text = text,
+                            weight = parts.getOrNull(8)?.toIntOrNull() ?: 0,
+                            uidHash = parts.getOrNull(6).orEmpty(),
                         )
                     }
                 }
@@ -265,6 +326,57 @@ class BilibiliRepository(
             if (response.code != 0) throw Exception(response.message)
             response.result ?: throw Exception("番剧信息为空")
         }.onFailure { Log.e(BilibiliApp.TAG, "getPgcSeason failed", it) }
+    }
+
+    suspend fun getPgcFollowStatus(seasonId: Long): Result<Boolean> {
+        if (seasonId <= 0L) return Result.success(false)
+        if (BilibiliApi.loginCookies.isBlank()) return Result.success(false)
+        return runCatching {
+            val response = api.getPgcFollowStatus(seasonId)
+            if (response.code != 0) throw Exception(response.message)
+            response.result?.follow == 1
+        }.onFailure { Log.e(BilibiliApp.TAG, "getPgcFollowStatus failed", it) }
+    }
+
+    suspend fun setPgcFollow(seasonId: Long, follow: Boolean): Result<Unit> {
+        if (BuildConfig.DEBUG) Log.d(BilibiliApp.TAG, "setPgcFollow: seasonId=$seasonId follow=$follow")
+        return runCatching {
+            if (BilibiliApi.loginCookies.isBlank() || BilibiliApi.biliJct.isBlank()) {
+                throw Exception("请先登录")
+            }
+            if (seasonId <= 0L) throw Exception("无法追番")
+            val csrf = BilibiliApi.biliJct
+            val response = if (follow) {
+                api.addPgcFollow(seasonId = seasonId, csrf = csrf)
+            } else {
+                api.removePgcFollow(seasonId = seasonId, csrf = csrf)
+            }
+            if (response.code == 0) Unit else throw Exception(response.message)
+        }.onFailure { Log.e(BilibiliApp.TAG, "setPgcFollow failed", it) }
+    }
+
+    suspend fun getPgcFollows(
+        type: Int,
+        page: Int = 1,
+        pageSize: Int = 30,
+    ): Result<Pair<List<PgcFollowItem>, Boolean>> {
+        if (BuildConfig.DEBUG) Log.d(BilibiliApp.TAG, "getPgcFollows: type=$type page=$page")
+        val mid = BilibiliApi.parseSelfMid() ?: return Result.failure(Exception("请先登录"))
+        return runCatching {
+            val response = api.getPgcFollowList(
+                vmid = mid,
+                type = type,
+                followStatus = 0,
+                page = page,
+                pageSize = pageSize,
+            )
+            if (response.code != 0) throw Exception(response.message)
+            val data = response.data
+            val items = data?.list.orEmpty().filter { it.seasonId > 0 }
+            val total = data?.total ?: 0
+            val hasMore = if (total > 0) page * pageSize < total else items.size >= pageSize
+            Pair(items, hasMore)
+        }.onFailure { Log.e(BilibiliApp.TAG, "getPgcFollows failed", it) }
     }
 
     suspend fun getPgcPlayUrl(epId: Long, cid: Long): Result<PlayUrlInfo> {
@@ -1595,5 +1707,24 @@ class BilibiliRepository(
                 "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
         val LOGIN_COOKIE_NAMES = setOf("SESSDATA", "bili_jct", "DedeUserID")
+
+        // Shared by the top-screen preview and the player, which use separate
+        // repository instances. A short TTL keeps view counts fresh while
+        // letting a previewed card open without a second view request.
+        const val VIDEO_INFO_TTL_MS = 60_000L
+        const val VIDEO_INFO_CACHE_SIZE = 16
+        val videoInfoLock = Any()
+        val videoInfoCache =
+            object : LinkedHashMap<String, Pair<Long, VideoInfo>>(
+                VIDEO_INFO_CACHE_SIZE,
+                0.75f,
+                true,
+            ) {
+                override fun removeEldestEntry(
+                    eldest: MutableMap.MutableEntry<String, Pair<Long, VideoInfo>>?,
+                ): Boolean = size > VIDEO_INFO_CACHE_SIZE
+            }
+        val videoInfoInFlight = mutableMapOf<String, Deferred<Result<VideoInfo>>>()
+        val videoInfoScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     }
 }

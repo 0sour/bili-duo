@@ -9,6 +9,15 @@ data class DanmakuPreference(
     val textSizeSp: Float = 16f,
     val area: Float = 1f,
     val blockedWords: Set<String> = emptySet(),
+    /** Raw regular expression entered by the user; invalid patterns are ignored. */
+    val blockedRegex: String = "",
+    /** Official-style shield level 0–10; keeps weight >= level (0 = off). */
+    val shieldLevel: Int = 0,
+    val showScroll: Boolean = true,
+    val showTop: Boolean = true,
+    val showBottom: Boolean = true,
+    /** Per-author hash from the danmaku XML (`p` field 7); never a real uid. */
+    val blockedUidHashes: Set<String> = emptySet(),
     /** 0 = unlimited. */
     val maxOnScreen: Int = 0,
     /** Live danmaku has its own values; it has no blocked-word/max settings. */
@@ -43,6 +52,16 @@ class DanmakuPreferenceManager(private val prefs: SharedPreferences) {
                 ?.take(50)
                 ?.toSet()
                 ?: emptySet(),
+            blockedRegex = prefs.getString(KEY_BLOCKED_REGEX, "").orEmpty().take(500),
+            shieldLevel = prefs.getInt(KEY_SHIELD_LEVEL, 0).coerceIn(0, 10),
+            showScroll = prefs.getBoolean(KEY_SHOW_SCROLL, true),
+            showTop = prefs.getBoolean(KEY_SHOW_TOP, true),
+            showBottom = prefs.getBoolean(KEY_SHOW_BOTTOM, true),
+            blockedUidHashes = prefs.getStringSet(KEY_BLOCKED_UIDS, emptySet())
+                ?.filter { it.isNotBlank() }
+                ?.take(200)
+                ?.toSet()
+                ?: emptySet(),
             maxOnScreen = prefs.getInt(KEY_MAX_ON_SCREEN, 0).coerceIn(0, 200),
             // First run after the split: clone the existing video settings so
             // upgrading users keep their current live appearance.
@@ -65,6 +84,15 @@ class DanmakuPreferenceManager(private val prefs: SharedPreferences) {
                 KEY_BLOCKED_WORDS,
                 pref.blockedWords.map { it.trim() }.filter { it.isNotEmpty() }.take(50).toSet(),
             )
+            .putString(KEY_BLOCKED_REGEX, pref.blockedRegex.take(500))
+            .putInt(KEY_SHIELD_LEVEL, pref.shieldLevel.coerceIn(0, 10))
+            .putBoolean(KEY_SHOW_SCROLL, pref.showScroll)
+            .putBoolean(KEY_SHOW_TOP, pref.showTop)
+            .putBoolean(KEY_SHOW_BOTTOM, pref.showBottom)
+            .putStringSet(
+                KEY_BLOCKED_UIDS,
+                pref.blockedUidHashes.filter { it.isNotBlank() }.take(200).toSet(),
+            )
             .putInt(KEY_MAX_ON_SCREEN, pref.maxOnScreen.coerceIn(0, 200))
             .putBoolean(KEY_LIVE_ENABLED, pref.liveEnabled)
             .putFloat(KEY_LIVE_OPACITY, pref.liveOpacity.coerceIn(0.2f, 1f))
@@ -81,6 +109,12 @@ class DanmakuPreferenceManager(private val prefs: SharedPreferences) {
         const val KEY_TEXT_SIZE = "danmaku_text_size"
         const val KEY_AREA = "danmaku_area"
         const val KEY_BLOCKED_WORDS = "danmaku_blocked_words"
+        const val KEY_BLOCKED_REGEX = "danmaku_blocked_regex"
+        const val KEY_SHIELD_LEVEL = "danmaku_shield_level"
+        const val KEY_SHOW_SCROLL = "danmaku_show_scroll"
+        const val KEY_SHOW_TOP = "danmaku_show_top"
+        const val KEY_SHOW_BOTTOM = "danmaku_show_bottom"
+        const val KEY_BLOCKED_UIDS = "danmaku_blocked_uids"
         const val KEY_MAX_ON_SCREEN = "danmaku_max_on_screen"
         const val KEY_LIVE_ENABLED = "danmaku_live_enabled"
         const val KEY_LIVE_OPACITY = "danmaku_live_opacity"

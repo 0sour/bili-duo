@@ -128,6 +128,12 @@ fun TopScreenHost(
                 textSizeSp = playerUi.danmakuTextSize,
                 area = playerUi.danmakuArea,
                 blockedWords = playerUi.danmakuBlockedWords,
+                blockedRegex = playerUi.danmakuBlockedRegex,
+                shieldLevel = playerUi.danmakuShieldLevel,
+                showScroll = playerUi.danmakuShowScroll,
+                showTop = playerUi.danmakuShowTop,
+                showBottom = playerUi.danmakuShowBottom,
+                blockedUidHashes = playerUi.danmakuBlockedUidHashes,
                 maxOnScreen = playerUi.danmakuMaxOnScreen,
             )
         }
@@ -252,6 +258,12 @@ private fun DanmakuOverlay(
     textSizeSp: Float,
     area: Float,
     blockedWords: Set<String>,
+    blockedRegex: String,
+    shieldLevel: Int,
+    showScroll: Boolean,
+    showTop: Boolean,
+    showBottom: Boolean,
+    blockedUidHashes: Set<String>,
     maxOnScreen: Int,
 ) {
     AndroidView(
@@ -265,6 +277,12 @@ private fun DanmakuOverlay(
                 textSizeSp = textSizeSp,
                 area = area,
                 blockedWords = blockedWords,
+                blockedRegex = blockedRegex,
+                shieldLevel = shieldLevel,
+                showScroll = showScroll,
+                showTop = showTop,
+                showBottom = showBottom,
+                blockedUidHashes = blockedUidHashes,
                 maxOnScreen = maxOnScreen,
             )
         },
@@ -1255,7 +1273,7 @@ private fun TopAmbientScreen(ambient: TopAmbientUi) {
                         Spacer(Modifier.height(12.dp))
                     }
                     Text(
-                        text = ambient.title,
+                        text = layoutCopy(ambient.title),
                         color = TopText,
                         fontSize = 40.sp,
                         lineHeight = 45.sp,
@@ -1266,7 +1284,7 @@ private fun TopAmbientScreen(ambient: TopAmbientUi) {
                     if (ambient.subtitle.isNotBlank()) {
                         Spacer(Modifier.height(12.dp))
                         Text(
-                            text = ambient.subtitle,
+                            text = layoutCopy(ambient.subtitle),
                             color = TopSecondary,
                             fontSize = 11.sp,
                             lineHeight = 17.sp,
@@ -1299,7 +1317,7 @@ private fun TopAmbientScreen(ambient: TopAmbientUi) {
                                 )
                             }
                             Spacer(Modifier.width(7.dp))
-                            Text(ambient.hint, color = TopText, fontSize = 9.sp)
+                            Text(layoutCopy(ambient.hint), color = TopText, fontSize = 9.sp)
                         }
                     }
                 }

@@ -64,8 +64,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import cn.xfangfang.biliduo.data.model.SearchPgcItem
 import cn.xfangfang.biliduo.data.model.SearchUserItem
 import cn.xfangfang.biliduo.data.model.SearchVideoItem
+import cn.xfangfang.biliduo.data.model.seasonKey
 import cn.xfangfang.biliduo.ui.duo.duoClickable
 import cn.xfangfang.biliduo.ui.duo.DuoTextFieldGate
 import cn.xfangfang.biliduo.ui.duo.duoTextFieldNavigation
@@ -91,6 +93,7 @@ private val SearchPink: Color @Composable get() = DuoTheme.colors.pinkInk
 fun SearchScreen(
     onVideoClick: (String) -> Unit,
     onUserClick: (Long) -> Unit = {},
+    onPgcClick: (Long) -> Unit = {},
     onBack: () -> Unit = {},
     onVideoFocused: (TopPreviewUi) -> Unit = {},
     onUserFocused: (TopPersonUi) -> Unit = {},
@@ -134,16 +137,17 @@ fun SearchScreen(
         state.query,
         state.results.size,
         state.users.size,
+        state.pgc.size,
         state.isLoading,
         state.error,
         searchFocused,
         editingQuery,
         state.suggestions.size,
     ) {
-        val hasItems = if (state.searchType == SearchType.USER) {
-            state.users.isNotEmpty()
-        } else {
-            state.results.isNotEmpty()
+        val hasItems = when (state.searchType) {
+            SearchType.USER -> state.users.isNotEmpty()
+            SearchType.BANGUMI, SearchType.MOVIE -> state.pgc.isNotEmpty()
+            else -> state.results.isNotEmpty()
         }
         when {
             editingQuery -> onTopAmbient(
@@ -166,6 +170,7 @@ fun SearchScreen(
         state.isLoading,
         state.results.firstOrNull()?.bvid,
         state.users.firstOrNull()?.mid,
+        state.pgc.firstOrNull()?.seasonKey,
     ) {
         if (state.isLoading) return@LaunchedEffect
         delay(120L)
@@ -177,10 +182,10 @@ fun SearchScreen(
             if (SystemClock.uptimeMillis() - lastShortcutAt < 600L) return@LaunchedEffect
             if (chipFocusCount > 0) return@LaunchedEffect
         }
-        val hasItems = if (state.searchType == SearchType.USER) {
-            state.users.isNotEmpty()
-        } else {
-            state.results.isNotEmpty()
+        val hasItems = when (state.searchType) {
+            SearchType.USER -> state.users.isNotEmpty()
+            SearchType.BANGUMI, SearchType.MOVIE -> state.pgc.isNotEmpty()
+            else -> state.results.isNotEmpty()
         }
         val target = when {
             state.hasSearched && hasItems -> firstResultFocus
@@ -316,10 +321,10 @@ fun SearchScreen(
                     onChipFocusChanged = onChipFocusChanged,
                 )
             }
-            val hasItems = if (state.searchType == SearchType.USER) {
-                state.users.isNotEmpty()
-            } else {
-                state.results.isNotEmpty()
+            val hasItems = when (state.searchType) {
+                SearchType.USER -> state.users.isNotEmpty()
+                SearchType.BANGUMI, SearchType.MOVIE -> state.pgc.isNotEmpty()
+                else -> state.results.isNotEmpty()
             }
             when {
                 state.isLoading && !hasItems -> {
@@ -338,10 +343,11 @@ fun SearchScreen(
 
                 !hasItems -> {
                     SearchMessage(
-                        text = if (state.searchType == SearchType.USER) {
-                            "没有找到相关用户"
-                        } else {
-                            "没有找到相关视频"
+                        text = when (state.searchType) {
+                            SearchType.USER -> "没有找到相关用户"
+                            SearchType.BANGUMI -> "没有找到相关番剧"
+                            SearchType.MOVIE -> "没有找到相关影视"
+                            else -> "没有找到相关视频"
                         }
                     )
                 }
@@ -364,6 +370,43 @@ fun SearchScreen(
                                 onFocusChanged = { focused ->
                                     if (focused) {
                                         onUserFocused(item.toTopPerson())
+                                    } else {
+                                        onFocusCleared()
+                                    }
+                                },
+                            )
+                        }
+                        item {
+                            SearchListFooter(
+                                isLoadingMore = state.isLoadingMore,
+                                hasMore = state.hasMore,
+                                moreError = state.moreError,
+                                onRetry = viewModel::retryLoadMore,
+                            )
+                        }
+                    }
+                }
+
+                state.searchType == SearchType.BANGUMI || state.searchType == SearchType.MOVIE -> {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        itemsIndexed(
+                            items = state.pgc,
+                            key = { _, item -> item.seasonKey },
+                        ) { index, item ->
+                            SearchPgcRow(
+                                item = item,
+                                onClick = {
+                                    if (item.seasonKey > 0) onPgcClick(item.seasonKey)
+                                },
+                                focusRequester = if (index == 0) firstResultFocus else null,
+                                onFocusChanged = { focused ->
+                                    if (focused) {
+                                        onVideoFocused(item.toTopPreview())
                                     } else {
                                         onFocusCleared()
                                     }
@@ -947,6 +990,128 @@ private fun SearchResultRow(
 }
 
 @Composable
+private fun SearchPgcRow(
+    item: SearchPgcItem,
+    onClick: () -> Unit,
+    focusRequester: FocusRequester?,
+    onFocusChanged: (Boolean) -> Unit = {},
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(96.dp)
+            .duoFocusRing(RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(8.dp))
+            .background(SearchCardBg)
+            .then(
+                if (focusRequester != null) {
+                    Modifier.focusRequester(focusRequester)
+                } else {
+                    Modifier
+                }
+            )
+            .onFocusChanged { onFocusChanged(it.hasFocus) }
+            .duoClickable(onClick = onClick)
+            .padding(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .width(66.dp)
+                .height(84.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(SearchFieldBg),
+        ) {
+            AsyncImage(
+                model = fixPic(item.cover.orEmpty()),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+            item.badge?.takeIf { it.isNotBlank() }?.let { badge ->
+                Text(
+                    text = badge,
+                    color = Color.White,
+                    fontSize = 8.sp,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(3.dp)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(SearchPink.copy(alpha = 0.9f))
+                        .padding(horizontal = 3.dp, vertical = 1.dp),
+                )
+            }
+            if (item.score > 0.0) {
+                Text(
+                    text = "${item.score} 分",
+                    color = Color.White,
+                    fontSize = 8.sp,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(3.dp)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(Color.Black.copy(alpha = 0.72f))
+                        .padding(horizontal = 3.dp, vertical = 1.dp),
+                )
+            }
+        }
+        Spacer(Modifier.width(10.dp))
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Text(
+                text = item.title.orEmpty(),
+                color = SearchText,
+                fontSize = 13.sp,
+                lineHeight = 17.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.height(5.dp))
+            Text(
+                text = buildString {
+                    item.seasonTypeName?.takeIf { it.isNotBlank() }?.let { append(it) }
+                    item.areas?.takeIf { it.isNotBlank() }?.let {
+                        if (isNotEmpty()) append(" · ")
+                        append(it)
+                    }
+                    item.indexShow?.takeIf { it.isNotBlank() }?.let {
+                        if (isNotEmpty()) append(" · ")
+                        append(it)
+                    }
+                    item.staff?.takeIf { it.isNotBlank() }?.let {
+                        if (isNotEmpty()) append(" · ")
+                        append(it)
+                    }
+                },
+                color = SearchSecondary,
+                fontSize = 10.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+private fun SearchPgcItem.toTopPreview(): TopPreviewUi = TopPreviewUi(
+    bvid = "",
+    title = title.orEmpty(),
+    coverUrl = fixPic(cover.orEmpty()),
+    ownerName = "哔哩哔哩${seasonTypeName.orEmpty().ifBlank { "番剧 / 影视" }}",
+    ownerLabel = "番剧 / 影视",
+    description = listOfNotNull(
+        score.takeIf { it > 0.0 }?.let { "$it 分" },
+        indexShow?.takeIf { it.isNotBlank() },
+        staff?.takeIf { it.isNotBlank() },
+    ).joinToString(" · "),
+    category = seasonTypeName.orEmpty(),
+    coverFit = true,
+    eyebrow = "● 搜索 · 即将播放",
+)
+
+@Composable
 private fun SearchUserRow(
     item: SearchUserItem,
     onClick: () -> Unit,
@@ -1126,8 +1291,17 @@ private fun SearchMessage(
 
 private fun searchAmbient(state: SearchUiState, searchFocused: Boolean): TopAmbientUi {
     val isUser = state.searchType == SearchType.USER
-    val itemCount = if (isUser) state.users.size else state.results.size
-    val unit = if (isUser) "位用户" else "条结果"
+    val isPgc = state.searchType == SearchType.BANGUMI || state.searchType == SearchType.MOVIE
+    val itemCount = when (state.searchType) {
+        SearchType.USER -> state.users.size
+        SearchType.BANGUMI, SearchType.MOVIE -> state.pgc.size
+        else -> state.results.size
+    }
+    val unit = when (state.searchType) {
+        SearchType.USER -> "位用户"
+        SearchType.BANGUMI, SearchType.MOVIE -> "部"
+        else -> "条结果"
+    }
     val title: String
     val subtitle: String
     when {
@@ -1151,6 +1325,8 @@ private fun searchAmbient(state: SearchUiState, searchFocused: Boolean): TopAmbi
             title = "搜索「${state.query}」。"
             subtitle = if (isUser) {
                 "共 $itemCount 位用户；方向键回到结果列表，B 进入 UP 主空间。"
+            } else if (isPgc) {
+                "共 $itemCount 部；方向键回到结果列表，B 进入播放。"
             } else {
                 "共 $itemCount 条结果；方向键回到结果列表，B 直接播放。"
             }

@@ -378,6 +378,7 @@ class DownloadManager(private val context: Context) {
             DownloadNotificationHelper.showCompleted(context, info.title)
 
             downloadSubtitles(info)
+            downloadDanmaku(info)
 
             checkAllDone()
 
@@ -437,6 +438,27 @@ class DownloadManager(private val context: Context) {
             }
         } catch (e: Exception) {
             Log.w(TAG, "Subtitle tracks fetch failed: ${e.message}")
+        }
+    }
+
+    /**
+     * Saves the decompressed danmaku XML next to the subtitle JSONs. Kept in
+     * private storage so it also works when the video itself is on SAF.
+     */
+    private suspend fun downloadDanmaku(info: DownloadInfo) {
+        if (info.cid <= 0L) return
+        try {
+            val repository = BilibiliRepository()
+            val xml = repository.getDanmakuXmlText(info.cid).getOrNull() ?: return
+            if (xml.isBlank()) return
+            val dir = File(context.filesDir, "download_danmaku")
+            if (!dir.exists()) dir.mkdirs()
+            val file = File(dir, "${info.id}.xml")
+            withContext(Dispatchers.IO) { file.writeText(xml) }
+            updateDownload(info.id) { it.copy(danmakuUri = file.absolutePath) }
+            Log.d(TAG, "Danmaku saved: ${file.name} (${xml.length} chars)")
+        } catch (e: Exception) {
+            Log.w(TAG, "Danmaku download failed: ${e.message}")
         }
     }
 
@@ -516,6 +538,7 @@ class DownloadManager(private val context: Context) {
         if (download != null) {
             DownloadSaf.delete(download.filePath)
             deleteSubtitleFiles(download)
+            deleteDanmakuFile(download)
         }
         onDownloadsChanged?.invoke()
     }
@@ -532,8 +555,13 @@ class DownloadManager(private val context: Context) {
         store.removeCompleted().forEach { download ->
             DownloadSaf.delete(download.filePath)
             deleteSubtitleFiles(download)
+            deleteDanmakuFile(download)
         }
         onDownloadsChanged?.invoke()
+    }
+
+    private fun deleteDanmakuFile(download: DownloadInfo) {
+        download.danmakuUri?.takeIf { it.isNotBlank() }?.let { runCatching { File(it).delete() } }
     }
 
     private fun deleteSubtitleFiles(download: DownloadInfo) {
