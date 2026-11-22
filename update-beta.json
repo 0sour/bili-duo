@@ -1,21 +1,21 @@
 {
-  "versionCode": 60,
-  "versionName": "0.2.0-rc59",
-  "tag": "v0.2.0-rc59",
+  "versionCode": 61,
+  "versionName": "0.2.0-rc60",
+  "tag": "v0.2.0-rc60",
   "downloads": [
     {
       "name": "cn",
-      "url": "https://bili-duo.sourden.xyz/releases/bili-duo-0.2.0-rc59-release.apk"
+      "url": "https://bili-duo.sourden.xyz/releases/bili-duo-0.2.0-rc60-release.apk"
     },
     {
       "name": "github",
-      "url": "https://github.com/0sour/bili-duo/releases/download/v0.2.0-rc59/bili-duo-0.2.0-rc59-release.apk"
+      "url": "https://github.com/0sour/bili-duo/releases/download/v0.2.0-rc60/bili-duo-0.2.0-rc60-release.apk"
     }
   ],
-  "size": 4429008,
-  "sha256": "9facfbec7aa0484a58eb2c10ee011dcf2589df662ee084438bfdbe9bc452ca3d",
-  "notes": "· 新增番剧 / 影视索引：6 种类型、地区/风格/年份/状态/排序筛选、分页与上屏预览\n· 播放器新增音轨选择：自动 / 无损 / 杜比 / 192K / 132K / 64K，指定档不可用时向下顺位\n· 新增 HDR / 4K 清晰度与「大会员」标记；4K/HDR 解码失败自动降级\n· 杜比音轨增加设备能力检测，Duo 不支持时显示「设备不支持」并回退\n· 视频默认清晰度 / 音质 / 倍速 / 字幕设置，播放页修改只影响当前视频\n· 多档值行改为点击弹窗选择；字幕轨道改为列表选择\n· 首页返回恢复原 tab / 卡片 / 滚动位置；网格 Down 保持同列\n· 动态视频播放后返回原卡片\n· 直播右侧信息卡重排；粉丝牌移到用户名后并加空格，避免裁切；评论 5 秒无操作回底\n· 起播优化：playurl 20s 缓存、优先请求道、500ms 起播、source error 自动重试 3 次\n· 应用内更新：关于页检查更新 / 自动检查开关；侧栏「有新版本」胶囊；国内源 + GitHub 双源弹窗，SHA-256 / 包名 / versionCode / 签名校验\n· 修复 PGC 索引筛选弹窗焦点环裁切、B 返回与焦点动画；设置右侧列表按左回当前分类",
-  "publishedAt": "2026-11-22T10:11:08Z",
+  "size": 4449004,
+  "sha256": "8d6ec33f242225e27d924af83e80e10e93eb627bd2ef2b9e3cf7c39d6a45ff96",
+  "notes": "· 修复 release 包检查更新失败：R8 移除了更新清单 DTO 字段，清单解析总是失败\n· rc59 用户请手动安装本版；安装后应用内检查更新恢复可用\n· 其余内容与 rc59 相同：番剧/影视索引、音轨/HDR/4K、多档值行弹窗、首页/动态焦点恢复、直播信息卡/粉丝牌、起播优化",
+  "publishedAt": "2026-11-22T10:21:46Z",
   "minSdk": 24,
   "channel": "beta"
 }

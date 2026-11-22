@@ -1,5 +1,13 @@
 [
   {
+    "versionName": "0.2.0-rc60",
+    "tag": "v0.2.0-rc60",
+    "publishedAt": "2026-11-22T10:21:46Z",
+    "channel": "beta",
+    "githubUrl": "https://github.com/0sour/bili-duo/releases/tag/v0.2.0-rc60",
+    "notes": "· 修复 release 包检查更新失败：R8 移除了更新清单 DTO 字段，清单解析总是失败\n· rc59 用户请手动安装本版；安装后应用内检查更新恢复可用\n· 其余内容与 rc59 相同：番剧/影视索引、音轨/HDR/4K、多档值行弹窗、首页/动态焦点恢复、直播信息卡/粉丝牌、起播优化"
+  },
+  {
     "versionName": "0.2.0-rc59",
     "tag": "v0.2.0-rc59",
     "publishedAt": "2026-11-22T10:11:08Z",

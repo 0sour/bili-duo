@@ -25,5 +25,12 @@
 
 -keep class cn.xfangfang.biliduo.data.model.** { *; }
 
+# UpdateManifestParser parses the update manifest with Gson reflection. Its DTOs
+# are private nested classes and Kotlin puts @SerializedName on constructor
+# parameters, so the generic "annotated field" rule below does not protect the
+# backing fields. Without this, R8 removes/renames them in release and every
+# update check fails with "invalid manifest" (unit tests run without R8).
+-keep class cn.xfangfang.biliduo.data.update.** { *; }
+
 -keep class io.noties.markwon.** { *; }
 -keep class dev.jeziellago.compose.markdowntext.** { *; }

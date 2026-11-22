@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc59-FB7299">
+  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc60-FB7299">
   <img alt="status" src="https://img.shields.io/badge/status-test%20build-orange">
   <img alt="Android" src="https://img.shields.io/badge/Android-24%2B-3DDC84?logo=android&logoColor=white">
   <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-1.9.23-7F52FF?logo=kotlin&logoColor=white">
@@ -23,13 +23,14 @@
 上屏只负责视频画面，下屏用一块 `Presentation` 承载完整 UI；手柄和触摸共用同一棵
 Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，也没有上屏 OSD。
 
-> 当前版本：**0.2.0-rc59**（versionCode 60，第六版测试版）
-> 下载：https://github.com/0sour/bili-duo/releases/tag/v0.2.0-rc59
+> 当前版本：**0.2.0-rc60**（versionCode 61，第七版测试版）
+> 下载：https://github.com/0sour/bili-duo/releases/tag/v0.2.0-rc60
 > 国内下载站：https://bili-duo.sourden.xyz/
-> 状态：功能完整的 **测试版**，268 个单元测试通过；第六版汇总 rc59：
-> **番剧 / 影视索引**、**音轨选择与 HDR/4K 清晰度**、**应用内检查更新**
-> （侧栏新版本提示 + 国内源/GitHub 双源下载弹窗）、首页/动态返回焦点恢复、
-> 直播信息卡与粉丝牌修复、起播与 source error 自动恢复。
+> 状态：功能完整的 **测试版**，268 个单元测试通过；rc60 是 rc59 的修复版：
+> 修复 release 包因 R8 裁掉更新清单 DTO 字段导致的应用内检查更新失败。
+> rc59 主要功能：**番剧 / 影视索引**、**音轨选择与 HDR/4K 清晰度**、
+> **应用内检查更新**（侧栏新版本提示 + 国内源/GitHub 双源下载弹窗）、
+> 首页/动态返回焦点恢复、直播信息卡与粉丝牌修复、起播与 source error 自动恢复。
 > rc50–rc58 的上下屏交换、启动器快捷方式、稍后再看、亮暗色主题、视频默认值、
 > 追番追剧、视频合集与弹幕过滤继续保留。
 
@@ -315,6 +316,9 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
     加空格、评论 5 秒回底；起播 500ms、playurl 20s 缓存、source error 自动重试；
     应用内检查更新（关于页手动/自动检查、侧栏新版本胶囊、国内源/GitHub 双源弹窗、
     SHA-256/包名/versionCode/签名校验）；268 单测通过。
+  - rc60 第七版测试版（rc59 修复版）：修复 release 包因 R8 移除更新清单 DTO 字段
+    导致的应用内检查更新失败（`-keep class ...data.update.**`）；release 包检查
+    更新恢复可用。其余内容与 rc59 相同。
   - 登录、个人中心、历史/收藏/关注只读浏览；弹幕发送→撤回闭环。
 
 ### 未实现（代码层面）
@@ -456,7 +460,7 @@ keyPassword=CHANGE_ME
 ### 测试产物
 
 `dist/` 只保留构建说明；APK 通过 GitHub Releases 或本地构建分发，不进入 Git 历史。
-当前 rc59 的哈希与说明见 [`dist/README.md`](dist/README.md)。
+当前 rc60 的哈希与说明见 [`dist/README.md`](dist/README.md)。
 
 ---
 

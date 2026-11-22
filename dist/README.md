@@ -4,6 +4,26 @@
 `*.apk`），需要时本地 `./gradlew assembleDebug` / `assembleRelease` 生成，或从
 GitHub Releases 下载。
 
+## 0.2.0-rc60（2026-11-22，第七版测试版，rc59 修复版）
+
+- `bili-duo-0.2.0-rc60-release.apk`
+  - R8 minify，正式 release keystore 签名；可覆盖安装同 key 的 rc59。
+  - 大小：4,449,004 字节
+  - APK SHA-256：`8d6ec33f242225e27d924af83e80e10e93eb627bd2ef2b9e3cf7c39d6a45ff96`
+- `bili-duo-0.2.0-rc60-debug.apk`
+  - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
+  - 大小：24,512,518 字节
+  - SHA-256：`8ec6fb6e18dac7a65ee2a3c74c5eb6d2f96d319dc3a3092fe8510fed94dcb6c9`
+
+rc60 变更：
+- 修复 release 包的应用内检查更新：R8 移除了 `UpdateManifestParser` 的
+  清单 DTO 字段，清单解析在 release 下总是失败（debug/单测不暴露）；新增
+  `-keep class cn.xfangfang.biliduo.data.update.** { *; }` 后恢复。
+- rc59 用户请手动安装本版；rc59 的检查更新不可用。
+- 其余内容与 rc59 相同。268 单测通过；Duo 已安装验证 release 包检查更新显示
+  「已是最新版本 v0.2.0-rc60」。发布页：
+  https://github.com/0sour/bili-duo/releases/tag/v0.2.0-rc60
+
 ## 0.2.0-rc59（2026-11-22，第六版测试版）
 
 - `bili-duo-0.2.0-rc59-release.apk`
