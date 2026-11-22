@@ -435,6 +435,16 @@ data class QualityOption(
     val vipOnly: Boolean = false,
 )
 
+/** A selectable DASH audio stream (normal / Dolby / FLAC). */
+data class AudioTrackOption(
+    val id: Int,
+    val label: String,
+    val stream: DashStream,
+    val vipOnly: Boolean = false,
+    /** False when this device has no decoder for the stream's codec. */
+    val supported: Boolean = true,
+)
+
 data class DownloadInfo(
     val id: String,
     val bvid: String,

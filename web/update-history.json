@@ -1,0 +1,50 @@
+[
+  {
+    "versionName": "0.2.0-rc59",
+    "tag": "v0.2.0-rc59",
+    "publishedAt": "2026-11-22T10:11:08Z",
+    "channel": "beta",
+    "githubUrl": "https://github.com/0sour/bili-duo/releases/tag/v0.2.0-rc59",
+    "notes": "· 新增番剧 / 影视索引：6 种类型、地区/风格/年份/状态/排序筛选、分页与上屏预览\n· 播放器新增音轨选择：自动 / 无损 / 杜比 / 192K / 132K / 64K，指定档不可用时向下顺位\n· 新增 HDR / 4K 清晰度与「大会员」标记；4K/HDR 解码失败自动降级\n· 杜比音轨增加设备能力检测，Duo 不支持时显示「设备不支持」并回退\n· 视频默认清晰度 / 音质 / 倍速 / 字幕设置，播放页修改只影响当前视频\n· 多档值行改为点击弹窗选择；字幕轨道改为列表选择\n· 首页返回恢复原 tab / 卡片 / 滚动位置；网格 Down 保持同列\n· 动态视频播放后返回原卡片\n· 直播右侧信息卡重排；粉丝牌移到用户名后并加空格，避免裁切；评论 5 秒无操作回底\n· 起播优化：playurl 20s 缓存、优先请求道、500ms 起播、source error 自动重试 3 次\n· 应用内更新：关于页检查更新 / 自动检查开关；侧栏「有新版本」胶囊；国内源 + GitHub 双源弹窗，SHA-256 / 包名 / versionCode / 签名校验\n· 修复 PGC 索引筛选弹窗焦点环裁切、B 返回与焦点动画；设置右侧列表按左回当前分类"
+  },
+  {
+    "versionName": "0.2.0-rc58",
+    "tag": "v0.2.0-rc58",
+    "publishedAt": "2026-11-18T12:40:01Z",
+    "channel": "beta",
+    "githubUrl": "https://github.com/0sour/bili-duo/releases/tag/v0.2.0-rc58",
+    "notes": "· PGC 播放页支持追番 / 取消追番\n· 个人中心新增「追番追剧」，番剧与影视两 tab\n· 搜索新增番剧、影视结果类型\n· UGC 视频新增「合集 N」tab，可直接切集\n· 弹幕过滤：官方等级 0–10、滚动/顶部/底部开关、正则屏蔽、按作者屏蔽\n· 下载完成保存离线弹幕，删除下载同步清理\n· 封面/头像按显示宽度加载 WebP，视频详情增加 LRU 缓存与在途合并\n· 底栏、页面提示和播放器页脚按 Xbox / Retro 手柄风格显示字母"
+  },
+  {
+    "versionName": "0.2.0-rc57",
+    "tag": "v0.2.0-rc57",
+    "publishedAt": "2026-11-13T11:38:02Z",
+    "channel": "beta",
+    "githubUrl": "https://github.com/0sour/bili-duo/releases/tag/v0.2.0-rc57",
+    "notes": "· 稍后再看：个人中心入口，播放页可直接加入 / 移除\n· 播放器分享：复制视频或番剧链接\n· 进入直播间时加载最近历史弹幕\n· 上下屏交换 + 启动器「双屏启动」快捷方式\n· 播放页简介焦点链修复，长合集/PGC 稍后再看条目显示修复"
+  },
+  {
+    "versionName": "0.2.0-rc55",
+    "tag": "v0.2.0-rc55",
+    "publishedAt": "2026-11-11T07:05:34Z",
+    "channel": "beta",
+    "githubUrl": "https://github.com/0sour/bili-duo/releases/tag/v0.2.0-rc55",
+    "notes": "· 修复下屏系统返回键（Return / ESC）\n· 直播控制台精简，刷新/暂停与清晰度/音量/弹幕按三列网格对齐\n· 直播弹幕独立设置与齿轮入口\n· 直播延迟 ≥5 秒时上屏提示\n· 设置 → 弹幕拆分为「视频弹幕 / 直播弹幕」两个标签页\n· 设置分类栏焦点修复"
+  },
+  {
+    "versionName": "0.2.0-rc54",
+    "tag": "v0.2.0-rc54",
+    "publishedAt": "2026-11-09T14:20:43Z",
+    "channel": "beta",
+    "githubUrl": "https://github.com/0sour/bili-duo/releases/tag/v0.2.0-rc54",
+    "notes": "· 上下双屏亮暗色主题，支持手动 / 跟随系统 / 日出日落\n· 亮色使用纸感灰色板，播放留边保持黑色\n· 设置新增「手柄」分类，支持 Xbox / Retro 风格\n· 修复切页时焦点指示器闪到旧项\n· 起播 API 限流、直播 playurl 并行等优化\n· 上屏预览长标题 / 简介截断"
+  },
+  {
+    "versionName": "0.2.0-rc50",
+    "tag": "v0.2.0-rc50",
+    "publishedAt": "2026-11-08T13:21:59Z",
+    "channel": "beta",
+    "githubUrl": "https://github.com/0sour/bili-duo/releases/tag/v0.2.0-rc50",
+    "notes": "· 左侧栏切页后焦点留在栏位\n· L1/R1 切换标签后直接聚焦内容，L2/R2 筛选停在新 chip\n· 侧栏聚焦时肩键继续转发给当前页面\n· 视频默认清晰度 / 倍速 / 字幕设置\n· 图片查看器支持 R2/L2 缩放、左摇杆平移、双指缩放\n· 首页推荐无限滚动、手动刷新与 X 刷新"
+  }
+]

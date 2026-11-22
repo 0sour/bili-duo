@@ -8,6 +8,7 @@ import android.content.SharedPreferences
  */
 data class VideoPreference(
     val quality: Int = 0,
+    val audioQuality: Int = 0,
     val speed: Float = 1f,
     val subtitleEnabled: Boolean = false,
     val subtitleTextSizeSp: Float = SubtitleStylePreference.DEFAULT_TEXT_SIZE_SP,
@@ -15,17 +16,30 @@ data class VideoPreference(
     val subtitleBottomPaddingDp: Int = SubtitleStylePreference.DEFAULT_BOTTOM_PADDING_DP,
 )
 
-data class VideoQualityOption(val qn: Int, val label: String)
+data class VideoQualityOption(val qn: Int, val label: String, val vip: Boolean = false)
 
 val videoQualityOptions = listOf(
     VideoQualityOption(0, "自动"),
-    VideoQualityOption(116, "1080P60"),
-    VideoQualityOption(112, "1080P+"),
+    VideoQualityOption(125, "HDR", vip = true),
+    VideoQualityOption(120, "4K", vip = true),
+    VideoQualityOption(116, "1080P60", vip = true),
+    VideoQualityOption(112, "1080P+", vip = true),
     VideoQualityOption(80, "1080P"),
     VideoQualityOption(74, "720P60"),
     VideoQualityOption(64, "720P"),
     VideoQualityOption(32, "480P"),
     VideoQualityOption(16, "360P"),
+)
+
+data class AudioQualityOption(val id: Int, val label: String, val vip: Boolean = false)
+
+val audioQualityOptions = listOf(
+    AudioQualityOption(0, "自动"),
+    AudioQualityOption(30251, "无损", vip = true),
+    AudioQualityOption(30250, "杜比", vip = true),
+    AudioQualityOption(30280, "192K"),
+    AudioQualityOption(30232, "132K"),
+    AudioQualityOption(30216, "64K"),
 )
 
 val videoSpeedOptions = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f)
@@ -35,6 +49,9 @@ val videoSubtitleBottomOptions = listOf(32, 58, 90)
 
 fun videoQualityLabel(qn: Int): String =
     videoQualityOptions.firstOrNull { it.qn == qn }?.label ?: "自动"
+
+fun audioQualityLabel(id: Int): String =
+    audioQualityOptions.firstOrNull { it.id == id }?.label ?: "自动"
 
 fun videoSpeedLabel(speed: Float): String {
     val text = "%.2f".format(speed).trimEnd('0').trimEnd('.')
@@ -70,6 +87,7 @@ class VideoPreferenceManager(private val prefs: SharedPreferences) {
         val legacyStyle = SubtitlePreferenceManager(prefs).loadStyle()
         return VideoPreference(
             quality = prefs.getInt(KEY_QUALITY, 0),
+            audioQuality = prefs.getInt(KEY_AUDIO_QUALITY, 0),
             speed = prefs.getFloat(KEY_SPEED, 1f).coerceIn(0.5f, 2f),
             subtitleEnabled = prefs.getBoolean(KEY_SUBTITLE_ENABLED, false),
             subtitleTextSizeSp = prefs.getFloat(
@@ -90,6 +108,7 @@ class VideoPreferenceManager(private val prefs: SharedPreferences) {
     fun save(preference: VideoPreference) {
         prefs.edit()
             .putInt(KEY_QUALITY, preference.quality)
+            .putInt(KEY_AUDIO_QUALITY, preference.audioQuality)
             .putFloat(KEY_SPEED, preference.speed)
             .putBoolean(KEY_SUBTITLE_ENABLED, preference.subtitleEnabled)
             .putFloat(KEY_SUBTITLE_SIZE, preference.subtitleTextSizeSp)
@@ -100,6 +119,7 @@ class VideoPreferenceManager(private val prefs: SharedPreferences) {
 
     private companion object {
         const val KEY_QUALITY = "video_default_quality"
+        const val KEY_AUDIO_QUALITY = "video_default_audio_quality"
         const val KEY_SPEED = "video_default_speed"
         const val KEY_SUBTITLE_ENABLED = "video_default_subtitle_enabled"
         const val KEY_SUBTITLE_SIZE = "video_default_subtitle_size"

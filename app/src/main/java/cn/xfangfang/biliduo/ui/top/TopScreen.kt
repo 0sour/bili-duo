@@ -1,5 +1,9 @@
 package cn.xfangfang.biliduo.ui.top
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -173,7 +177,11 @@ fun TopScreenHost(
                 bottomPaddingDp = playerUi.subtitleBottomPaddingDp,
             )
         }
-        if (!playback.hasRenderedFrame || topState.mode == TopScreenMode.DYNAMIC) {
+        AnimatedVisibility(
+            visible = !playback.hasRenderedFrame || topState.mode == TopScreenMode.DYNAMIC,
+            enter = fadeIn(animationSpec = tween(140)),
+            exit = fadeOut(animationSpec = tween(220)),
+        ) {
             TopReadOnlyLayer(
                 state = topState,
                 modifier = Modifier.fillMaxSize(),

@@ -23,6 +23,7 @@ enum class DuoMode {
 enum class DuoOverlay {
     QUALITY,
     SPEED,
+    VOLUME,
     /** Playback settings: danmaku and subtitle options. */
     SETTINGS,
     /** Live-room danmaku size/opacity/speed/area. */
@@ -34,6 +35,8 @@ enum class DuoOverlay {
     COIN,
     FAVORITE,
     IMAGE,
+    /** App-level update sheet, available while browsing (not only in a player). */
+    UPDATE,
 }
 
 /**
@@ -96,6 +99,16 @@ class DuoSessionViewModel : ViewModel() {
     /** Open a bottom modal. Input ownership moves to OVERLAY until it is closed. */
     fun openOverlay(overlay: DuoOverlay) {
         if (!_playerActive.value) return
+        if (_overlay.value == overlay) return
+        _overlay.value = overlay
+        _mode.value = DuoMode.OVERLAY
+    }
+
+    /**
+     * Open an app-level modal while browsing. Player overlays still require an
+     * active player; the update sheet is reachable from Settings and the rail.
+     */
+    fun openAppOverlay(overlay: DuoOverlay) {
         if (_overlay.value == overlay) return
         _overlay.value = overlay
         _mode.value = DuoMode.OVERLAY

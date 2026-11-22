@@ -24,6 +24,7 @@ object Routes {
     const val PLAYER_CID = "player/{bvid}/{cid}"
     const val DOWNLOAD_PLAY = "download/{bvid}/{cid}"
     const val PGC_PLAYER = "pgc/{seasonId}"
+    const val PGC_INDEX = "pgc_index/{indexType}"
     const val LIVE_PLAYER = "live/{roomId}"
     const val LOGIN = "login"
     const val HISTORY = "history"
@@ -53,6 +54,7 @@ object Routes {
     }
     fun channel(mid: Long) = "channel/$mid"
     fun pgc(seasonId: Long) = "pgc/$seasonId"
+    fun pgcIndex(typeOrdinal: Int) = "pgc_index/$typeOrdinal"
     fun live(roomId: Long) = "live/$roomId"
 }
 

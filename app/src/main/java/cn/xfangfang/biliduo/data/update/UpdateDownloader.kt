@@ -3,50 +3,56 @@ package cn.xfangfang.biliduo.data.update
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageInfo
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
-import android.util.Log
 import androidx.core.content.FileProvider
+import cn.xfangfang.biliduo.BuildConfig
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
+import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 
-class UpdateDownloader(private val context: Context) : UpdateDownloaderApi {
+/**
+ * Downloads and verifies an update APK.
+ *
+ * The download uses its own client, never BilibiliApi.httpClient, so update
+ * requests cannot accidentally carry login cookies or Bilibili headers.
+ */
+class UpdateDownloader(private val context: Context) {
 
     companion object {
-        private const val TAG = "bili-duo"
         private const val FILE_PREFIX = "bili-duo-"
 
-        /** Builds the versioned APK file name for a release tag, sanitizing unsafe characters. */
+        /** Builds a safe, versioned APK filename for the update directory. */
         fun apkFileName(tag: String): String {
             val safe = tag.replace(Regex("[^A-Za-z0-9._-]"), "_")
             return "$FILE_PREFIX$safe.apk"
         }
 
-        /** A local APK is reusable only when it exists, is non-empty and matches the release size. */
+        /** A local APK is reusable only when it exists, is non-empty and matches the size. */
         fun isValidApk(file: File, expectedSize: Long): Boolean {
             if (expectedSize <= 0) return false
             return file.exists() && file.isFile && file.length() == expectedSize && file.length() > 0
         }
 
         /**
-         * Identity check for a locally parsed APK archive: it must belong to [expectedPackage]
-         * and its internal versionName must equal the release [tag] (with or without `v` prefix).
-         * Null metadata (corrupt/unparseable archive) never matches.
+         * Identity check for a locally parsed APK archive: it must belong to
+         * [expectedPackage] and its internal versionName must equal [tag].
+         * Kept as a pure helper for tests and diagnostics.
          */
         fun matchesRelease(
             pkg: String?,
             versionName: String?,
             expectedPackage: String,
-            tag: String
+            tag: String,
         ): Boolean {
             if (pkg == null || versionName == null) return false
             return pkg == expectedPackage && versionName == tag.removePrefix("v")
@@ -58,119 +64,109 @@ class UpdateDownloader(private val context: Context) : UpdateDownloaderApi {
         .readTimeout(60, TimeUnit.SECONDS)
         .build()
 
-    /**
-     * Downloads the update APK to a fixed app-private file. While [isPaused] evaluates to
-     * true the download is suspended in place (connection stays open). Early EOF before the
-     * full length is reached is treated as a failure so a truncated APK is never kept.
-     */
-    override suspend fun download(
-        url: String,
-        tag: String,
-        progress: (downloaded: Long, total: Long) -> Unit,
-        isPaused: () -> Boolean
-    ): Result<File> =
-        withContext(Dispatchers.IO) {
-            try {
-                val dir = updatesDir()
-                dir.mkdirs()
-                dir.listFiles()?.forEach { f ->
-                    if (f.name.endsWith(".apk") && f.name != apkFileName(tag)) f.delete()
-                }
-                val target = File(dir, apkFileName(tag))
-                if (target.exists()) target.delete()
+    suspend fun download(
+        info: UpdateInfo,
+        source: UpdateSource,
+        onProgress: (downloaded: Long, total: Long) -> Unit,
+    ): Result<File> = withContext(Dispatchers.IO) {
+        val url = info.downloadUrl(source)
+            ?: return@withContext Result.failure(IOException("该下载源不可用"))
+        val dir = updatesDir()
+        dir.listFiles()
+            ?.filter { it.isFile && it.name.endsWith(".apk") && it.name != apkFileName(info.tag) }
+            ?.forEach { runCatching { it.delete() } }
+        val target = File(dir, apkFileName(info.tag))
+        target.delete()
 
-                val request = Request.Builder().url(url).build()
-                client.newCall(request).execute().use { resp ->
-                    if (!resp.isSuccessful) {
-                        return@withContext Result.failure(Exception("HTTP ${resp.code}"))
-                    }
-                    val body = resp.body
-                        ?: return@withContext Result.failure(Exception("Empty response body"))
-                    val total = body.contentLength()
-                    body.byteStream().use { input ->
-                        FileOutputStream(target).use { output ->
-                            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-                            var downloaded = 0L
-                            var read: Int
-                            while (true) {
-                                while (isPaused()) {
-                                    delay(200)
-                                }
-                                read = input.read(buffer)
-                                if (read == -1) {
-                                    if (downloaded < total) {
-                                        throw IOException(
-                                            "连接中断，已下载 ${downloaded}/$total 字节"
-                                        )
-                                    }
-                                    break
-                                }
-                                output.write(buffer, 0, read)
-                                downloaded += read
-                                progress(downloaded, total)
+        try {
+            val request = Request.Builder()
+                .url(url)
+                .header("User-Agent", "Bili-Duo/${BuildConfig.VERSION_NAME}")
+                .build()
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    throw IOException("HTTP ${response.code}")
+                }
+                val body = response.body ?: throw IOException("空响应")
+                val total = info.size.coerceAtLeast(body.contentLength().coerceAtLeast(0L))
+                val digest = MessageDigest.getInstance("SHA-256")
+                var downloaded = 0L
+                var lastEmit = 0L
+                body.byteStream().use { input ->
+                    FileOutputStream(target).use { output ->
+                        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                        while (true) {
+                            val read = input.read(buffer)
+                            if (read == -1) break
+                            output.write(buffer, 0, read)
+                            digest.update(buffer, 0, read)
+                            downloaded += read
+                            val now = System.currentTimeMillis()
+                            if (now - lastEmit >= 150L || (total > 0 && downloaded >= total)) {
+                                lastEmit = now
+                                onProgress(downloaded, total)
                             }
-                            output.flush()
                         }
+                        output.flush()
                     }
-                    Result.success(target)
                 }
-            } catch (e: CancellationException) {
-                deleteTarget(tag)
-                throw e
-            } catch (e: Exception) {
-                Log.e(TAG, "UpdateDownloader failed: ${e.message}", e)
-                deleteTarget(tag)
-                Result.failure(e)
+                if (total > 0 && downloaded != total) {
+                    throw IOException("安装包不完整：$downloaded/$total 字节")
+                }
+                if (target.length() != info.size) {
+                    throw IOException("安装包大小不一致")
+                }
+                val actualSha = digest.digest().toHex()
+                if (!actualSha.equals(info.sha256, ignoreCase = true)) {
+                    throw IOException("SHA-256 校验失败")
+                }
+                verifyApk(target, info)
+                Result.success(target)
             }
+        } catch (e: CancellationException) {
+            target.delete()
+            throw e
+        } catch (e: Exception) {
+            target.delete()
+            Result.failure(e)
         }
+    }
 
     /**
-     * Returns a previously downloaded APK for [tag] only when it passes three checks:
-     * file size matches the GitHub release asset, the archive parses, and its packageName +
-     * versionName identify exactly this app and release. A file failing any check is deleted
-     * so the caller falls back to a fresh download.
+     * Verifies package name, versionCode and the signing certificate. The
+     * Android installer enforces the signature too; failing early gives the
+     * user a useful message instead of a generic "应用未安装".
      */
-    override fun findExisting(tag: String, expectedSize: Long): File? {
-        val file = targetFile(tag)
-        if (!isValidApk(file, expectedSize)) return null
-        val info = readArchive(file)
-        val ok = info != null && matchesRelease(
-            info.packageName, info.versionName, context.packageName, tag
+    private fun verifyApk(file: File, info: UpdateInfo) {
+        val pm = context.packageManager
+        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            PackageManager.GET_SIGNING_CERTIFICATES
+        } else {
+            @Suppress("DEPRECATION")
+            PackageManager.GET_SIGNATURES
+        }
+        val archive = pm.getPackageArchiveInfo(file.absolutePath, flags)
+            ?: throw IOException("无法解析安装包")
+        if (archive.packageName != context.packageName) {
+            throw IOException("安装包包名不匹配")
+        }
+        val archiveCode = versionCodeOf(archive)
+        if (archiveCode != info.versionCode) {
+            throw IOException("安装包版本号不匹配")
+        }
+        if (archiveCode <= BuildConfig.VERSION_CODE.toLong()) {
+            throw IOException("安装包版本不高于当前版本")
+        }
+        val expected = signaturesOf(
+            pm.getPackageInfo(context.packageName, flags)
         )
-        return if (ok) file else {
-            file.delete()
-            null
+        val actual = signaturesOf(archive)
+        if (expected.isEmpty() || actual.isEmpty() || expected.intersect(actual).isEmpty()) {
+            throw IOException("安装包签名与当前应用不一致")
         }
     }
 
-    private fun readArchive(file: File): PackageInfo? = try {
-        context.packageManager.getPackageArchiveInfo(file.absolutePath, 0)
-    } catch (e: Exception) {
-        Log.e(TAG, "readArchive failed: ${e.message}", e)
-        null
-    }
-
-    override fun install(apkFile: File): Boolean {
-        return try {
-            val uri = FileProvider.getUriForFile(
-                context,
-                "${context.packageName}.fileprovider",
-                apkFile
-            )
-            val intent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(uri, "application/vnd.android.package-archive")
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-            context.startActivity(intent)
-            true
-        } catch (e: Exception) {
-            Log.e(TAG, "UpdateDownloader install failed: ${e.message}", e)
-            false
-        }
-    }
-
-    /** Whether this app is allowed to install packages from unknown sources. */
-    override fun hasInstallPermission(): Boolean {
+    fun hasInstallPermission(): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             context.packageManager.canRequestPackageInstalls()
         } else {
@@ -178,27 +174,70 @@ class UpdateDownloader(private val context: Context) : UpdateDownloaderApi {
         }
     }
 
-    /** Opens the per-app "Install unknown apps" settings page for this app. */
-    override fun openInstallPermissionSettings() {
+    fun openInstallPermissionSettings() {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val intent = Intent(
-                    Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
-                    Uri.parse("package:${context.packageName}")
-                ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                context.startActivity(intent)
+                context.startActivity(
+                    Intent(
+                        Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                        Uri.parse("package:${context.packageName}"),
+                    ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "UpdateDownloader openInstallPermissionSettings failed: ${e.message}", e)
+        } catch (_: Exception) {
+            runCatching {
+                context.startActivity(
+                    Intent(Settings.ACTION_SECURITY_SETTINGS)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+            }
         }
     }
 
-    private fun updatesDir(): File = File(context.getExternalFilesDir(null), "updates")
+    fun install(apkFile: File): Result<Unit> = runCatching {
+        val uri = FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            apkFile,
+        )
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, "application/vnd.android.package-archive")
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(intent)
+    }
 
-    private fun targetFile(tag: String): File = File(updatesDir(), apkFileName(tag))
+    private fun updatesDir(): File {
+        val base = context.getExternalFilesDir(null) ?: context.filesDir
+        return File(base, "updates").apply { mkdirs() }
+    }
 
-    private fun deleteTarget(tag: String) {
-        val f = targetFile(tag)
-        if (f.exists()) f.delete()
+    @Suppress("DEPRECATION")
+    private fun versionCodeOf(info: PackageInfo): Long =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            info.longVersionCode
+        } else {
+            info.versionCode.toLong()
+        }
+
+    @Suppress("DEPRECATION")
+    private fun signaturesOf(info: PackageInfo): Set<String> {
+        val signatures = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            info.signingInfo?.apkContentsSigners
+        } else {
+            info.signatures
+        }
+        return signatures.orEmpty().map { it.toCharsString() }.toSet()
+    }
+
+    private fun ByteArray.toHex(): String {
+        val digits = "0123456789abcdef"
+        return buildString(size * 2) {
+            for (byte in this@toHex) {
+                val value = byte.toInt() and 0xff
+                append(digits[value ushr 4])
+                append(digits[value and 0x0f])
+            }
+        }
     }
 }

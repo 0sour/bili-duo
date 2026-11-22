@@ -53,7 +53,9 @@ import cn.xfangfang.biliduo.ui.common.DuoPageHeader
 import cn.xfangfang.biliduo.ui.common.DuoPalette
 import cn.xfangfang.biliduo.ui.duo.duoClickable
 import cn.xfangfang.biliduo.ui.duo.duoFocusRing
+import cn.xfangfang.biliduo.ui.duo.duoGridDown
 import cn.xfangfang.biliduo.ui.duo.duoTabCycling
+import cn.xfangfang.biliduo.ui.duo.rememberGridFocusNavigator
 import cn.xfangfang.biliduo.ui.duo.requestPageFocus
 import cn.xfangfang.biliduo.ui.top.TopAmbientUi
 import cn.xfangfang.biliduo.ui.top.TopGlyph
@@ -75,6 +77,7 @@ fun MyFollowsScreen(
     val ui by viewModel.uiState.collectAsState()
     val loggedIn = BilibiliApi.parseSelfMid() != null
     val gridState = rememberLazyGridState()
+    val navigator = rememberGridFocusNavigator(4, gridState)
     val firstItemFocus = remember { FocusRequester() }
     val retryFocus = remember { FocusRequester() }
     val typeFocuses = remember { List(2) { FocusRequester() } }
@@ -225,6 +228,12 @@ fun MyFollowsScreen(
                         FollowCard(
                             item = item,
                             firstFocus = if (index == 0) firstItemFocus else null,
+                            modifier = Modifier.duoGridDown(index, ui.items.size, navigator),
+                            focusRequester = if (index == 0) {
+                                null
+                            } else {
+                                navigator.requester(index)
+                            },
                             onFocusChanged = { focused ->
                                 if (focused) onVideoFocused(item.toTopPreview()) else onFocusCleared()
                             },
@@ -269,6 +278,8 @@ private fun FollowTypeChip(
 private fun FollowCard(
     item: PgcFollowItem,
     firstFocus: FocusRequester?,
+    modifier: Modifier = Modifier,
+    focusRequester: FocusRequester? = null,
     onFocusChanged: (Boolean) -> Unit,
     onClick: () -> Unit,
 ) {
@@ -276,9 +287,10 @@ private fun FollowCard(
     val progress = item.progress.orEmpty().takeUnless { it == "-" }.orEmpty()
     val newEp = item.newEp?.indexShow.orEmpty()
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .then(if (firstFocus != null) Modifier.focusRequester(firstFocus) else Modifier)
+            .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
             .onFocusChanged {
                 focused = it.isFocused
                 onFocusChanged(it.hasFocus)

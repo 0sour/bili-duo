@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,6 +32,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.InlineTextContent
+import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -46,11 +49,13 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -67,6 +72,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.Key
@@ -78,14 +84,19 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.Placeholder
+import androidx.compose.ui.text.PlaceholderVerticalAlign
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -105,6 +116,14 @@ import cn.xfangfang.biliduo.duo.DuoMode
 import cn.xfangfang.biliduo.duo.DuoOverlay
 import cn.xfangfang.biliduo.duo.DuoSessionViewModel
 import cn.xfangfang.biliduo.ui.theme.DuoTheme
+import cn.xfangfang.biliduo.ui.common.DuoChoiceController
+import cn.xfangfang.biliduo.ui.common.DuoChoiceHost
+import cn.xfangfang.biliduo.ui.common.DuoChoiceOption
+import cn.xfangfang.biliduo.ui.common.DuoChoiceOverlay
+import cn.xfangfang.biliduo.ui.common.DuoChoiceRequest
+import cn.xfangfang.biliduo.ui.common.LocalDuoChoiceController
+import cn.xfangfang.biliduo.ui.common.dismissDuoChoice
+import cn.xfangfang.biliduo.ui.common.rememberDuoChoiceController
 import cn.xfangfang.biliduo.ui.duo.duoClickable
 import cn.xfangfang.biliduo.ui.duo.duoFocusRing
 import cn.xfangfang.biliduo.ui.duo.DuoTextFieldGate
@@ -189,7 +208,9 @@ fun LiveConsoleScreen(
     val danmakuSettingsFirstFocus = remember { FocusRequester() }
     val danmakuSettingsCloseFocus = remember { FocusRequester() }
     var qualityOpener by remember { mutableStateOf<FocusRequester?>(null) }
+    var volumeOpener by remember { mutableStateOf<FocusRequester?>(null) }
     var danmakuSettingsOpener by remember { mutableStateOf<FocusRequester?>(null) }
+    val liveDanmakuChoice = rememberDuoChoiceController()
 
     val detail = ui.liveDetail
     val qualities = ui.liveQualities
@@ -398,11 +419,29 @@ fun LiveConsoleScreen(
                 delay(300L)
                 runCatching { (qualityOpener ?: playFocus).requestFocus() }
             }
+            previous == DuoOverlay.VOLUME && overlay == null -> {
+                delay(300L)
+                runCatching { (volumeOpener ?: playFocus).requestFocus() }
+            }
             previous == DuoOverlay.LIVE_DANMAKU_SETTINGS && overlay == null -> {
                 delay(300L)
                 runCatching { (danmakuSettingsOpener ?: playFocus).requestFocus() }
             }
         }
+    }
+
+    DisposableEffect(liveDanmakuChoice.request) {
+        if (liveDanmakuChoice.request != null) {
+            session.setOverlayBackInterceptor {
+                dismissDuoChoice(liveDanmakuChoice, scope)
+                true
+            }
+        } else {
+            // The choice was just dismissed; drop its always-true interceptor
+            // so B can close the live danmaku settings overlay again.
+            session.setOverlayBackInterceptor(null)
+        }
+        onDispose { session.setOverlayBackInterceptor(null) }
     }
 
     Box(
@@ -461,10 +500,8 @@ fun LiveConsoleScreen(
                     session.openOverlay(DuoOverlay.QUALITY)
                 },
                 onVolume = {
-                    controller.setVolume(
-                        if (playback.volume >= 0.99f) 0f
-                        else (playback.volume + 0.25f).coerceAtMost(1f)
-                    )
+                    volumeOpener = volumeFocus
+                    session.openOverlay(DuoOverlay.VOLUME)
                 },
                 onToggleDanmaku = { vm.toggleLiveDanmaku() },
                 danmakuSettingsFocus = danmakuSettingsFocus,
@@ -525,33 +562,39 @@ fun LiveConsoleScreen(
             )
         }
 
+        if (overlay == DuoOverlay.VOLUME) {
+            val volumeValues = listOf(0f, 0.25f, 0.5f, 0.75f, 1f)
+            DuoChoiceOverlay(
+                request = DuoChoiceRequest(
+                    title = "音量",
+                    options = volumeValues.map { value ->
+                        DuoChoiceOption(
+                            label = "${(value * 100).toInt()}%",
+                            selected = kotlin.math.abs(value - playback.volume) < 0.01f,
+                        )
+                    },
+                    onSelect = {},
+                ),
+                onSelect = { index ->
+                    controller.setVolume(volumeValues[index])
+                    session.closeOverlay()
+                },
+                onDismiss = { session.closeOverlay() },
+            )
+        }
+
         if (overlay == DuoOverlay.LIVE_DANMAKU_SETTINGS) {
             LiveDanmakuSettingsOverlay(
                 ui = ui,
                 firstFocus = danmakuSettingsFirstFocus,
                 closeFocus = danmakuSettingsCloseFocus,
+                choiceController = liveDanmakuChoice,
                 onDismiss = { session.closeOverlay() },
                 onToggleEnabled = { vm.setLiveDanmakuEnabled(!ui.liveDanmakuEnabled) },
-                onCycleOpacity = {
-                    vm.setLiveDanmakuOpacity(
-                        nextLiveDanmakuValue(ui.liveDanmakuOpacity, liveDanmakuOpacityOptions)
-                    )
-                },
-                onCycleSpeed = {
-                    vm.setLiveDanmakuSpeed(
-                        nextLiveDanmakuValue(ui.liveDanmakuSpeed, liveDanmakuSpeedOptions)
-                    )
-                },
-                onCycleSize = {
-                    vm.setLiveDanmakuTextSize(
-                        nextLiveDanmakuValue(ui.liveDanmakuTextSize, liveDanmakuSizeOptions)
-                    )
-                },
-                onCycleArea = {
-                    vm.setLiveDanmakuArea(
-                        nextLiveDanmakuValue(ui.liveDanmakuArea, liveDanmakuAreaOptions)
-                    )
-                },
+                onOpacity = { vm.setLiveDanmakuOpacity(it) },
+                onSpeed = { vm.setLiveDanmakuSpeed(it) },
+                onSize = { vm.setLiveDanmakuTextSize(it) },
+                onArea = { vm.setLiveDanmakuArea(it) },
             )
         }
     }
@@ -928,6 +971,7 @@ private fun LiveChatTab(
     val fieldFocus = remember { FocusRequester() }
     var fieldFocused by remember { mutableStateOf(false) }
     var scrolledUp by remember { mutableStateOf(false) }
+    var lastUserScrollAt by remember { mutableLongStateOf(0L) }
     val currentDraft by rememberUpdatedState(draft)
     val chatMessages = remember(messages) { messages.filterNot { it.isSuperChat } }
     var nowSec by remember { mutableStateOf(System.currentTimeMillis() / 1000L) }
@@ -947,18 +991,46 @@ private fun LiveChatTab(
     }
 
     LaunchedEffect(listState) {
+        launch {
+            listState.interactionSource.interactions.collect { interaction ->
+                // Measure from the end of the drag as well: holding the finger
+                // down for a long time must not start the 5s timer early.
+                if (interaction is DragInteraction.Start ||
+                    interaction is DragInteraction.Stop ||
+                    interaction is DragInteraction.Cancel
+                ) {
+                    lastUserScrollAt = System.currentTimeMillis()
+                }
+            }
+        }
         snapshotFlow { listState.isScrollInProgress }.collect { scrolling ->
             if (!scrolling) {
                 scrolledUp = listState.canScrollForward
+                if (!scrolledUp) lastUserScrollAt = 0L
             }
         }
     }
 
     val lastId = chatMessages.lastOrNull()?.id
-    LaunchedEffect(lastId) {
-        if (chatMessages.isNotEmpty() && !scrolledUp) {
+    LaunchedEffect(chatMessages.size, lastId, activeSuperChat?.id) {
+        if (chatMessages.isNotEmpty() && !scrolledUp && !listState.isScrollInProgress) {
             runCatching { listState.animateScrollToItem(chatMessages.lastIndex) }
         }
+    }
+
+    // If the user has scrolled up, return to the newest message after five
+    // seconds without another drag. Programmatic auto-scroll does not touch
+    // lastUserScrollAt, so it cannot keep postponing the timer.
+    LaunchedEffect(scrolledUp, lastUserScrollAt, chatMessages.size) {
+        if (!scrolledUp || lastUserScrollAt == 0L || chatMessages.isEmpty()) {
+            return@LaunchedEffect
+        }
+        val elapsed = System.currentTimeMillis() - lastUserScrollAt
+        delay((5_000L - elapsed).coerceAtLeast(0L))
+        if (!scrolledUp) return@LaunchedEffect
+        runCatching { listState.animateScrollToItem(chatMessages.lastIndex) }
+        scrolledUp = false
+        lastUserScrollAt = 0L
     }
 
     DisposableEffect(fieldFocused) {
@@ -1087,19 +1159,53 @@ private fun LiveConnectionBar(
 
 @Composable
 private fun LiveChatLine(message: LiveChatMessage) {
+    val hasMedal = message.medalName.isNotBlank()
+    val medalId = "live_medal"
+    val textMeasurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val badgeTextStyle = TextStyle(
+        fontSize = 8.sp,
+        lineHeight = 10.sp,
+        platformStyle = PlatformTextStyle(includeFontPadding = false),
+    )
+    val medalContent = if (hasMedal) {
+        val nameWidth = with(density) {
+            textMeasurer.measure(
+                text = message.medalName,
+                style = badgeTextStyle.copy(fontWeight = FontWeight.SemiBold),
+            ).size.width.toDp()
+        }.coerceAtMost(52.dp)
+        val levelWidth = if (message.medalLevel > 0) {
+            with(density) {
+                textMeasurer.measure(
+                    text = message.medalLevel.toString(),
+                    style = badgeTextStyle.copy(fontWeight = FontWeight.Bold),
+                ).size.width.toDp()
+            }
+        } else {
+            0.dp
+        }
+        val dividerWidth = if (message.medalLevel > 0) 7.dp else 0.dp
+        val badgeWidth = nameWidth + levelWidth + dividerWidth + 8.dp
+        val badgeHeight = maxOf(15.dp, with(density) { 10.sp.toDp() } + 2.dp)
+        medalId to InlineTextContent(
+            Placeholder(
+                width = with(density) { badgeWidth.toSp() },
+                height = with(density) { badgeHeight.toSp() },
+                placeholderVerticalAlign = PlaceholderVerticalAlign.Center,
+            ),
+        ) {
+            LiveFanBadge(
+                name = message.medalName,
+                level = message.medalLevel,
+                color = message.medalColor,
+            )
+        }
+    } else {
+        null
+    }
     Text(
         text = buildAnnotatedString {
-            if (!message.medal.isNullOrBlank()) {
-                withStyle(
-                    SpanStyle(
-                        color = LiveMedal,
-                        background = LiveMedal.copy(alpha = 0.12f),
-                        fontSize = 8.sp,
-                    )
-                ) {
-                    append("[${message.medal}] ")
-                }
-            }
             withStyle(
                 SpanStyle(
                     color = if (message.isAdmin) LivePink else LiveUsername,
@@ -1108,16 +1214,85 @@ private fun LiveChatLine(message: LiveChatMessage) {
             ) {
                 append(message.uname)
             }
+            if (hasMedal) {
+                // Keep a visible gap between the username and the medal
+                // without allowing a line break between them.
+                append('\u00A0')
+                appendInlineContent(
+                    medalId,
+                    alternateText = "[${message.medalName} ${message.medalLevel}]",
+                )
+            }
             append("：")
             withStyle(SpanStyle(color = LiveTextPrimary)) {
                 append(message.text)
             }
         },
+        inlineContent = medalContent?.let { mapOf(it) } ?: emptyMap(),
         fontSize = 10.5.sp,
         lineHeight = 15.sp,
         maxLines = 3,
         overflow = TextOverflow.Ellipsis,
+        modifier = Modifier.fillMaxWidth(),
     )
+}
+
+/** Compact, official-like fan medal drawn entirely in Compose. */
+@Composable
+private fun LiveFanBadge(name: String, level: Int, color: Long?) {
+    val base = color?.let { Color(it) } ?: LiveMedal
+    val dark = Color(
+        red = (base.red * 0.62f).coerceIn(0f, 1f),
+        green = (base.green * 0.62f).coerceIn(0f, 1f),
+        blue = (base.blue * 0.62f).coerceIn(0f, 1f),
+        alpha = 1f,
+    )
+    val textColor = if (base.luminance() > 0.55f) Color(0xFF2A1A05) else Color.White
+    val shape = RoundedCornerShape(3.dp)
+    val badgeTextStyle = TextStyle(
+        fontSize = 8.sp,
+        lineHeight = 10.sp,
+        // Default font padding makes the line box taller than the compact
+        // 15dp badge and clipped its bottom strokes on the Duo.
+        platformStyle = PlatformTextStyle(includeFontPadding = false),
+    )
+    Row(
+        modifier = Modifier
+            .heightIn(min = 15.dp)
+            .clip(shape)
+            .background(Brush.horizontalGradient(listOf(dark, base)))
+            .border(0.5.dp, Color.White.copy(alpha = 0.28f), shape)
+            .padding(horizontal = 4.dp, vertical = 1.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = name,
+            style = badgeTextStyle.copy(
+                color = textColor,
+                fontWeight = FontWeight.SemiBold,
+            ),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.widthIn(max = 52.dp),
+        )
+        if (level > 0) {
+            Box(
+                Modifier
+                    .padding(horizontal = 3.dp)
+                    .width(1.dp)
+                    .height(8.dp)
+                    .background(textColor.copy(alpha = 0.45f)),
+            )
+            Text(
+                text = level.toString(),
+                style = badgeTextStyle.copy(
+                    color = textColor,
+                    fontWeight = FontWeight.Bold,
+                ),
+                maxLines = 1,
+            )
+        }
+    }
 }
 
 @Composable
@@ -1316,14 +1491,19 @@ private fun LiveInfoTab(
             }
             Spacer(Modifier.width(9.dp))
             Column(Modifier.weight(1f)) {
-                Text(
-                    text = detail?.anchorName?.ifBlank { "未知主播" } ?: "加载中…",
-                    color = LiveTextPrimary,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = detail?.anchorName?.ifBlank { "未知主播" } ?: "加载中…",
+                        color = LiveTextPrimary,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    LiveStatusPill(loading = isLoading, live = detail?.isLive == true)
+                }
                 Text(
                     text = detail?.anchorOfficial?.takeIf { it.isNotBlank() }
                         ?: "Bilibili 直播",
@@ -1333,27 +1513,24 @@ private fun LiveInfoTab(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            LiveStatusPill(loading = isLoading, live = detail?.isLive == true)
-        }
-
-        Spacer(Modifier.height(9.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
+            Spacer(Modifier.width(8.dp))
             LiveFollowButton(
                 loggedIn = loggedIn,
                 isFollowed = isFollowed,
                 busy = followBusy,
                 onClick = onToggleFollow,
             )
-            Spacer(Modifier.weight(1f))
-            if (!followError.isNullOrBlank()) {
-                Text(
-                    text = followError,
-                    color = DuoTheme.colors.error,
-                    fontSize = 9.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
+        }
+
+        if (!followError.isNullOrBlank()) {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = followError,
+                color = DuoTheme.colors.error,
+                fontSize = 9.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
 
         Spacer(Modifier.height(10.dp))
@@ -1692,13 +1869,15 @@ private fun LiveDanmakuSettingsOverlay(
     ui: PlayerUiState,
     firstFocus: FocusRequester,
     closeFocus: FocusRequester,
+    choiceController: DuoChoiceController,
     onDismiss: () -> Unit,
     onToggleEnabled: () -> Unit,
-    onCycleOpacity: () -> Unit,
-    onCycleSpeed: () -> Unit,
-    onCycleSize: () -> Unit,
-    onCycleArea: () -> Unit,
+    onOpacity: (Float) -> Unit,
+    onSpeed: (Float) -> Unit,
+    onSize: (Float) -> Unit,
+    onArea: (Float) -> Unit,
 ) {
+    CompositionLocalProvider(LocalDuoChoiceController provides choiceController) {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -1754,23 +1933,47 @@ private fun LiveDanmakuSettingsOverlay(
                 LiveDanmakuSettingRow(
                     label = "不透明度",
                     value = "${(ui.liveDanmakuOpacity * 100).toInt()}%",
-                    onClick = onCycleOpacity,
+                    choices = liveDanmakuOpacityOptions.map { value ->
+                        DuoChoiceOption(
+                            label = "${(value * 100).toInt()}%",
+                            selected = kotlin.math.abs(value - ui.liveDanmakuOpacity) < 0.01f,
+                        )
+                    },
+                    onChoice = { index -> onOpacity(liveDanmakuOpacityOptions[index]) },
                 )
                 LiveDanmakuSettingRow(
                     label = "字号",
                     value = liveDanmakuSizeLabel(ui.liveDanmakuTextSize),
-                    onClick = onCycleSize,
+                    choices = liveDanmakuSizeOptions.map { value ->
+                        DuoChoiceOption(
+                            label = liveDanmakuSizeLabel(value),
+                            selected = kotlin.math.abs(value - ui.liveDanmakuTextSize) < 0.01f,
+                        )
+                    },
+                    onChoice = { index -> onSize(liveDanmakuSizeOptions[index]) },
                 )
                 LiveDanmakuSettingRow(
                     label = "速度",
                     value = liveDanmakuSpeedLabel(ui.liveDanmakuSpeed),
-                    onClick = onCycleSpeed,
+                    choices = liveDanmakuSpeedOptions.map { value ->
+                        DuoChoiceOption(
+                            label = liveDanmakuSpeedLabel(value),
+                            selected = kotlin.math.abs(value - ui.liveDanmakuSpeed) < 0.01f,
+                        )
+                    },
+                    onChoice = { index -> onSpeed(liveDanmakuSpeedOptions[index]) },
                 )
                 LiveDanmakuSettingRow(
                     label = "显示区域",
                     value = liveDanmakuAreaLabel(ui.liveDanmakuArea),
+                    choices = liveDanmakuAreaOptions.map { value ->
+                        DuoChoiceOption(
+                            label = liveDanmakuAreaLabel(value),
+                            selected = kotlin.math.abs(value - ui.liveDanmakuArea) < 0.01f,
+                        )
+                    },
+                    onChoice = { index -> onArea(liveDanmakuAreaOptions[index]) },
                     modifier = Modifier.focusProperties { down = FocusRequester.Cancel },
-                    onClick = onCycleArea,
                 )
             }
             Text(
@@ -1781,23 +1984,49 @@ private fun LiveDanmakuSettingsOverlay(
             )
         }
     }
+    DuoChoiceHost(choiceController)
+    }
 }
 
 @Composable
 private fun LiveDanmakuSettingRow(
     label: String,
     value: String,
+    choices: List<DuoChoiceOption>? = null,
+    onChoice: ((Int) -> Unit)? = null,
     focusRequester: FocusRequester? = null,
     modifier: Modifier = Modifier,
-    onClick: () -> Unit,
+    onClick: (() -> Unit)? = null,
 ) {
+    val localRowFocus = remember { FocusRequester() }
+    val rowFocus = focusRequester ?: localRowFocus
+    val choiceController = LocalDuoChoiceController.current
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
+            .then(
+                if (focusRequester != null) {
+                    Modifier.focusRequester(focusRequester)
+                } else {
+                    Modifier.focusRequester(localRowFocus)
+                }
+            )
             .duoFocusRing(RoundedCornerShape(6.dp))
             .clip(RoundedCornerShape(6.dp))
-            .duoClickable(onClick = onClick)
+            .duoClickable {
+                if (choices != null && onChoice != null && choiceController != null) {
+                    choiceController.show(
+                        DuoChoiceRequest(
+                            title = label,
+                            options = choices,
+                            returnFocus = rowFocus,
+                            onSelect = onChoice,
+                        )
+                    )
+                } else {
+                    onClick?.invoke()
+                }
+            }
             .padding(horizontal = 10.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -1914,11 +2143,6 @@ private val liveDanmakuOpacityOptions = listOf(0.3f, 0.5f, 0.7f, 0.9f, 1f)
 private val liveDanmakuSpeedOptions = listOf(0.7f, 1f, 1.4f, 1.8f)
 private val liveDanmakuSizeOptions = listOf(13f, 16f, 20f, 24f)
 private val liveDanmakuAreaOptions = listOf(0.3f, 0.55f, 0.8f, 1f)
-
-private fun nextLiveDanmakuValue(current: Float, options: List<Float>): Float {
-    val index = options.indexOfFirst { kotlin.math.abs(it - current) < 0.01f }
-    return options[(index + 1).mod(options.size)]
-}
 
 private fun liveDanmakuSizeLabel(value: Float): String = when {
     value <= 14f -> "小"

@@ -23,6 +23,7 @@ import retrofit2.http.GET
 import retrofit2.http.Headers
 import retrofit2.http.POST
 import retrofit2.http.Query
+import retrofit2.http.QueryMap
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
@@ -102,6 +103,24 @@ interface BilibiliApi {
         @Query("season_type") seasonType: Int
     ): PgcApiResponse<PgcRankResult>
 
+    @GET("pgc/page/index/condition")
+    suspend fun getPgcIndexCondition(
+        @Query("type") type: Int,
+        @Query("index_type") indexType: Int,
+    ): PgcIndexResponse<PgcIndexConditionData>
+
+    @GET("pgc/page/index/result")
+    suspend fun getPgcIndexResult(
+        @Query("type") type: Int,
+        @Query("index_type") indexType: Int,
+        @Query("page") page: Int = 1,
+        // This endpoint uses `pagesize` (no underscore); `page_size` is ignored.
+        @Query("pagesize") pageSize: Int = 24,
+        @Query("order") order: String = "0",
+        @Query("sort") sort: String = "0",
+        @QueryMap filters: Map<String, String> = emptyMap(),
+    ): PgcIndexResponse<PgcIndexResultData>
+
     @GET("pgc/view/web/season")
     suspend fun getPgcSeason(
         @Query("season_id") seasonId: Long
@@ -139,7 +158,9 @@ interface BilibiliApi {
     suspend fun getPgcPlayUrl(
         @Query("ep_id") epId: Long,
         @Query("cid") cid: Long,
-        @Query("fnval") fnval: Int = 4048,
+        // DASH + HDR + 4K + Dolby audio. Deliberately excludes AV1/8K/Dolby
+        // Vision so the app does not auto-select unsupported streams.
+        @Query("fnval") fnval: Int = 464,
         @Query("fnver") fnver: Int = 0,
         @Query("fourk") fourk: Int = 1
     ): PgcApiResponse<PlayUrlInfo>
@@ -437,7 +458,8 @@ interface BilibiliApi {
         @Query("bvid") bvid: String,
         @Query("cid") cid: Long,
         @Query("qn") qn: Int = 80,
-        @Query("fnval") fnval: Int = 16,
+        // Same HDR/4K/Dolby-audio mask as PGC; avoids AV1/8K/Dolby Vision.
+        @Query("fnval") fnval: Int = 464,
         @Query("fnver") fnver: Int = 0,
         @Query("fourk") fourk: Int = 1,
         @Query("platform") platform: String = "android"
@@ -768,14 +790,35 @@ interface BilibiliApi {
              * unrelated calls (view → playurl → player/wbi).
              */
             @Volatile private var lastStartedAt = 0L
+            @Volatile private var lastPriorityStartedAt = 0L
             override fun intercept(chain: Interceptor.Chain): Response {
                 val url = chain.request().url.toString()
                 val isApi = url.contains("api.bilibili.com") || url.contains("passport.bilibili.com")
                 if (isApi) {
-                    awaitSlot()
+                    if (isPlaybackCritical(url)) {
+                        awaitPrioritySlot()
+                    } else {
+                        awaitSlot()
+                    }
                 }
                 return chain.proceed(chain.request())
             }
+
+            /**
+             * Video/live entry needs view + playurl back-to-back. Letting those
+             * queue behind comments/preview calls for 120ms each was a visible
+             * part of the player's black-screen time. Keep a small gap between
+             * the critical calls themselves, but do not serialize them behind
+             * the general API lane.
+             */
+            private fun isPlaybackCritical(url: String): Boolean =
+                url.contains("/x/web-interface/view") ||
+                    url.contains("/x/player/playurl") ||
+                    url.contains("/x/player/wbi/playurl") ||
+                    url.contains("/x/player/wbi/v2") ||
+                    url.contains("/pgc/player/web/playurl") ||
+                    url.contains("/xlive/web-room/v2/index/getRoomPlayInfo") ||
+                    url.contains("/room/v1/Room/get_info")
 
             @Synchronized
             private fun awaitSlot() {
@@ -787,8 +830,19 @@ interface BilibiliApi {
                 lastStartedAt = System.currentTimeMillis()
             }
 
+            @Synchronized
+            private fun awaitPrioritySlot() {
+                val now = System.currentTimeMillis()
+                val wait = MIN_PRIORITY_INTERVAL_MS - (now - lastPriorityStartedAt)
+                if (wait > 0) {
+                    try { Thread.sleep(wait) } catch (_: InterruptedException) {}
+                }
+                lastPriorityStartedAt = System.currentTimeMillis()
+            }
+
             companion object {
                 private const val MIN_API_INTERVAL_MS = 120L
+                private const val MIN_PRIORITY_INTERVAL_MS = 40L
             }
         }
 

@@ -26,6 +26,7 @@ import okhttp3.Response
 import java.io.ByteArrayOutputStream
 import java.io.StringReader
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.ConcurrentHashMap
 import java.util.zip.GZIPInputStream
 import java.util.zip.Inflater
 import org.xmlpull.v1.XmlPullParser
@@ -319,6 +320,51 @@ class BilibiliRepository(
         }.onFailure { Log.e(BilibiliApp.TAG, "getPgcRank failed", it) }
     }
 
+    private val pgcIndexConditionCache = ConcurrentHashMap<String, PgcIndexConditionData>()
+
+    suspend fun getPgcIndexCondition(
+        type: Int,
+        indexType: Int,
+        force: Boolean = false,
+    ): Result<PgcIndexConditionData> {
+        val key = "$type:$indexType"
+        if (!force) pgcIndexConditionCache[key]?.let { return Result.success(it) }
+        if (BuildConfig.DEBUG) Log.d(BilibiliApp.TAG, "getPgcIndexCondition: $key")
+        return runCatching {
+            val response = api.getPgcIndexCondition(type = type, indexType = indexType)
+            if (response.code != 0) throw Exception(response.message)
+            val data = response.data ?: throw Exception("筛选条件为空")
+            pgcIndexConditionCache[key] = data
+            data
+        }.onFailure { Log.e(BilibiliApp.TAG, "getPgcIndexCondition failed", it) }
+    }
+
+    suspend fun getPgcIndexResult(
+        type: Int,
+        indexType: Int,
+        page: Int,
+        filters: Map<String, String>,
+        order: String,
+    ): Result<PgcIndexResultData> {
+        if (BuildConfig.DEBUG) {
+            Log.d(
+                BilibiliApp.TAG,
+                "getPgcIndexResult: type=$type index=$indexType page=$page order=$order",
+            )
+        }
+        return runCatching {
+            val response = api.getPgcIndexResult(
+                type = type,
+                indexType = indexType,
+                page = page,
+                order = order,
+                filters = filters,
+            )
+            if (response.code != 0) throw Exception(response.message)
+            response.data ?: throw Exception("索引结果为空")
+        }.onFailure { Log.e(BilibiliApp.TAG, "getPgcIndexResult failed", it) }
+    }
+
     suspend fun getPgcSeason(seasonId: Long): Result<PgcSeasonDetail> {
         if (BuildConfig.DEBUG) Log.d(BilibiliApp.TAG, "getPgcSeason: seasonId=$seasonId")
         return runCatching {
@@ -379,13 +425,19 @@ class BilibiliRepository(
         }.onFailure { Log.e(BilibiliApp.TAG, "getPgcFollows failed", it) }
     }
 
-    suspend fun getPgcPlayUrl(epId: Long, cid: Long): Result<PlayUrlInfo> {
-        if (BuildConfig.DEBUG) Log.d(BilibiliApp.TAG, "getPgcPlayUrl: epId=$epId cid=$cid")
-        return runCatching {
-            val response = api.getPgcPlayUrl(epId = epId, cid = cid)
-            if (response.code != 0) throw Exception(response.message)
-            response.result ?: throw Exception("无法获取番剧播放链接")
-        }.onFailure { Log.e(BilibiliApp.TAG, "getPgcPlayUrl failed", it) }
+    suspend fun getPgcPlayUrl(
+        epId: Long,
+        cid: Long,
+        forceRefresh: Boolean = false,
+    ): Result<PlayUrlInfo> {
+        return cachedPlayUrl("pgc:$epId:$cid", forceRefresh) {
+            if (BuildConfig.DEBUG) Log.d(BilibiliApp.TAG, "getPgcPlayUrl: epId=$epId cid=$cid")
+            runCatching {
+                val response = api.getPgcPlayUrl(epId = epId, cid = cid)
+                if (response.code != 0) throw Exception(response.message)
+                response.result ?: throw Exception("无法获取番剧播放链接")
+            }.onFailure { Log.e(BilibiliApp.TAG, "getPgcPlayUrl failed", it) }
+        }
     }
 
     suspend fun getLiveRooms(
@@ -1036,32 +1088,80 @@ class BilibiliRepository(
         }.onFailure { Log.e(BilibiliApp.TAG, "getPlayUrl exception", it) }
     }
 
-    suspend fun getPlayUrlDash(bvid: String, cid: Long): Result<PlayUrlInfo> {
-        if (BuildConfig.DEBUG) Log.d(BilibiliApp.TAG, "getPlayUrlDash: bvid=$bvid cid=$cid fnval=16")
-        return runCatching {
-            val response = api.getPlayUrlDash(bvid = bvid, cid = cid)
-            if (BuildConfig.DEBUG) Log.d(BilibiliApp.TAG, "getPlayUrlDash response: code=${response.code} msg=${response.message}")
-            if (response.code == 0) {
-                val playUrl = response.data ?: throw Exception("No play URL data")
-                if (BuildConfig.DEBUG) {
-                    val acceptDesc = playUrl.accept_description?.joinToString(", ") ?: "N/A"
-                    val acceptQual = playUrl.accept_quality?.joinToString(", ") ?: "N/A"
-                    val videoCount = playUrl.dash?.video?.size ?: 0
-                    val audioCount = playUrl.dash?.audio?.size ?: 0
-                    Log.d(BilibiliApp.TAG, "getPlayUrlDash success: accept=[$acceptQual]($acceptDesc) video=$videoCount audio=$audioCount")
-                    playUrl.dash?.video?.forEach { v ->
-                        Log.d(BilibiliApp.TAG, "  video: id=${v.id} ${v.width}x${v.height} codec=${v.codecs} bw=${v.bandwidth}")
-                    }
-                    playUrl.dash?.audio?.forEach { a ->
-                        Log.d(BilibiliApp.TAG, "  audio: id=${a.id} codec=${a.codecs} bw=${a.bandwidth}")
+    private suspend fun cachedPlayUrl(
+        key: String,
+        forceRefresh: Boolean,
+        block: suspend () -> Result<PlayUrlInfo>,
+    ): Result<PlayUrlInfo> {
+        if (forceRefresh) {
+            synchronized(playUrlLock) { playUrlCache.remove(key) }
+            return playUrlScope.async {
+                block().onSuccess { info ->
+                    synchronized(playUrlLock) {
+                        playUrlCache[key] = System.currentTimeMillis() to info
                     }
                 }
-                playUrl
-            } else {
-                Log.w(BilibiliApp.TAG, "getPlayUrlDash failed: code=${response.code} msg=${response.message}")
-                throw Exception(response.message)
+            }.await()
+        }
+        val cached = synchronized(playUrlLock) {
+            playUrlCache[key]
+                ?.takeIf { System.currentTimeMillis() - it.first < PLAY_URL_TTL_MS }
+                ?.second
+        }
+        if (cached != null) return Result.success(cached)
+        val deferred = synchronized(playUrlLock) {
+            playUrlInFlight[key] ?: playUrlScope.async(start = CoroutineStart.LAZY) {
+                block().onSuccess { info ->
+                    synchronized(playUrlLock) {
+                        playUrlCache[key] = System.currentTimeMillis() to info
+                    }
+                }
+            }.also { job ->
+                playUrlInFlight[key] = job
+                job.invokeOnCompletion {
+                    synchronized(playUrlLock) {
+                        if (playUrlInFlight[key] === job) playUrlInFlight.remove(key)
+                    }
+                }
+                job.start()
             }
-        }.onFailure { Log.e(BilibiliApp.TAG, "getPlayUrlDash exception", it) }
+        }
+        return deferred.await()
+    }
+
+    suspend fun getPlayUrlDash(
+        bvid: String,
+        cid: Long,
+        forceRefresh: Boolean = false,
+    ): Result<PlayUrlInfo> {
+        val key = "ugc:$bvid:$cid"
+        return cachedPlayUrl(key, forceRefresh) {
+            if (BuildConfig.DEBUG) Log.d(BilibiliApp.TAG, "getPlayUrlDash: bvid=$bvid cid=$cid fnval=16")
+            runCatching {
+                val response = api.getPlayUrlDash(bvid = bvid, cid = cid)
+                if (BuildConfig.DEBUG) Log.d(BilibiliApp.TAG, "getPlayUrlDash response: code=${response.code} msg=${response.message}")
+                if (response.code == 0) {
+                    val playUrl = response.data ?: throw Exception("No play URL data")
+                    if (BuildConfig.DEBUG) {
+                        val acceptDesc = playUrl.accept_description?.joinToString(", ") ?: "N/A"
+                        val acceptQual = playUrl.accept_quality?.joinToString(", ") ?: "N/A"
+                        val videoCount = playUrl.dash?.video?.size ?: 0
+                        val audioCount = playUrl.dash?.audio?.size ?: 0
+                        Log.d(BilibiliApp.TAG, "getPlayUrlDash success: accept=[$acceptQual]($acceptDesc) video=$videoCount audio=$audioCount")
+                        playUrl.dash?.video?.forEach { v ->
+                            Log.d(BilibiliApp.TAG, "  video: id=${v.id} ${v.width}x${v.height} codec=${v.codecs} bw=${v.bandwidth}")
+                        }
+                        playUrl.dash?.audio?.forEach { a ->
+                            Log.d(BilibiliApp.TAG, "  audio: id=${a.id} codec=${a.codecs} bw=${a.bandwidth}")
+                        }
+                    }
+                    playUrl
+                } else {
+                    Log.w(BilibiliApp.TAG, "getPlayUrlDash failed: code=${response.code} msg=${response.message}")
+                    throw Exception(response.message)
+                }
+            }.onFailure { Log.e(BilibiliApp.TAG, "getPlayUrlDash exception", it) }
+        }
     }
 
     suspend fun getComments(
@@ -1726,5 +1826,24 @@ class BilibiliRepository(
             }
         val videoInfoInFlight = mutableMapOf<String, Deferred<Result<VideoInfo>>>()
         val videoInfoScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+        // Short-lived playurl cache: backing out and re-entering the same video
+        // reuses the fresh DASH URLs instead of repeating view→playurl. A
+        // source-error retry bypasses this cache so it cannot pin a bad URL.
+        const val PLAY_URL_TTL_MS = 20_000L
+        const val PLAY_URL_CACHE_SIZE = 8
+        val playUrlLock = Any()
+        val playUrlCache =
+            object : LinkedHashMap<String, Pair<Long, PlayUrlInfo>>(
+                PLAY_URL_CACHE_SIZE,
+                0.75f,
+                true,
+            ) {
+                override fun removeEldestEntry(
+                    eldest: MutableMap.MutableEntry<String, Pair<Long, PlayUrlInfo>>?,
+                ): Boolean = size > PLAY_URL_CACHE_SIZE
+            }
+        val playUrlInFlight = mutableMapOf<String, Deferred<Result<PlayUrlInfo>>>()
+        val playUrlScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     }
 }

@@ -39,8 +39,19 @@ class DynamicViewModel(
 
     private var loadJob: Job? = null
     private var requestId = 0
+    private var initialLoadStarted = false
     private val likeJobs = mutableMapOf<String, Job>()
     private var messageJob: Job? = null
+
+    /**
+     * First screen entry only. Returning from a video keeps the existing feed
+     * and scroll position; the refresh chip is still available explicitly.
+     */
+    fun loadInitial() {
+        if (initialLoadStarted) return
+        initialLoadStarted = true
+        refresh()
+    }
 
     /** Optimistically toggles one card's like; rolls back if the API fails. */
     fun toggleLike(card: DynamicCardUi) {

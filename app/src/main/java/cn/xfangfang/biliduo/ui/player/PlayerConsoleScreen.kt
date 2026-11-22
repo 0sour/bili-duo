@@ -71,6 +71,7 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -109,6 +110,14 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
 import cn.xfangfang.biliduo.ui.theme.DuoTheme
 import cn.xfangfang.biliduo.ui.common.DuoPillButton
+import cn.xfangfang.biliduo.ui.common.DuoChoiceHost
+import cn.xfangfang.biliduo.ui.common.DuoChoiceOption
+import cn.xfangfang.biliduo.ui.common.DuoChoiceOverlay
+import cn.xfangfang.biliduo.ui.common.DuoChoiceRequest
+import cn.xfangfang.biliduo.ui.common.LocalDuoChoiceController
+import cn.xfangfang.biliduo.ui.common.dismissDuoChoice
+import cn.xfangfang.biliduo.ui.common.rememberDuoChoiceController
+import cn.xfangfang.biliduo.ui.common.DuoVipBadge
 import cn.xfangfang.biliduo.ui.common.DuoZoomableImage
 import cn.xfangfang.biliduo.ui.common.rememberImageZoomState
 import androidx.compose.ui.text.style.TextOverflow
@@ -208,6 +217,7 @@ fun PlayerConsoleScreen(
     val nextPageFocus = remember { FocusRequester() }
     val qualityFocus = remember { FocusRequester() }
     val speedFocus = remember { FocusRequester() }
+    val volumeFocus = remember { FocusRequester() }
     val settingsFocus = remember { FocusRequester() }
     val danmakuSendFocus = remember { FocusRequester() }
     val likeFocus = remember { FocusRequester() }
@@ -312,6 +322,12 @@ fun PlayerConsoleScreen(
 
     fun toast(message: String) {
         Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+    }
+
+    LaunchedEffect(ui.qualityFallbackNotice) {
+        val message = ui.qualityFallbackNotice ?: return@LaunchedEffect
+        toast(message)
+        vm.clearQualityFallbackNotice()
     }
 
     fun addToWatchLater() {
@@ -1277,8 +1293,8 @@ fun PlayerConsoleScreen(
                 }
 
                 // The slider ring extends ~5.75dp outside its 30dp box; keep
-                // enough gap so it never touches the play/pause button.
-                Spacer(Modifier.height(10.dp))
+                // enough gap so it never touches the play/pause button ring.
+                Spacer(Modifier.height(14.dp))
                 val transportNav = Modifier.focusProperties {
                     up = sliderFocus
                     down = if (!ui.isPgc) danmakuSendFocus else qualityFocus
@@ -1305,8 +1321,6 @@ fun PlayerConsoleScreen(
                     Box(
                         modifier = Modifier
                             .size(56.dp)
-                            .clip(CircleShape)
-                            .background(if (playback.isActive) DuoPink else DuoSurfaceHigh)
                             .focusRequester(playFocus)
                             .focusProperties {
                                 up = sliderFocus
@@ -1321,13 +1335,9 @@ fun PlayerConsoleScreen(
                                     )
                                 }
                             }
-                            .then(
-                                if (playFocused) {
-                                    Modifier.border(2.dp, DuoTheme.colors.onPink, CircleShape)
-                                } else {
-                                    Modifier
-                                }
-                            )
+                            .duoFocusRing(CircleShape, focused = playFocused)
+                            .clip(CircleShape)
+                            .background(if (playback.isActive) DuoPink else DuoSurfaceHigh)
                             // Keep this focusable while playurl is loading so
                             // initial D-pad focus lands here; click is a no-op
                             // until media is active.
@@ -1491,12 +1501,10 @@ fun PlayerConsoleScreen(
                     ConsoleChip(
                         text = "音量 ${(playback.volume * 100).toInt()}%",
                         active = false,
-                        modifier = chipDown,
+                        modifier = chipDown.then(Modifier.focusRequester(volumeFocus)),
                         onClick = {
-                            controller.setVolume(
-                                if (playback.volume >= 0.99f) 0f
-                                else (playback.volume + 0.25f).coerceAtMost(1f)
-                            )
+                            pendingOverlayFocus = volumeFocus
+                            session.openOverlay(DuoOverlay.VOLUME)
                         },
                     )
                     ConsoleIconChip(
@@ -1974,8 +1982,9 @@ fun PlayerConsoleScreen(
                     ui.availableQualities.forEachIndexed { index, quality ->
                         val vipLocked = quality.vipOnly && ui.isVip == false
                         OverlayRow(
-                            label = if (vipLocked) "${quality.description} · 大会员" else quality.description,
+                            label = quality.description,
                             selected = quality.quality == ui.currentQuality?.quality,
+                            vip = quality.vipOnly,
                             focusRequester = if (index == selectedIndex) qualityRowFocus else null,
                             onFocus = { qualityFocusedRow = index },
                             onClick = {
@@ -1994,6 +2003,27 @@ fun PlayerConsoleScreen(
                 }
             }
         }
+    }
+
+    if (overlay == DuoOverlay.VOLUME) {
+        val volumeValues = listOf(0f, 0.25f, 0.5f, 0.75f, 1f)
+        DuoChoiceOverlay(
+            request = DuoChoiceRequest(
+                title = "音量",
+                options = volumeValues.map { value ->
+                    DuoChoiceOption(
+                        label = "${(value * 100).toInt()}%",
+                        selected = kotlin.math.abs(value - playback.volume) < 0.01f,
+                    )
+                },
+                onSelect = {},
+            ),
+            onSelect = { index ->
+                controller.setVolume(volumeValues[index])
+                session.closeOverlay()
+            },
+            onDismiss = { session.closeOverlay() },
+        )
     }
 
     if (overlay == DuoOverlay.SPEED) {
@@ -2085,6 +2115,7 @@ fun PlayerConsoleScreen(
                                 label = quality.description,
                                 selected = quality.quality == selectedQuality?.quality,
                                 focusRequester = if (index == 0) qualityFocus else null,
+                                vip = quality.vipOnly,
                                 onClick = { downloadQuality = quality },
                                 modifier = Modifier.weight(1f),
                             )
@@ -2361,8 +2392,10 @@ fun PlayerConsoleScreen(
     if (overlay == DuoOverlay.SETTINGS) {
         val danmakuFirstFocus = remember { FocusRequester() }
         val subtitleFirstFocus = remember { FocusRequester() }
+        val audioFirstFocus = remember { FocusRequester() }
         val filterFirstFocus = remember { FocusRequester() }
-        val sectionTabFocus = remember { List(2) { FocusRequester() } }
+        val settingsChoice = rememberDuoChoiceController()
+        val sectionTabFocus = remember { List(3) { FocusRequester() } }
         val blockedFieldFocus = remember { FocusRequester() }
         val regexFieldFocus = remember { FocusRequester() }
         val authorFirstFocus = remember { FocusRequester() }
@@ -2396,8 +2429,10 @@ fun PlayerConsoleScreen(
                     when {
                         !focusContent -> sectionTabFocus[section].requestFocus()
                         section == 0 -> danmakuFirstFocus.requestFocus()
-                        hasSubtitles -> subtitleFirstFocus.requestFocus()
-                        else -> sectionTabFocus[1].requestFocus()
+                        section == 1 && hasSubtitles -> subtitleFirstFocus.requestFocus()
+                        section == 2 && ui.availableAudioTracks.isNotEmpty() ->
+                            audioFirstFocus.requestFocus()
+                        else -> sectionTabFocus[section].requestFocus()
                     }
                 }
             }
@@ -2410,28 +2445,14 @@ fun PlayerConsoleScreen(
             if (event.nativeKeyEvent.repeatCount > 0) return true
             return when (event.key) {
                 Key.DirectionLeft -> {
-                    if (current != 0) selectSection(0, focusContent = false)
+                    selectSection((current + 2) % 3, focusContent = false)
                     true
                 }
                 Key.DirectionRight -> {
-                    if (current != 1) selectSection(1, focusContent = false)
+                    selectSection((current + 1) % 3, focusContent = false)
                     true
                 }
                 else -> false
-            }
-        }
-
-        fun cycleSubtitleTrack() {
-            val subs = ui.availableSubtitles
-            if (subs.isEmpty()) return
-            val index = subs.indexOfFirst { it.id == ui.currentSubtitle?.id }
-            val next = when {
-                index < 0 -> subs.first()
-                ui.subtitleEnabled -> subs[(index + 1) % subs.size]
-                else -> subs[index]
-            }
-            if (next.id != ui.currentSubtitle?.id || !ui.subtitleEnabled) {
-                vm.selectSubtitle(next)
             }
         }
 
@@ -2464,25 +2485,33 @@ fun PlayerConsoleScreen(
                 keyboard?.hide()
             }
         }
-        DisposableEffect(settingsPage) {
-            when (settingsPage) {
-                1, 2 -> session.setOverlayBackInterceptor {
-                    settingsPage = 0
+        DisposableEffect(settingsPage, settingsChoice.request) {
+            if (settingsChoice.request != null) {
+                session.setOverlayBackInterceptor {
+                    dismissDuoChoice(settingsChoice, scope)
                     true
                 }
-                3 -> session.setOverlayBackInterceptor {
-                    settingsPage = 1
-                    true
+            } else {
+                when (settingsPage) {
+                    1, 2 -> session.setOverlayBackInterceptor {
+                        settingsPage = 0
+                        true
+                    }
+                    3 -> session.setOverlayBackInterceptor {
+                        settingsPage = 1
+                        true
+                    }
+                    4 -> session.setOverlayBackInterceptor {
+                        settingsPage = 1
+                        true
+                    }
+                    else -> session.setOverlayBackInterceptor(null)
                 }
-                4 -> session.setOverlayBackInterceptor {
-                    settingsPage = 1
-                    true
-                }
-                else -> session.setOverlayBackInterceptor(null)
             }
             onDispose { session.setOverlayBackInterceptor(null) }
         }
 
+        CompositionLocalProvider(LocalDuoChoiceController provides settingsChoice) {
         OverlayCard(
             title = when (settingsPage) {
                 1 -> "弹幕过滤"
@@ -2580,33 +2609,15 @@ fun PlayerConsoleScreen(
                     DanmakuSettingRow(
                         label = "屏蔽等级",
                         value = danmakuShieldLevelLabel(ui.danmakuShieldLevel),
-                        focusRequester = filterFirstFocus,
-                        modifier = Modifier
-                            .focusProperties { up = FocusRequester.Cancel }
-                            .onPreviewKeyEvent { event ->
-                                if (event.type != KeyEventType.KeyDown) {
-                                    false
-                                } else {
-                                    when (event.key) {
-                                        Key.DirectionLeft -> {
-                                            vm.setDanmakuShieldLevel(
-                                                (ui.danmakuShieldLevel - 1).coerceAtLeast(0)
-                                            )
-                                            true
-                                        }
-                                        Key.DirectionRight -> {
-                                            vm.setDanmakuShieldLevel(
-                                                (ui.danmakuShieldLevel + 1).coerceAtMost(10)
-                                            )
-                                            true
-                                        }
-                                        else -> false
-                                    }
-                                }
-                            },
-                        onClick = {
-                            vm.setDanmakuShieldLevel(nextDanmakuShieldLevel(ui.danmakuShieldLevel))
+                        choices = (0..10).map { level ->
+                            DuoChoiceOption(
+                                label = danmakuShieldLevelLabel(level),
+                                selected = level == ui.danmakuShieldLevel,
+                            )
                         },
+                        onChoice = { index -> vm.setDanmakuShieldLevel(index) },
+                        focusRequester = filterFirstFocus,
+                        modifier = Modifier.focusProperties { up = FocusRequester.Cancel },
                     )
                     DanmakuSettingRow(
                         label = "滚动弹幕",
@@ -2712,7 +2723,7 @@ fun PlayerConsoleScreen(
                                 Key.ButtonL1 -> {
                                     if (event.nativeKeyEvent.repeatCount == 0) {
                                         selectSection(
-                                            (settingsSection - 1 + 2) % 2,
+                                            (settingsSection + 2) % 3,
                                             focusContent = true,
                                         )
                                     }
@@ -2721,7 +2732,7 @@ fun PlayerConsoleScreen(
                                 Key.ButtonR1 -> {
                                     if (event.nativeKeyEvent.repeatCount == 0) {
                                         selectSection(
-                                            (settingsSection + 1) % 2,
+                                            (settingsSection + 1) % 3,
                                             focusContent = true,
                                         )
                                     }
@@ -2756,6 +2767,18 @@ fun PlayerConsoleScreen(
                             onClick = { selectSection(1, focusContent = true) },
                             onKeyEvent = { event -> handleSectionKey(event, 1) },
                         )
+                        SettingsSectionTab(
+                            text = "音轨",
+                            selected = settingsSection == 2,
+                            focusRequester = sectionTabFocus[2],
+                            downFocus = if (ui.availableAudioTracks.isNotEmpty()) {
+                                audioFirstFocus
+                            } else {
+                                FocusRequester.Cancel
+                            },
+                            onClick = { selectSection(2, focusContent = true) },
+                            onKeyEvent = { event -> handleSectionKey(event, 2) },
+                        )
                     }
                     Text(
                         text = "L1/R1 切标签 · 方向键选择 · ${gamepadStyle.backLabel} 关闭",
@@ -2775,37 +2798,53 @@ fun PlayerConsoleScreen(
                         DanmakuSettingRow(
                             label = "不透明度",
                             value = "${(ui.danmakuOpacity * 100).toInt()}%",
-                            onClick = {
-                                vm.setDanmakuOpacity(
-                                    nextDanmakuValue(ui.danmakuOpacity, danmakuOpacityOptions)
+                            choices = danmakuOpacityOptions.map { value ->
+                                DuoChoiceOption(
+                                    label = "${(value * 100).toInt()}%",
+                                    selected = kotlin.math.abs(value - ui.danmakuOpacity) < 0.01f,
                                 )
+                            },
+                            onChoice = { index ->
+                                vm.setDanmakuOpacity(danmakuOpacityOptions[index])
                             },
                         )
                         DanmakuSettingRow(
                             label = "弹幕速度",
                             value = danmakuSpeedLabel(ui.danmakuSpeed),
-                            onClick = {
-                                vm.setDanmakuSpeed(
-                                    nextDanmakuValue(ui.danmakuSpeed, danmakuSpeedOptions)
+                            choices = danmakuSpeedOptions.map { value ->
+                                DuoChoiceOption(
+                                    label = danmakuSpeedLabel(value),
+                                    selected = kotlin.math.abs(value - ui.danmakuSpeed) < 0.01f,
                                 )
+                            },
+                            onChoice = { index ->
+                                vm.setDanmakuSpeed(danmakuSpeedOptions[index])
                             },
                         )
                         DanmakuSettingRow(
                             label = "字号",
                             value = danmakuSizeLabel(ui.danmakuTextSize),
-                            onClick = {
-                                vm.setDanmakuTextSize(
-                                    nextDanmakuValue(ui.danmakuTextSize, danmakuTextSizeOptions)
+                            choices = danmakuTextSizeOptions.map { value ->
+                                DuoChoiceOption(
+                                    label = danmakuSizeLabel(value),
+                                    selected = kotlin.math.abs(value - ui.danmakuTextSize) < 0.01f,
                                 )
+                            },
+                            onChoice = { index ->
+                                vm.setDanmakuTextSize(danmakuTextSizeOptions[index])
                             },
                         )
                         DanmakuSettingRow(
                             label = "显示区域",
                             value = danmakuAreaLabel(ui.danmakuArea),
-                            onClick = {
-                                vm.setDanmakuArea(
-                                    nextDanmakuValue(ui.danmakuArea, danmakuAreaOptions)
+                            choices = danmakuAreaOptions.map { value ->
+                                DuoChoiceOption(
+                                    label = danmakuAreaLabel(value),
+                                    selected = kotlin.math.abs(value - ui.danmakuArea) < 0.01f,
                                 )
+                            },
+                            onChoice = { index ->
+                                vm.setDanmakuArea(danmakuAreaOptions[index])
                             },
                         )
                         DanmakuSettingRow(
@@ -2820,10 +2859,14 @@ fun PlayerConsoleScreen(
                         DanmakuSettingRow(
                             label = "同屏上限",
                             value = danmakuMaxOnScreenLabel(ui.danmakuMaxOnScreen),
-                            onClick = {
-                                vm.setDanmakuMaxOnScreen(
-                                    nextDanmakuMaxOnScreen(ui.danmakuMaxOnScreen)
+                            choices = danmakuMaxOnScreenOptions.map { value ->
+                                DuoChoiceOption(
+                                    label = danmakuMaxOnScreenLabel(value),
+                                    selected = value == ui.danmakuMaxOnScreen,
                                 )
+                            },
+                            onChoice = { index ->
+                                vm.setDanmakuMaxOnScreen(danmakuMaxOnScreenOptions[index])
                             },
                         )
                         DanmakuSettingRow(
@@ -2838,63 +2881,125 @@ fun PlayerConsoleScreen(
                             modifier = Modifier.focusProperties { down = FocusRequester.Cancel },
                             onClick = { settingsPage = 1 },
                         )
-                    } else if (!hasSubtitles) {
-                        Text(
-                            text = "当前视频没有字幕",
-                            color = DuoTextSecondary,
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 12.dp),
-                        )
+                    } else if (settingsSection == 1) {
+                        if (!hasSubtitles) {
+                            Text(
+                                text = "当前视频没有字幕",
+                                color = DuoTextSecondary,
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 12.dp),
+                            )
+                        } else {
+                            DanmakuSettingRow(
+                                label = "显示字幕",
+                                value = if (ui.subtitleEnabled) "开" else "关",
+                                focusRequester = subtitleFirstFocus,
+                                modifier = Modifier.focusProperties { up = sectionTabFocus[1] },
+                                onClick = { vm.toggleSubtitle() },
+                            )
+                            DanmakuSettingRow(
+                                label = "字幕轨道",
+                                value = ui.currentSubtitle?.displayName ?: "未选择",
+                                choices = ui.availableSubtitles.map { track ->
+                                    DuoChoiceOption(
+                                        label = track.displayName,
+                                        selected = track.id == ui.currentSubtitle?.id,
+                                    )
+                                },
+                                onChoice = { index ->
+                                    ui.availableSubtitles.getOrNull(index)?.let(vm::selectSubtitle)
+                                },
+                            )
+                            DanmakuSettingRow(
+                                label = "字号",
+                                value = subtitleSizeLabel(ui.subtitleTextSizeSp),
+                                choices = subtitleTextSizeOptions.map { value ->
+                                    DuoChoiceOption(
+                                        label = subtitleSizeLabel(value),
+                                        selected = kotlin.math.abs(
+                                            value - ui.subtitleTextSizeSp
+                                        ) < 0.01f,
+                                    )
+                                },
+                                onChoice = { index ->
+                                    vm.setSubtitleTextSize(subtitleTextSizeOptions[index])
+                                },
+                            )
+                            DanmakuSettingRow(
+                                label = "背景",
+                                value = subtitleBackgroundLabel(ui.subtitleBackgroundAlpha),
+                                choices = subtitleBackgroundOptions.map { value ->
+                                    DuoChoiceOption(
+                                        label = subtitleBackgroundLabel(value),
+                                        selected = kotlin.math.abs(
+                                            value - ui.subtitleBackgroundAlpha
+                                        ) < 0.01f,
+                                    )
+                                },
+                                onChoice = { index ->
+                                    vm.setSubtitleBackgroundAlpha(
+                                        subtitleBackgroundOptions[index]
+                                    )
+                                },
+                            )
+                            DanmakuSettingRow(
+                                label = "位置",
+                                value = subtitlePositionLabel(ui.subtitleBottomPaddingDp),
+                                choices = subtitleBottomPaddingOptions.map { value ->
+                                    DuoChoiceOption(
+                                        label = subtitlePositionLabel(value),
+                                        selected = value == ui.subtitleBottomPaddingDp,
+                                    )
+                                },
+                                onChoice = { index ->
+                                    vm.setSubtitleBottomPadding(
+                                        subtitleBottomPaddingOptions[index]
+                                    )
+                                },
+                                modifier = Modifier.focusProperties { down = FocusRequester.Cancel },
+                            )
+                        }
                     } else {
-                        DanmakuSettingRow(
-                            label = "显示字幕",
-                            value = if (ui.subtitleEnabled) "开" else "关",
-                            focusRequester = subtitleFirstFocus,
-                            modifier = Modifier.focusProperties { up = sectionTabFocus[1] },
-                            onClick = { vm.toggleSubtitle() },
-                        )
-                        DanmakuSettingRow(
-                            label = "字幕轨道",
-                            value = ui.currentSubtitle?.displayName ?: "未选择",
-                            onClick = { cycleSubtitleTrack() },
-                        )
-                        DanmakuSettingRow(
-                            label = "字号",
-                            value = subtitleSizeLabel(ui.subtitleTextSizeSp),
-                            onClick = {
-                                vm.setSubtitleTextSize(
-                                    nextSubtitleValue(
-                                        ui.subtitleTextSizeSp,
-                                        subtitleTextSizeOptions
-                                    )
+                        if (ui.availableAudioTracks.isEmpty()) {
+                            Text(
+                                text = "当前内容不支持切换音轨",
+                                color = DuoTextSecondary,
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 12.dp),
+                            )
+                        } else {
+                            ui.availableAudioTracks.forEachIndexed { index, track ->
+                                val vipLocked = track.vipOnly && ui.isVip == false
+                                DanmakuSettingRow(
+                                    label = track.label,
+                                    value = when {
+                                        track.id == ui.currentAudio?.id -> "使用中"
+                                        !track.supported -> "设备不支持"
+                                        else -> ""
+                                    },
+                                    vip = track.vipOnly,
+                                    focusRequester = if (index == 0) audioFirstFocus else null,
+                                    modifier = Modifier.focusProperties {
+                                        if (index == 0) up = sectionTabFocus[2]
+                                        if (index == ui.availableAudioTracks.lastIndex) {
+                                            down = FocusRequester.Cancel
+                                        }
+                                    },
+                                    onClick = {
+                                        when {
+                                            !track.supported -> toast("此设备无法解码${track.label}音轨")
+                                            vipLocked -> toast("该音轨需要大会员")
+                                            else -> vm.selectAudio(track)
+                                        }
+                                    },
                                 )
-                            },
-                        )
-                        DanmakuSettingRow(
-                            label = "背景",
-                            value = subtitleBackgroundLabel(ui.subtitleBackgroundAlpha),
-                            onClick = {
-                                vm.setSubtitleBackgroundAlpha(
-                                    nextSubtitleValue(
-                                        ui.subtitleBackgroundAlpha,
-                                        subtitleBackgroundOptions
-                                    )
-                                )
-                            },
-                        )
-                        DanmakuSettingRow(
-                            label = "位置",
-                            value = subtitlePositionLabel(ui.subtitleBottomPaddingDp),
-                            modifier = Modifier.focusProperties { down = FocusRequester.Cancel },
-                            onClick = {
-                                vm.setSubtitleBottomPadding(
-                                    nextSubtitleBottomPadding(ui.subtitleBottomPaddingDp)
-                                )
-                            },
-                        )
+                            }
+                        }
                     }
                 }
             }
+        }
+        DuoChoiceHost(settingsChoice)
         }
     }
 
@@ -4605,6 +4710,7 @@ private fun DownloadQualityChip(
     label: String,
     selected: Boolean,
     focusRequester: FocusRequester?,
+    vip: Boolean = false,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -4634,6 +4740,10 @@ private fun DownloadQualityChip(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
+        if (vip) {
+            Spacer(Modifier.width(4.dp))
+            DuoVipBadge(compact = true)
+        }
         if (selected) {
             Text("✓", color = DuoPink, fontSize = 11.sp)
         }
@@ -4644,6 +4754,7 @@ private fun DownloadQualityChip(
 private fun OverlayRow(
     label: String,
     selected: Boolean,
+    vip: Boolean = false,
     focusRequester: FocusRequester? = null,
     onFocus: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
@@ -4668,6 +4779,10 @@ private fun OverlayRow(
             fontSize = 12.sp,
             modifier = Modifier.weight(1f),
         )
+        if (vip) {
+            DuoVipBadge()
+            Spacer(Modifier.width(6.dp))
+        }
         if (selected) {
             Icon(Icons.Filled.Check, contentDescription = null, tint = DuoPink, modifier = Modifier.size(16.dp))
         }
@@ -4896,17 +5011,42 @@ private fun DanmakuAuthorRow(
 private fun DanmakuSettingRow(
     label: String,
     value: String,
+    vip: Boolean = false,
+    choices: List<DuoChoiceOption>? = null,
+    onChoice: ((Int) -> Unit)? = null,
     focusRequester: FocusRequester? = null,
     modifier: Modifier = Modifier,
-    onClick: () -> Unit,
+    onClick: (() -> Unit)? = null,
 ) {
+    val localRowFocus = remember { FocusRequester() }
+    val rowFocus = focusRequester ?: localRowFocus
+    val choiceController = LocalDuoChoiceController.current
     Row(
         modifier = modifier
             .fillMaxWidth()
             .duoFocusRing(RoundedCornerShape(6.dp))
             .clip(RoundedCornerShape(6.dp))
-            .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
-            .duoClickable(onClick = onClick)
+            .then(
+                if (focusRequester != null) {
+                    Modifier.focusRequester(focusRequester)
+                } else {
+                    Modifier.focusRequester(localRowFocus)
+                }
+            )
+            .duoClickable {
+                if (choices != null && onChoice != null && choiceController != null) {
+                    choiceController.show(
+                        DuoChoiceRequest(
+                            title = label,
+                            options = choices,
+                            returnFocus = rowFocus,
+                            onSelect = onChoice,
+                        )
+                    )
+                } else {
+                    onClick?.invoke()
+                }
+            }
             .padding(horizontal = 10.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -4916,6 +5056,10 @@ private fun DanmakuSettingRow(
             fontSize = 12.sp,
             modifier = Modifier.weight(1f),
         )
+        if (vip) {
+            DuoVipBadge()
+            Spacer(Modifier.width(6.dp))
+        }
         Text(text = value, color = DuoPink, fontSize = 12.sp)
     }
 }
@@ -4969,9 +5113,6 @@ private fun buildDanmakuAuthorList(
     return active + missing
 }
 
-private fun nextDanmakuShieldLevel(current: Int): Int =
-    if (current >= 10) 0 else current + 1
-
 private fun danmakuFilterSummary(
     shieldLevel: Int,
     showScroll: Boolean,
@@ -5012,19 +5153,8 @@ private fun OverlayActionButton(
     }
 }
 
-private fun nextDanmakuMaxOnScreen(current: Int): Int {
-    val index = danmakuMaxOnScreenOptions.indexOf(current)
-    val nextIndex = if (index >= 0) (index + 1) % danmakuMaxOnScreenOptions.size else 1
-    return danmakuMaxOnScreenOptions[nextIndex]
-}
-
 private fun danmakuMaxOnScreenLabel(value: Int): String =
     if (value <= 0) "不限" else value.toString()
-
-private fun nextDanmakuValue(current: Float, options: List<Float>): Float {
-    val index = options.indexOfFirst { kotlin.math.abs(it - current) < 0.01f }
-    return options[(index + 1).mod(options.size)]
-}
 
 private fun danmakuSpeedLabel(value: Float): String = when {
     value <= 0.8f -> "0.7×"
@@ -5065,16 +5195,6 @@ private fun subtitlePositionLabel(value: Int): String = when {
     value <= 40 -> "靠下"
     value <= 70 -> "标准"
     else -> "靠上"
-}
-
-private fun nextSubtitleValue(current: Float, options: List<Float>): Float {
-    val index = options.indexOfFirst { kotlin.math.abs(it - current) < 0.01f }
-    return options[(index + 1).mod(options.size)]
-}
-
-private fun nextSubtitleBottomPadding(current: Int): Int {
-    val index = subtitleBottomPaddingOptions.indexOf(current)
-    return subtitleBottomPaddingOptions[(index + 1).mod(subtitleBottomPaddingOptions.size)]
 }
 
 @Composable

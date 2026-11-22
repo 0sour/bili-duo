@@ -47,6 +47,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -78,9 +79,12 @@ import cn.xfangfang.biliduo.data.model.PgcSeasonItem
 import cn.xfangfang.biliduo.ui.theme.DuoTheme
 import cn.xfangfang.biliduo.ui.common.DuoPalette
 import cn.xfangfang.biliduo.ui.duo.requestPageFocus
+import cn.xfangfang.biliduo.ui.duo.GridFocusNavigator
 import cn.xfangfang.biliduo.ui.duo.duoClickable
 import cn.xfangfang.biliduo.ui.duo.duoFocusRing
+import cn.xfangfang.biliduo.ui.duo.duoGridDown
 import cn.xfangfang.biliduo.ui.duo.duoTabCycling
+import cn.xfangfang.biliduo.ui.duo.rememberGridFocusNavigator
 import cn.xfangfang.biliduo.ui.top.TopAmbientUi
 import cn.xfangfang.biliduo.ui.top.TopGlyph
 import cn.xfangfang.biliduo.ui.top.TopPreviewUi
@@ -106,6 +110,7 @@ private enum class TabFocusTarget { TAB, CONTENT }
 fun HomeScreen(
     onVideoClick: (String) -> Unit,
     onPgcClick: (Long) -> Unit = {},
+    onPgcIndexClick: (Int) -> Unit = {},
     onLiveClick: (Long) -> Unit = {},
     onVideoFocused: (TopPreviewUi) -> Unit = {},
     onFocusCleared: () -> Unit = {},
@@ -114,9 +119,16 @@ fun HomeScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val gridState = rememberLazyGridState()
+    val pgcGridState = rememberLazyGridState()
+    val videoNavigator = rememberGridFocusNavigator(3, gridState)
+    val liveNavigator = rememberGridFocusNavigator(2, gridState)
+    val pgcNavigator = rememberGridFocusNavigator(4, pgcGridState)
+    var lastTabName by rememberSaveable { mutableStateOf<String?>(null) }
+    var lastFocusedKey by rememberSaveable { mutableStateOf<String?>(null) }
     val firstFocus = remember { FocusRequester() }
     val tabFocuses = remember { List(HomeTab.entries.size) { FocusRequester() } }
     val refreshFocus = remember { FocusRequester() }
+    val indexFocus = remember { FocusRequester() }
     val areaFocus = remember { FocusRequester() }
     val followedFocus = remember { FocusRequester() }
     val subAreaFocus = remember { FocusRequester() }
@@ -171,7 +183,15 @@ fun HomeScreen(
 
     LaunchedEffect(state.tab) {
         onTopAmbient(homeTabAmbient(state.tab))
-        runCatching { gridState.scrollToItem(0) }
+        if (lastTabName != state.tab.name) {
+            val changed = lastTabName != null
+            lastTabName = state.tab.name
+            if (changed) {
+                lastFocusedKey = null
+                runCatching { gridState.scrollToItem(0) }
+                runCatching { pgcGridState.scrollToItem(0) }
+            }
+        }
     }
     LaunchedEffect(itemsEmpty, state.isLoading, state.error) {
         if (itemsEmpty && !state.isLoading) {
@@ -182,7 +202,24 @@ fun HomeScreen(
     LaunchedEffect(state.tab, firstKey, itemsEmpty, tabFocusTarget) {
         if (itemsEmpty || tabFocusTarget != TabFocusTarget.CONTENT) return@LaunchedEffect
         delay(80L)
-        runCatching { firstFocus.requestPageFocus() }
+        val savedKey = lastFocusedKey
+        val savedIndex = when {
+            isLive -> savedKey?.removePrefix("live:")?.toLongOrNull()?.let { id ->
+                state.liveItems.indexOfFirst { it.roomId == id }
+            } ?: -1
+            isPgc -> savedKey?.removePrefix("pgc:")?.toLongOrNull()?.let { id ->
+                state.pgcItems.indexOfFirst { it.seasonId == id }
+            } ?: -1
+            else -> savedKey?.removePrefix("video:")?.let { bvid ->
+                state.items.indexOfFirst { it.bvid == bvid }
+            } ?: -1
+        }
+        when {
+            savedIndex > 0 && isLive -> liveNavigator.focus(savedIndex, state.liveItems.size)
+            savedIndex > 0 && isPgc -> pgcNavigator.focus(savedIndex, state.pgcItems.size)
+            savedIndex > 0 -> videoNavigator.focus(savedIndex, state.items.size)
+            else -> runCatching { firstFocus.requestPageFocus() }
+        }
         tabFocusTarget = null
     }
     LaunchedEffect(state.tab, tabFocusTarget) {
@@ -290,6 +327,14 @@ fun HomeScreen(
             onRefresh = viewModel::refresh,
             isRefreshing = state.isLoading,
             refreshFocus = refreshFocus,
+            indexFocus = indexFocus,
+            onIndex = if (state.tab.isPgc) {
+                {
+                    onPgcIndexClick(if (state.tab == HomeTab.ANIME) 0 else 1)
+                }
+            } else {
+                null
+            },
             downFocus = if (itemsEmpty) null else firstFocus,
         )
 
@@ -345,6 +390,7 @@ fun HomeScreen(
                     selectedSubAreaId = state.liveSubAreaId,
                     showSecondaryRows = liveRowsExpanded,
                     gridState = gridState,
+                    navigator = liveNavigator,
                     firstFocus = firstFocus,
                     areaFocus = areaFocus,
                     followedFocus = followedFocus,
@@ -357,19 +403,36 @@ fun HomeScreen(
                     onRetry = viewModel::refresh,
                     onAreaSelected = viewModel::selectLiveArea,
                     onSubAreaSelected = viewModel::selectLiveSubArea,
-                    onFocused = { room -> onVideoFocused(room.toTopPreview()) },
+                    onFocused = { room ->
+                        lastFocusedKey = "live:${room.roomId}"
+                        onVideoFocused(room.toTopPreview())
+                    },
                     onFocusCleared = onFocusCleared,
-                    onClick = { onLiveClick(it.roomId) },
-                    onFollowedClick = { onLiveClick(it.roomId) },
+                    onClick = { room ->
+                        lastFocusedKey = "live:${room.roomId}"
+                        onLiveClick(room.roomId)
+                    },
+                    onFollowedClick = { anchor ->
+                        lastFocusedKey = "live:${anchor.roomId}"
+                        onLiveClick(anchor.roomId)
+                    },
                 )
             }
             isPgc -> {
                 PgcSeasonGrid(
                     items = state.pgcItems,
+                    gridState = pgcGridState,
+                    navigator = pgcNavigator,
                     firstFocus = firstFocus,
-                    onFocused = { season -> onVideoFocused(season.toTopPreview(state.tab)) },
+                    onFocused = { season ->
+                        lastFocusedKey = "pgc:${season.seasonId}"
+                        onVideoFocused(season.toTopPreview(state.tab))
+                    },
                     onFocusCleared = onFocusCleared,
-                    onClick = { onPgcClick(it.seasonId) },
+                    onClick = { season ->
+                        lastFocusedKey = "pgc:${season.seasonId}"
+                        onPgcClick(season.seasonId)
+                    },
                 )
             }
             else -> {
@@ -384,15 +447,20 @@ fun HomeScreen(
                     itemsIndexed(state.items, key = { _, item -> item.bvid }) { index, item ->
                         HomeVideoCard(
                             item = item,
-                            focusRequester = if (index == 0) firstFocus else null,
+                            modifier = Modifier.duoGridDown(index, state.items.size, videoNavigator),
+                            focusRequester = if (index == 0) firstFocus else videoNavigator.requester(index),
                             onFocusChanged = { focused ->
                                 if (focused) {
+                                    lastFocusedKey = "video:${item.bvid}"
                                     onVideoFocused(item.toTopPreview())
                                 } else {
                                     onFocusCleared()
                                 }
                             },
-                            onClick = { onVideoClick(item.bvid) },
+                            onClick = {
+                                lastFocusedKey = "video:${item.bvid}"
+                                onVideoClick(item.bvid)
+                            },
                         )
                     }
                     if (state.isLoadingMore) {
@@ -471,6 +539,8 @@ private fun HomeHeader(
     onRefresh: () -> Unit,
     isRefreshing: Boolean,
     refreshFocus: FocusRequester,
+    indexFocus: FocusRequester,
+    onIndex: (() -> Unit)?,
     downFocus: FocusRequester?,
 ) {
     Row(
@@ -490,6 +560,29 @@ private fun HomeHeader(
             Spacer(Modifier.width(16.dp))
         }
         Spacer(Modifier.weight(1f))
+        if (onIndex != null) {
+            Box(
+                modifier = Modifier
+                    .height(32.dp)
+                    .focusRequester(indexFocus)
+                    .duoFocusRing(RoundedCornerShape(8.dp))
+                    .then(
+                        if (downFocus != null) {
+                            Modifier.focusProperties { down = downFocus }
+                        } else {
+                            Modifier
+                        }
+                    )
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(HomeCardBg)
+                    .duoClickable(onClick = onIndex)
+                    .padding(horizontal = 10.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("索引", color = HomeSecondary, fontSize = 11.sp)
+            }
+            Spacer(Modifier.width(6.dp))
+        }
         Box(
             modifier = Modifier
                 .size(32.dp)
@@ -568,6 +661,7 @@ private fun LiveSection(
     selectedSubAreaId: Int,
     showSecondaryRows: Boolean,
     gridState: LazyGridState,
+    navigator: GridFocusNavigator,
     firstFocus: FocusRequester,
     areaFocus: FocusRequester,
     followedFocus: FocusRequester,
@@ -624,9 +718,15 @@ private fun LiveSection(
         }
     }
     // Keep the grid at the top when the area changes; the old cards stay
-    // visible until the new response replaces them.
+    // visible until the new response replaces them. Returning from a player
+    // must not reset the restored position.
+    var lastAreaKey by rememberSaveable { mutableStateOf<String?>(null) }
     LaunchedEffect(selectedAreaId, selectedSubAreaId) {
-        gridState.scrollToItem(0)
+        val key = "$selectedAreaId:$selectedSubAreaId"
+        if (lastAreaKey != null && lastAreaKey != key) {
+            gridState.scrollToItem(0)
+        }
+        lastAreaKey = key
     }
     Column(Modifier.fillMaxSize()) {
         LazyRow(
@@ -772,7 +872,8 @@ private fun LiveSection(
             itemsIndexed(rooms, key = { _, room -> room.roomId }) { index, room ->
                 LiveRoomCard(
                     room = room,
-                    focusRequester = if (index == 0) firstFocus else null,
+                    modifier = Modifier.duoGridDown(index, rooms.size, navigator),
+                    focusRequester = if (index == 0) firstFocus else navigator.requester(index),
                     // Let the grid's top row jump into the filter rows instead
                     // of skipping straight to the header tabs.
                     upFocusRequester = gridUpFocus.takeIf { index < 2 },
@@ -950,6 +1051,7 @@ private fun LiveFollowedRow(
 @Composable
 private fun LiveRoomCard(
     room: LiveRoomItem,
+    modifier: Modifier = Modifier,
     focusRequester: FocusRequester?,
     upFocusRequester: FocusRequester?,
     onFocusChanged: (Boolean) -> Unit,
@@ -962,7 +1064,7 @@ private fun LiveRoomCard(
         .joinToString(" · ")
     var focused by remember { mutableStateOf(false) }
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
             .then(
@@ -1087,6 +1189,8 @@ private fun LiveRoomCard(
 @Composable
 private fun PgcSeasonGrid(
     items: List<PgcSeasonItem>,
+    gridState: LazyGridState,
+    navigator: GridFocusNavigator,
     firstFocus: FocusRequester,
     onFocused: (PgcSeasonItem) -> Unit,
     onFocusCleared: () -> Unit,
@@ -1094,6 +1198,7 @@ private fun PgcSeasonGrid(
 ) {
     LazyVerticalGrid(
         columns = GridCells.Fixed(4),
+        state = gridState,
         contentPadding = PaddingValues(start = 10.dp, end = 10.dp, top = 0.dp, bottom = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(0.dp),
@@ -1102,7 +1207,8 @@ private fun PgcSeasonGrid(
         itemsIndexed(items, key = { _, item -> item.seasonId }) { index, season ->
             PgcSeasonCard(
                 season = season,
-                focusRequester = if (index == 0) firstFocus else null,
+                modifier = Modifier.duoGridDown(index, items.size, navigator),
+                focusRequester = if (index == 0) firstFocus else navigator.requester(index),
                 onFocusChanged = { focused ->
                     if (focused) onFocused(season) else onFocusCleared()
                 },
@@ -1115,13 +1221,14 @@ private fun PgcSeasonGrid(
 @Composable
 private fun PgcSeasonCard(
     season: PgcSeasonItem,
+    modifier: Modifier = Modifier,
     focusRequester: FocusRequester?,
     onFocusChanged: (Boolean) -> Unit,
     onClick: () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
             .onFocusChanged {
@@ -1272,13 +1379,14 @@ private fun PgcSeasonItem.toTopPreview(tab: HomeTab): TopPreviewUi = TopPreviewU
 @Composable
 private fun HomeVideoCard(
     item: HomeVideoItem,
+    modifier: Modifier = Modifier,
     focusRequester: FocusRequester?,
     onFocusChanged: (Boolean) -> Unit = {},
     onClick: () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
             .onFocusChanged {

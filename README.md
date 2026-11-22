@@ -10,27 +10,28 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc58-FB7299">
+  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc59-FB7299">
   <img alt="status" src="https://img.shields.io/badge/status-test%20build-orange">
   <img alt="Android" src="https://img.shields.io/badge/Android-24%2B-3DDC84?logo=android&logoColor=white">
   <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-1.9.23-7F52FF?logo=kotlin&logoColor=white">
   <img alt="Compose" src="https://img.shields.io/badge/Jetpack%20Compose-2024.04-4285F4?logo=jetpackcompose&logoColor=white">
   <img alt="Media3" src="https://img.shields.io/badge/Media3-1.4.1-FF6D00">
-  <img alt="tests" src="https://img.shields.io/badge/tests-252%20passing-brightgreen">
+  <img alt="tests" src="https://img.shields.io/badge/tests-268%20passing-brightgreen">
   <img alt="license" src="https://img.shields.io/badge/license-MIT-blue">
 </p>
 
 上屏只负责视频画面，下屏用一块 `Presentation` 承载完整 UI；手柄和触摸共用同一棵
 Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，也没有上屏 OSD。
 
-> 当前版本：**0.2.0-rc58**（versionCode 59，第五版测试版）
-> 下载：https://github.com/0sour/bili-duo/releases/tag/v0.2.0-rc58
-> 状态：功能完整的 **测试版**，252 个单元测试通过；第五版汇总 rc58：
-> **PGC 追番 / 我的追番追剧 / 番剧影视搜索 / 播放器内视频合集**、
-> **弹幕过滤（屏蔽等级 0–10、滚动/顶部/底部类型、正则、按作者屏蔽）**、
-> **离线弹幕（下载时保存 XML，断网播放仍有弹幕）**，以及图片按目标宽度请求
-> WebP、视频详情 LRU/在途合并的加载优化；手柄提示字母随 Xbox/Retro 风格即时切换。
-> rc50–rc57 的上下屏交换、启动器快捷方式、稍后再看、亮暗色主题与视频默认值继续保留。
+> 当前版本：**0.2.0-rc59**（versionCode 60，第六版测试版）
+> 下载：https://github.com/0sour/bili-duo/releases/tag/v0.2.0-rc59
+> 国内下载站：https://bili-duo.sourden.xyz/
+> 状态：功能完整的 **测试版**，268 个单元测试通过；第六版汇总 rc59：
+> **番剧 / 影视索引**、**音轨选择与 HDR/4K 清晰度**、**应用内检查更新**
+> （侧栏新版本提示 + 国内源/GitHub 双源下载弹窗）、首页/动态返回焦点恢复、
+> 直播信息卡与粉丝牌修复、起播与 source error 自动恢复。
+> rc50–rc58 的上下屏交换、启动器快捷方式、稍后再看、亮暗色主题、视频默认值、
+> 追番追剧、视频合集与弹幕过滤继续保留。
 
 ## 界面预览
 
@@ -150,7 +151,7 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
 | 图片 | Coil 2.6（含 GIF）、telephoto-zoomable |
 | 登录 | ZXing 二维码、极验 Geetest WebView |
 | 构建 | Gradle 8.7、AGP 8.4.0、JDK 17、R8 |
-| 测试 | JUnit4，252 个单元测试 |
+| 测试 | JUnit4，268 个单元测试 |
 | 架构 | Activity + Presentation、MVVM + StateFlow、单一 `PlayerController` |
 | 界面语言 | 简体中文（当前未做多语言资源） |
 
@@ -160,7 +161,7 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
 
 ### 已验证
 
-- **单元测试**：252 个用例通过（`./gradlew testDebugUnitTest`）。
+- **单元测试**：268 个用例通过（`./gradlew testDebugUnitTest`）。
 - **MuMu（1280×960 / 320dpi）**：双屏壳层、首页、搜索、播放控制台、直播列表与
   HLS 播放、动态空态/登录态、单屏回退提示、签名包安装与冷启动。
 - **Retroid Pocket Duo 真机**：
@@ -307,12 +308,17 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
     XML，本地/断网播放仍有弹幕；首页图片按目标宽度请求 WebP、视频详情 LRU 与
     在途合并；252 单测通过。Duo 自主验收 + 用户复测无 FATAL/ANR，测试下载与
     本地屏蔽设置已还原。
+  - rc59 第六版测试版：番剧/影视索引（6 类型、筛选、分页、上屏预览）；音轨选择
+    （自动/无损/杜比/192K/132K/64K）与 HDR/4K 清晰度、VIP「大会员」标记、杜比
+    设备能力检测与降级；多档值行点击弹窗、字幕轨道列表选择；首页返回恢复 tab/
+    卡片/滚动、网格 Down 同列、动态视频返回原卡；直播信息卡重排、粉丝牌行内并
+    加空格、评论 5 秒回底；起播 500ms、playurl 20s 缓存、source error 自动重试；
+    应用内检查更新（关于页手动/自动检查、侧栏新版本胶囊、国内源/GitHub 双源弹窗、
+    SHA-256/包名/versionCode/签名校验）；268 单测通过。
   - 登录、个人中心、历史/收藏/关注只读浏览；弹幕发送→撤回闭环。
 
 ### 未实现（代码层面）
 
-- **番剧 / 影视索引**：`pgc/page/index/condition` + `result` 的发现页尚未加入，
-  计划 rc59；当前可通过首页番剧/影视 tab 与搜索使用 PGC 内容。
 - **动态转发 / 发布**：点赞已实现；转发和图文/纯文本发布仍只读（需要创作者向
   payload、图片上传与更完整的发布 UI，暂不纳入本 RC）。
 - **PGC 大会员 / 付费集**：选集已显示 badge、试看与大会员提示；没有内嵌购买/
@@ -450,7 +456,7 @@ keyPassword=CHANGE_ME
 ### 测试产物
 
 `dist/` 只保留构建说明；APK 通过 GitHub Releases 或本地构建分发，不进入 Git 历史。
-当前 rc58 的哈希与说明见 [`dist/README.md`](dist/README.md)。
+当前 rc59 的哈希与说明见 [`dist/README.md`](dist/README.md)。
 
 ---
 

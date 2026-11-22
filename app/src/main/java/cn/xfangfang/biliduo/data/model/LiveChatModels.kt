@@ -35,6 +35,11 @@ data class LiveChatMessage(
     val uname: String = "",
     val text: String = "",
     val medal: String? = null,
+    /** Split medal fields for the official-style fan badge. */
+    val medalName: String = "",
+    val medalLevel: Int = 0,
+    /** 0xFFRRGGBB; null when the payload did not carry a usable color. */
+    val medalColor: Long? = null,
     val isAdmin: Boolean = false,
     val isSuperChat: Boolean = false,
     /** Server-side SC id, used by SUPER_CHAT_MESSAGE_DELETE. */
@@ -76,6 +81,10 @@ data class LiveHistoryDanmakuItem(
 fun LiveHistoryDanmakuItem.toLiveChatMessage(index: Int): LiveChatMessage {
     val level = medal?.getOrNull(0)?.let { runCatching { it.asInt }.getOrNull() } ?: 0
     val name = medal?.getOrNull(1)?.let { runCatching { it.asString }.getOrNull() }.orEmpty()
+    val color = medal?.getOrNull(4)
+        ?.let { runCatching { it.asLong }.getOrNull() }
+        ?.takeIf { it != 0L }
+        ?.let { 0xFF000000L or (it and 0xFFFFFF) }
     return LiveChatMessage(
         // Historical entries load once, but keep ids unique against the WS
         // counter (which starts at 1) for the LazyColumn keys.
@@ -86,6 +95,9 @@ fun LiveHistoryDanmakuItem.toLiveChatMessage(index: Int): LiveChatMessage {
         medal = name.takeIf { it.isNotBlank() }?.let {
             if (level > 0) "$it $level" else it
         },
+        medalName = name,
+        medalLevel = level,
+        medalColor = color,
         isAdmin = isAdmin == 1,
         timestampSec = ctime,
     )
@@ -132,6 +144,10 @@ object LiveChatParser {
         val medalArray = info.arrayAt(3)
         val medalName = medalArray?.stringAt(1).orEmpty()
         val medalLevel = medalArray?.intAt(0) ?: 0
+        val medalColor = medalArray?.intAt(4)
+            ?.toLong()
+            ?.takeIf { it != 0L }
+            ?.let { 0xFF000000L or (it and 0xFFFFFF) }
         val medal = medalName.takeIf { it.isNotBlank() }?.let {
             if (medalLevel > 0) "$it $medalLevel" else it
         }
@@ -143,6 +159,9 @@ object LiveChatParser {
                 uname = uname.ifBlank { "匿名用户" },
                 text = text,
                 medal = medal,
+                medalName = medalName,
+                medalLevel = medalLevel,
+                medalColor = medalColor,
                 isAdmin = admin,
                 timestampSec = timestamp,
             )

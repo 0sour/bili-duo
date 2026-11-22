@@ -37,7 +37,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 enum class PlaybackSource { ONLINE, LOCAL }
 
 /** Cap the wait for player/v2 so a slow metadata call never blocks playback. */
-private const val META_WAIT_MS = 600L
+private const val META_WAIT_MS = 350L
 /** Danmaku XML can be several MB; let the first video segment win. */
 private const val DANMAKU_DEFER_MS = 900L
 /** /nav is only needed to lock VIP qualities; it need not run per video. */
@@ -56,6 +56,10 @@ data class PlayerUiState(
     val resumePositionMs: Long = 0L,
     val availableQualities: List<QualityOption> = emptyList(),
     val currentQuality: QualityOption? = null,
+    val availableAudioTracks: List<AudioTrackOption> = emptyList(),
+    val currentAudio: AudioTrackOption? = null,
+    /** Set when 4K/HDR decode fails and playback falls back to a lower tier. */
+    val qualityFallbackNotice: String? = null,
     val dashVideo: DashStream? = null,
     val dashAudio: DashStream? = null,
     val isDash: Boolean = false,
@@ -567,11 +571,13 @@ class PlayerViewModel(
         )
     }
 
-    private fun loadPgcPlayUrl(episode: PgcEpisode) {
+    private fun loadPgcPlayUrl(episode: PgcEpisode, forceRefresh: Boolean = false) {
         playUrlJob?.cancel()
         playUrlJob = viewModelScope.launch {
             val pendingMeta = metaJob
-            val playUrlDeferred = async { repository.getPgcPlayUrl(episode.epId, episode.cid) }
+            val playUrlDeferred = async {
+                repository.getPgcPlayUrl(episode.epId, episode.cid, forceRefresh)
+            }
             // Local progress already wins over the cloud position; waiting for
             // player/wbi in that case only delays the first frame.
             val meta = if (_uiState.value.resumePositionMs > 0L) {
@@ -953,7 +959,32 @@ class PlayerViewModel(
             videoUrl = null
         )
         playUrlJob?.cancel()
-        loadPlayUrlDash(bvid, cid)
+        loadPlayUrlDash(bvid, cid, forceRefresh = true)
+    }
+
+    /**
+     * Re-fetch the current stream after a transient source/CDN error.
+     * UGC/PGC keep the current page and playback position; live returns to the
+     * live edge. Local files have no URL to refresh and are handled by the
+     * player controller's re-prepare path.
+     */
+    fun retryCurrentPlayback() {
+        val state = _uiState.value
+        when {
+            state.isLive -> refreshLive()
+            state.isPgc -> {
+                val cid = state.currentPage?.cid ?: return
+                val episode = pgcEpisodeByCid[cid] ?: return
+                _uiState.value = state.copy(
+                    isLoading = true,
+                    error = null,
+                    videoUrl = null,
+                )
+                playUrlJob?.cancel()
+                loadPgcPlayUrl(episode, forceRefresh = true)
+            }
+            state.videoInfo?.bvid?.isNotBlank() == true -> reloadCurrent()
+        }
     }
 
     fun selectQuality(quality: QualityOption) {
@@ -963,16 +994,60 @@ class PlayerViewModel(
 
         val dash = cachedDashData ?: return
         val videoStream = pickVideoStream(dash.video, quality.quality) ?: return
-        val audioStream = dash.audio?.firstOrNull() ?: dash.flac?.audio
+        val audio = _uiState.value.currentAudio
+            ?: _uiState.value.availableAudioTracks.firstOrNull()
 
         val url = videoStream.getUrl()
         _uiState.value = _uiState.value.copy(
             currentQuality = quality,
             videoUrl = url,
             dashVideo = videoStream,
-            dashAudio = audioStream,
+            dashAudio = audio?.stream,
+            currentAudio = audio,
             isDash = true
         )
+    }
+
+    fun selectAudio(track: AudioTrackOption) {
+        if (!track.supported) {
+            Log.w(BilibiliApp.TAG, "PlayerVM: audio track ${track.id} is unsupported on this device")
+            return
+        }
+        if (track.id == _uiState.value.currentAudio?.id) return
+        if (track.vipOnly && _uiState.value.isVip == false) return
+        Log.d(BilibiliApp.TAG, "PlayerVM: selectAudio id=${track.id} label=${track.label}")
+        _uiState.value = _uiState.value.copy(
+            currentAudio = track,
+            dashAudio = track.stream,
+        )
+    }
+
+    /**
+     * 4K/HDR may be advertised but undecodable on the target device. Step down
+     * once to the highest non-4K/HDR tier the account can play.
+     */
+    fun fallbackFromUnsupportedQuality(): Boolean {
+        val state = _uiState.value
+        val current = state.currentQuality ?: return false
+        if (current.quality < 120) return false
+        val next = state.availableQualities
+            .filter { it.quality <= 116 && it.quality < current.quality }
+            .filter { !it.vipOnly || state.isVip != false }
+            .maxByOrNull { it.quality } ?: return false
+        selectQuality(next)
+        val changed = _uiState.value.currentQuality?.quality != current.quality
+        if (changed) {
+            _uiState.value = _uiState.value.copy(
+                qualityFallbackNotice = "无法解码 ${current.description}，已降到 ${next.description}",
+            )
+        }
+        return changed
+    }
+
+    fun clearQualityFallbackNotice() {
+        if (_uiState.value.qualityFallbackNotice != null) {
+            _uiState.value = _uiState.value.copy(qualityFallbackNotice = null)
+        }
     }
 
     fun reportProgress(aid: Long, cid: Long, progress: Long, duration: Long = 0L) {
@@ -996,12 +1071,12 @@ class PlayerViewModel(
         }
     }
 
-    private fun loadPlayUrlDash(bvid: String, cid: Long) {
+    private fun loadPlayUrlDash(bvid: String, cid: Long, forceRefresh: Boolean = false) {
         playUrlJob = viewModelScope.launch {
             // Metadata and play URL run in parallel; metadata only delays the
             // start when it answers within META_WAIT_MS.
             val pendingMeta = metaJob
-            val playUrlDeferred = async { repository.getPlayUrlDash(bvid, cid) }
+            val playUrlDeferred = async { repository.getPlayUrlDash(bvid, cid, forceRefresh) }
             // Local progress already wins over the cloud position; waiting for
             // player/wbi in that case only delays the first frame.
             val meta = if (_uiState.value.resumePositionMs > 0L) {
@@ -1037,14 +1112,20 @@ class PlayerViewModel(
             cachedDashData = dash
 
             val qualities = buildQualityList(playUrlInfo, dash, _uiState.value.isPgc)
-            val preferredQn = videoDefaults.quality
-            val defaultQuality = qualities.firstOrNull {
-                it.quality == preferredQn && (!it.vipOnly || _uiState.value.isVip != false)
-            } ?: qualities.firstOrNull { !it.vipOnly || _uiState.value.isVip != false }
-                ?: qualities.firstOrNull()
+            val defaultQuality = pickDefaultQuality(
+                qualities = qualities,
+                preferredQn = videoDefaults.quality,
+                isVip = _uiState.value.isVip,
+            )
+            val audioTracks = buildAudioTracks(dash)
+            val defaultAudio = pickDefaultAudio(
+                tracks = audioTracks,
+                preferredId = videoDefaults.audioQuality,
+                isVip = _uiState.value.isVip,
+            )
 
             val videoStream = defaultQuality?.let { pickVideoStream(dash.video, it.quality) }
-            val audioStream = dash.audio?.firstOrNull() ?: dash.flac?.audio
+            val audioStream = defaultAudio?.stream
 
             val videoUrl = videoStream?.getUrl()
 
@@ -1052,6 +1133,8 @@ class PlayerViewModel(
                 videoUrl = videoUrl,
                 availableQualities = qualities,
                 currentQuality = defaultQuality,
+                availableAudioTracks = audioTracks,
+                currentAudio = defaultAudio,
                 dashVideo = videoStream,
                 dashAudio = audioStream,
                 isDash = true,
@@ -1136,6 +1219,50 @@ class PlayerViewModel(
         }
 
         return videos.minByOrNull { it.id }
+    }
+
+    private fun buildAudioTracks(dash: DashData): List<AudioTrackOption> {
+        val byId = linkedMapOf<Int, DashStream>()
+        dash.audio?.forEach { stream ->
+            if (stream.id > 0) byId.putIfAbsent(stream.id, stream)
+        }
+        dash.dolby?.audio?.forEach { stream ->
+            byId.putIfAbsent(30250, stream)
+        }
+        dash.flac?.audio?.let { stream ->
+            byId.putIfAbsent(30251, stream)
+        }
+        val order = listOf(30251, 30250, 30280, 30232, 30216)
+        val tracks = order.mapNotNull { id ->
+            byId[id]?.let { stream ->
+                AudioTrackOption(
+                    id = id,
+                    label = audioTrackLabel(id),
+                    stream = stream,
+                    vipOnly = id == 30251 || id == 30250,
+                    supported = AudioCapabilities.supports(id, stream),
+                )
+            }
+        }.toMutableList()
+        byId.keys.filter { it !in order }.sortedDescending().forEach { id ->
+            val stream = byId.getValue(id)
+            tracks += AudioTrackOption(
+                id = id,
+                label = audioTrackLabel(id),
+                stream = stream,
+                supported = AudioCapabilities.supports(id, stream),
+            )
+        }
+        return tracks
+    }
+
+    private fun audioTrackLabel(id: Int): String = when (id) {
+        30251 -> "无损"
+        30250 -> "杜比"
+        30280 -> "192K"
+        30232 -> "132K"
+        30216 -> "64K"
+        else -> "音轨 $id"
     }
 
     /**

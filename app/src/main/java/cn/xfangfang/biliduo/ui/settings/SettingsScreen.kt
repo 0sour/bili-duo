@@ -31,6 +31,7 @@ import androidx.compose.material.icons.outlined.Bolt
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.SportsEsports
@@ -41,6 +42,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -78,8 +80,11 @@ import cn.xfangfang.biliduo.data.local.GamepadStyleStore
 import cn.xfangfang.biliduo.data.local.SearchHistoryManager
 import cn.xfangfang.biliduo.data.local.VideoPreference
 import cn.xfangfang.biliduo.data.local.VideoPreferenceManager
+import cn.xfangfang.biliduo.data.local.audioQualityLabel
+import cn.xfangfang.biliduo.data.local.audioQualityOptions
 import cn.xfangfang.biliduo.data.local.videoQualityLabel
 import cn.xfangfang.biliduo.data.local.videoQualityOptions
+import cn.xfangfang.biliduo.ui.common.DuoVipBadge
 import cn.xfangfang.biliduo.data.local.videoSpeedLabel
 import cn.xfangfang.biliduo.data.local.videoSpeedOptions
 import cn.xfangfang.biliduo.data.local.videoSubtitleBackgroundLabel
@@ -91,6 +96,12 @@ import cn.xfangfang.biliduo.data.local.videoSubtitleSizeOptions
 import cn.xfangfang.biliduo.data.model.DownloadInfo
 import cn.xfangfang.biliduo.duo.DuoSessionViewModel
 import cn.xfangfang.biliduo.ui.common.DuoConfirmOverlay
+import cn.xfangfang.biliduo.ui.common.DuoChoiceHost
+import cn.xfangfang.biliduo.ui.common.DuoChoiceOption
+import cn.xfangfang.biliduo.ui.common.DuoChoiceRequest
+import cn.xfangfang.biliduo.ui.common.LocalDuoChoiceController
+import cn.xfangfang.biliduo.ui.common.dismissDuoChoice
+import cn.xfangfang.biliduo.ui.common.rememberDuoChoiceController
 import cn.xfangfang.biliduo.ui.common.DuoPageHeader
 import cn.xfangfang.biliduo.ui.common.DuoPalette
 import cn.xfangfang.biliduo.ui.duo.requestPageFocus
@@ -102,6 +113,9 @@ import cn.xfangfang.biliduo.ui.theme.themeModeLabels
 import cn.xfangfang.biliduo.ui.theme.themeModeOptions
 import cn.xfangfang.biliduo.ui.top.TopGlyph
 import cn.xfangfang.biliduo.ui.top.TopPanelUi
+import cn.xfangfang.biliduo.ui.update.UpdateErrorKind
+import cn.xfangfang.biliduo.ui.update.UpdateUiState
+import cn.xfangfang.biliduo.ui.update.UpdateViewModel
 import cn.xfangfang.biliduo.ui.duo.duoFocusRing
 import cn.xfangfang.biliduo.ui.player.PlayerUiState
 import cn.xfangfang.biliduo.ui.player.PlayerViewModel
@@ -147,6 +161,8 @@ fun SettingsScreen(
     onTopPanel: (TopPanelUi) -> Unit = {},
     session: DuoSessionViewModel? = null,
     playerViewModel: PlayerViewModel? = null,
+    updateViewModel: UpdateViewModel? = null,
+    onOpenUpdate: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -168,6 +184,7 @@ fun SettingsScreen(
     var category by remember { mutableIntStateOf(0) }
     var danmakuSection by remember { mutableIntStateOf(0) }
     var danmakuContentFocused by remember { mutableStateOf(false) }
+    var danmakuTabFocused by remember { mutableStateOf(false) }
     var wifiOnlyPlayback by remember { mutableStateOf(AppSettings.wifiOnlyPlayback) }
     var wifiOnlyDownload by remember { mutableStateOf(AppSettings.wifiOnlyDownload) }
     var confirmClearDownloads by remember { mutableStateOf(false) }
@@ -180,6 +197,7 @@ fun SettingsScreen(
     val firstRowFocus = remember { FocusRequester() }
     val danmakuLiveTabFocus = remember { FocusRequester() }
     val backFocus = remember { FocusRequester() }
+    val choiceController = rememberDuoChoiceController()
     val categoryFocus = remember { List(settingsCategories.size) { FocusRequester() } }
     val scrollState = rememberScrollState()
 
@@ -233,6 +251,7 @@ fun SettingsScreen(
         val wifi = AppSettings.isWifiConnected(context)
         val detail = when (category) {
             0 -> "默认 ${videoQualityLabel(videoPreference.quality)} · " +
+                "${audioQualityLabel(videoPreference.audioQuality)} · " +
                 "${videoSpeedLabel(videoPreference.speed)} · " +
                 "字幕${if (videoPreference.subtitleEnabled) "开" else "关"}"
             1 -> "${gamepadStyle.label} · ${gamepadStyle.confirmLabel} 确认 / " +
@@ -337,8 +356,16 @@ fun SettingsScreen(
         confirmClearAllDownloads,
         confirmClearSearchHistory,
         confirmClearImageCache,
+        choiceController.request,
         session,
     ) {
+        if (choiceController.request != null) {
+            session?.setBackInterceptor {
+                dismissDuoChoice(choiceController, scope)
+                true
+            }
+            return@LaunchedEffect
+        }
         val close = when {
             confirmClearDownloads -> ({ closeClearDownloads() })
             confirmClearAllDownloads -> ({ closeClearAllDownloads() })
@@ -371,6 +398,7 @@ fun SettingsScreen(
         }
     }
 
+    CompositionLocalProvider(LocalDuoChoiceController provides choiceController) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -426,7 +454,10 @@ fun SettingsScreen(
                 selected = category,
                 onSelect = { category = it },
                 onEnter = { selectCategory(it, focusContent = true) },
-                onFocus = { danmakuContentFocused = false },
+                onFocus = {
+                    danmakuContentFocused = false
+                    danmakuTabFocused = false
+                },
                 focusRequesters = categoryFocus,
                 backFocus = backFocus,
             )
@@ -445,7 +476,12 @@ fun SettingsScreen(
                             // The Danmaku tab row is the exception: let Left/Right
                             // move between 视频弹幕 and 直播弹幕.
                             Key.DirectionLeft -> {
-                                if (category == 4) {
+                                // The Danmaku section tabs use Left/Right to
+                                // switch between 视频弹幕 and 直播弹幕. Every
+                                // other row must return to the currently
+                                // selected category, not the category that
+                                // happens to sit next to the row vertically.
+                                if (category == 4 && danmakuTabFocused) {
                                     false
                                 } else {
                                     scope.launch {
@@ -506,6 +542,7 @@ fun SettingsScreen(
                         liveTabFocus = danmakuLiveTabFocus,
                         leftFocus = categoryFocus[4],
                         onContentFocusChanged = { danmakuContentFocused = it },
+                        onTabFocusChanged = { danmakuTabFocused = it },
                         backFocus = backFocus,
                         bottomModifier = bottomEdgeModifier,
                         onEnabled = { playerViewModel?.setDanmakuEnabled(it) },
@@ -557,6 +594,8 @@ fun SettingsScreen(
                         bottomModifier = bottomEdgeModifier,
                         onOpenRepository = { openRepository() },
                         onOpenIssues = { openRepository(ISSUES_URL) },
+                        updateViewModel = updateViewModel,
+                        onOpenUpdate = onOpenUpdate,
                     )
                 }
                 // Extra tail lets the last row scroll clear of the viewport
@@ -657,6 +696,8 @@ fun SettingsScreen(
         )
     }
 
+    DuoChoiceHost(choiceController)
+    }
 }
 
 @Composable
@@ -732,10 +773,13 @@ private fun CategoryRail(
         }
         Spacer(Modifier.weight(1f))
         Text(
-            text = "↑ / ↓ 选择分类 · → 进入",
+            text = "↑↓ 分类 · → 进入",
             color = DuoPalette.Tertiary,
             fontSize = 9.sp,
-            modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp),
+            lineHeight = 11.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
         )
     }
 }
@@ -753,24 +797,53 @@ private fun PlaySettings(
     val subtitleFocus = remember { FocusRequester() }
 
     SettingsSection("视频设置 · 每次打开视频时应用")
+    val qualityVip = videoQualityOptions
+        .firstOrNull { it.qn == preference.quality }?.vip == true
     SettingsValueRow(
         title = "默认清晰度",
         value = videoQualityLabel(preference.quality),
+        vip = qualityVip,
+        options = videoQualityOptions.map { option ->
+            DuoChoiceOption(
+                label = option.label,
+                selected = option.qn == preference.quality,
+                vip = option.vip,
+            )
+        },
+        onSelect = { index ->
+            onPreference(preference.copy(quality = videoQualityOptions[index].qn))
+        },
         focusRequester = firstFocus,
         modifier = settingsTopEdge(backFocus),
-        onClick = {
-            val index = videoQualityOptions.indexOfFirst { it.qn == preference.quality }
-            val next = videoQualityOptions[
-                (if (index >= 0) index + 1 else 0) % videoQualityOptions.size
-            ]
-            onPreference(preference.copy(quality = next.qn))
+    )
+    val audioVip = audioQualityOptions
+        .firstOrNull { it.id == preference.audioQuality }?.vip == true
+    SettingsValueRow(
+        title = "默认音质",
+        value = audioQualityLabel(preference.audioQuality),
+        vip = audioVip,
+        options = audioQualityOptions.map { option ->
+            DuoChoiceOption(
+                label = option.label,
+                selected = option.id == preference.audioQuality,
+                vip = option.vip,
+            )
+        },
+        onSelect = { index ->
+            onPreference(preference.copy(audioQuality = audioQualityOptions[index].id))
         },
     )
     SettingsValueRow(
         title = "默认倍速",
         value = videoSpeedLabel(preference.speed),
-        onClick = {
-            onPreference(preference.copy(speed = nextValue(preference.speed, videoSpeedOptions)))
+        options = videoSpeedOptions.map { speed ->
+            DuoChoiceOption(
+                label = videoSpeedLabel(speed),
+                selected = kotlin.math.abs(speed - preference.speed) < 0.01f,
+            )
+        },
+        onSelect = { index ->
+            onPreference(preference.copy(speed = videoSpeedOptions[index]))
         },
     )
     SettingsSwitchRow(
@@ -785,27 +858,31 @@ private fun PlaySettings(
     SettingsValueRow(
         title = "字幕字号",
         value = videoSubtitleSizeLabel(preference.subtitleTextSizeSp),
-        onClick = {
+        options = videoSubtitleSizeOptions.map { size ->
+            DuoChoiceOption(
+                label = videoSubtitleSizeLabel(size),
+                selected = kotlin.math.abs(size - preference.subtitleTextSizeSp) < 0.01f,
+            )
+        },
+        onSelect = { index ->
             onPreference(
-                preference.copy(
-                    subtitleTextSizeSp = nextValue(
-                        preference.subtitleTextSizeSp,
-                        videoSubtitleSizeOptions,
-                    ),
-                )
+                preference.copy(subtitleTextSizeSp = videoSubtitleSizeOptions[index])
             )
         },
     )
     SettingsValueRow(
         title = "字幕背景",
         value = videoSubtitleBackgroundLabel(preference.subtitleBackgroundAlpha),
-        onClick = {
+        options = videoSubtitleBackgroundOptions.map { alpha ->
+            DuoChoiceOption(
+                label = videoSubtitleBackgroundLabel(alpha),
+                selected = kotlin.math.abs(alpha - preference.subtitleBackgroundAlpha) < 0.01f,
+            )
+        },
+        onSelect = { index ->
             onPreference(
                 preference.copy(
-                    subtitleBackgroundAlpha = nextValue(
-                        preference.subtitleBackgroundAlpha,
-                        videoSubtitleBackgroundOptions,
-                    ),
+                    subtitleBackgroundAlpha = videoSubtitleBackgroundOptions[index],
                 )
             )
         },
@@ -813,16 +890,21 @@ private fun PlaySettings(
     SettingsValueRow(
         title = "字幕位置",
         value = videoSubtitlePositionLabel(preference.subtitleBottomPaddingDp),
-        onClick = {
-            val index = videoSubtitleBottomOptions.indexOf(preference.subtitleBottomPaddingDp)
-            val next = videoSubtitleBottomOptions[
-                (if (index >= 0) index + 1 else 0) % videoSubtitleBottomOptions.size
-            ]
-            onPreference(preference.copy(subtitleBottomPaddingDp = next))
+        options = videoSubtitleBottomOptions.map { padding ->
+            DuoChoiceOption(
+                label = videoSubtitlePositionLabel(padding),
+                selected = padding == preference.subtitleBottomPaddingDp,
+            )
+        },
+        onSelect = { index ->
+            onPreference(
+                preference.copy(subtitleBottomPaddingDp = videoSubtitleBottomOptions[index])
+            )
         },
     )
     Text(
-        text = "播放控制台里修改清晰度 / 倍速 / 字幕只影响当前视频；" +
+        text = "带「大会员」标记的档位需要大会员；所选档位不可用时自动向下顺位。" +
+            "播放控制台里修改清晰度 / 音轨 / 倍速 / 字幕只影响当前视频；" +
             "弹幕设置与「弹幕」分类双向同步。",
         color = DuoPalette.Tertiary,
         fontSize = 10.sp,
@@ -856,13 +938,17 @@ private fun GamepadSettings(
     SettingsValueRow(
         title = "当前风格",
         value = gamepadStyle.label,
-        focusRequester = firstFocus,
-        modifier = settingsTopEdge(backFocus),
-        onClick = {
-            onGamepadStyle(
-                if (gamepadStyle == GamepadStyle.XBOX) GamepadStyle.RETRO else GamepadStyle.XBOX
+        options = GamepadStyle.entries.map { style ->
+            DuoChoiceOption(
+                label = style.label,
+                selected = style == gamepadStyle,
             )
         },
+        onSelect = { index ->
+            onGamepadStyle(GamepadStyle.entries[index])
+        },
+        focusRequester = firstFocus,
+        modifier = settingsTopEdge(backFocus),
     )
     Text(
         text = "请与 RP Duo 系统设置里的「手柄风格」保持一致。按钮位置固定：" +
@@ -928,23 +1014,32 @@ private fun AppearanceSettings(
     bottomModifier: Modifier,
 ) {
     val mode = AppSettings.themeMode
-    val modeIndex = themeModeOptions.indexOf(mode).coerceAtLeast(0)
     SettingsSection("亮暗色")
     SettingsValueRow(
         title = "自动切换",
         value = themeModeLabels[mode] ?: "不自动切换",
+        options = themeModeOptions.map { option ->
+            DuoChoiceOption(
+                label = themeModeLabels[option] ?: "不自动切换",
+                selected = option == mode,
+            )
+        },
+        onSelect = { index ->
+            AppSettings.themeMode = themeModeOptions[index]
+        },
         focusRequester = firstFocus,
         modifier = settingsTopEdge(backFocus),
-        onClick = {
-            AppSettings.themeMode = themeModeOptions[(modeIndex + 1) % themeModeOptions.size]
-        },
     )
     SettingsValueRow(
         title = "手动外观",
         value = if (AppSettings.manualDark) "深色" else "浅色",
-        onClick = {
+        options = listOf(
+            DuoChoiceOption("深色", selected = AppSettings.manualDark),
+            DuoChoiceOption("浅色", selected = !AppSettings.manualDark),
+        ),
+        onSelect = { index ->
             AppSettings.themeMode = THEME_MANUAL
-            AppSettings.manualDark = !AppSettings.manualDark
+            AppSettings.manualDark = index == 0
         },
     )
     SettingsInfoRow(
@@ -976,6 +1071,7 @@ private fun DanmakuSettings(
     liveTabFocus: FocusRequester,
     leftFocus: FocusRequester,
     onContentFocusChanged: (Boolean) -> Unit,
+    onTabFocusChanged: (Boolean) -> Unit,
     backFocus: FocusRequester,
     bottomModifier: Modifier,
     onEnabled: (Boolean) -> Unit,
@@ -995,10 +1091,19 @@ private fun DanmakuSettings(
     onLiveArea: (Float) -> Unit,
 ) {
     val firstRowFocus = remember { FocusRequester() }
-    val contentFocus = Modifier.onFocusChanged {
-        if (it.isFocused) onContentFocusChanged(true)
+    val tabFocus = Modifier.onFocusChanged {
+        if (it.isFocused) {
+            onContentFocusChanged(true)
+            onTabFocusChanged(true)
+        }
     }
-    val noRight = contentFocus.then(Modifier.focusProperties { right = FocusRequester.Cancel })
+    val rowFocus = Modifier.onFocusChanged {
+        if (it.isFocused) {
+            onContentFocusChanged(true)
+            onTabFocusChanged(false)
+        }
+    }
+    val noRight = rowFocus.then(Modifier.focusProperties { right = FocusRequester.Cancel })
 
     val enabled = ui?.danmakuEnabled ?: true
     val opacity = ui?.danmakuOpacity ?: 0.9f
@@ -1029,7 +1134,7 @@ private fun DanmakuSettings(
                 up = backFocus
                 right = liveTabFocus
                 left = leftFocus
-            }.then(contentFocus),
+            }.then(tabFocus),
             onClick = {
                 onSectionChange(0)
                 runCatching { firstFocus.requestFocus() }
@@ -1044,7 +1149,7 @@ private fun DanmakuSettings(
                 up = backFocus
                 right = FocusRequester.Cancel
                 left = firstFocus
-            }.then(contentFocus),
+            }.then(tabFocus),
             onClick = {
                 onSectionChange(1)
                 runCatching { liveTabFocus.requestFocus() }
@@ -1062,38 +1167,68 @@ private fun DanmakuSettings(
             modifier = Modifier.focusProperties {
                 up = firstFocus
                 right = FocusRequester.Cancel
-            }.then(contentFocus),
+            }.then(rowFocus),
             onToggle = { onEnabled(!enabled) },
         )
         SettingsValueRow(
             title = "不透明度",
             value = "${(opacity * 100).toInt()}%",
+            options = danmakuOpacityOptions.map { value ->
+                DuoChoiceOption(
+                    label = "${(value * 100).toInt()}%",
+                    selected = kotlin.math.abs(value - opacity) < 0.01f,
+                )
+            },
+            onSelect = { index -> onOpacity(danmakuOpacityOptions[index]) },
             modifier = noRight,
-            onClick = { onOpacity(nextValue(opacity, danmakuOpacityOptions)) },
         )
         SettingsValueRow(
             title = "速度",
             value = speedLabel(speed),
+            options = danmakuSpeedOptions.map { value ->
+                DuoChoiceOption(
+                    label = speedLabel(value),
+                    selected = kotlin.math.abs(value - speed) < 0.01f,
+                )
+            },
+            onSelect = { index -> onSpeed(danmakuSpeedOptions[index]) },
             modifier = noRight,
-            onClick = { onSpeed(nextValue(speed, danmakuSpeedOptions)) },
         )
         SettingsValueRow(
             title = "字号",
             value = sizeLabel(size),
+            options = danmakuSizeOptions.map { value ->
+                DuoChoiceOption(
+                    label = sizeLabel(value),
+                    selected = kotlin.math.abs(value - size) < 0.01f,
+                )
+            },
+            onSelect = { index -> onSize(danmakuSizeOptions[index]) },
             modifier = noRight,
-            onClick = { onSize(nextValue(size, danmakuSizeOptions)) },
         )
         SettingsValueRow(
             title = "显示区域",
             value = areaLabel(area),
+            options = danmakuAreaOptions.map { value ->
+                DuoChoiceOption(
+                    label = areaLabel(value),
+                    selected = kotlin.math.abs(value - area) < 0.01f,
+                )
+            },
+            onSelect = { index -> onArea(danmakuAreaOptions[index]) },
             modifier = noRight,
-            onClick = { onArea(nextValue(area, danmakuAreaOptions)) },
         )
         SettingsValueRow(
             title = "屏蔽等级",
             value = if (shieldLevel <= 0) "不过滤" else "等级 $shieldLevel",
+            options = (0..10).map { level ->
+                DuoChoiceOption(
+                    label = if (level <= 0) "不过滤" else "等级 $level",
+                    selected = level == shieldLevel,
+                )
+            },
+            onSelect = { index -> onShieldLevel(index) },
             modifier = noRight,
-            onClick = { onShieldLevel(if (shieldLevel >= 10) 0 else shieldLevel + 1) },
         )
         SettingsSwitchRow(
             title = "滚动弹幕",
@@ -1119,11 +1254,14 @@ private fun DanmakuSettings(
         SettingsValueRow(
             title = "同屏上限",
             value = if (max <= 0) "不限" else "$max",
-            modifier = noRight,
-            onClick = {
-                val index = danmakuMaxOptions.indexOf(max)
-                onMax(danmakuMaxOptions[(if (index >= 0) index + 1 else 0) % danmakuMaxOptions.size])
+            options = danmakuMaxOptions.map { value ->
+                DuoChoiceOption(
+                    label = if (value <= 0) "不限" else "$value",
+                    selected = value == max,
+                )
             },
+            onSelect = { index -> onMax(danmakuMaxOptions[index]) },
+            modifier = noRight,
         )
         SettingsInfoRow(
             title = "屏蔽词",
@@ -1155,32 +1293,56 @@ private fun DanmakuSettings(
             modifier = Modifier.focusProperties {
                 up = liveTabFocus
                 right = FocusRequester.Cancel
-            }.then(contentFocus),
+            }.then(rowFocus),
             onToggle = { onLiveEnabled(!liveEnabled) },
         )
         SettingsValueRow(
             title = "不透明度",
             value = "${(liveOpacity * 100).toInt()}%",
+            options = danmakuOpacityOptions.map { value ->
+                DuoChoiceOption(
+                    label = "${(value * 100).toInt()}%",
+                    selected = kotlin.math.abs(value - liveOpacity) < 0.01f,
+                )
+            },
+            onSelect = { index -> onLiveOpacity(danmakuOpacityOptions[index]) },
             modifier = noRight,
-            onClick = { onLiveOpacity(nextValue(liveOpacity, danmakuOpacityOptions)) },
         )
         SettingsValueRow(
             title = "速度",
             value = speedLabel(liveSpeed),
+            options = danmakuSpeedOptions.map { value ->
+                DuoChoiceOption(
+                    label = speedLabel(value),
+                    selected = kotlin.math.abs(value - liveSpeed) < 0.01f,
+                )
+            },
+            onSelect = { index -> onLiveSpeed(danmakuSpeedOptions[index]) },
             modifier = noRight,
-            onClick = { onLiveSpeed(nextValue(liveSpeed, danmakuSpeedOptions)) },
         )
         SettingsValueRow(
             title = "字号",
             value = sizeLabel(liveSize),
+            options = danmakuSizeOptions.map { value ->
+                DuoChoiceOption(
+                    label = sizeLabel(value),
+                    selected = kotlin.math.abs(value - liveSize) < 0.01f,
+                )
+            },
+            onSelect = { index -> onLiveSize(danmakuSizeOptions[index]) },
             modifier = noRight,
-            onClick = { onLiveSize(nextValue(liveSize, danmakuSizeOptions)) },
         )
         SettingsValueRow(
             title = "显示区域",
             value = areaLabel(liveArea),
+            options = danmakuAreaOptions.map { value ->
+                DuoChoiceOption(
+                    label = areaLabel(value),
+                    selected = kotlin.math.abs(value - liveArea) < 0.01f,
+                )
+            },
+            onSelect = { index -> onLiveArea(danmakuAreaOptions[index]) },
             modifier = noRight,
-            onClick = { onLiveArea(nextValue(liveArea, danmakuAreaOptions)) },
         )
         Spacer(Modifier.height(10.dp))
         SettingsInfoRow(
@@ -1312,7 +1474,29 @@ private fun AboutSettings(
     bottomModifier: Modifier,
     onOpenRepository: () -> Unit,
     onOpenIssues: () -> Unit,
+    updateViewModel: UpdateViewModel?,
+    onOpenUpdate: () -> Unit,
 ) {
+    val vm = updateViewModel
+    val updateState = if (vm != null) vm.state.collectAsState().value else null
+    val updateInfo = if (vm != null) vm.available.collectAsState().value else null
+    val checking = updateState is UpdateUiState.Checking
+    val updateHint = when (val current = updateState) {
+        is UpdateUiState.Checking -> "正在检查更新…"
+        is UpdateUiState.Downloading -> "正在下载更新…"
+        is UpdateUiState.Ready -> "安装包已就绪"
+        is UpdateUiState.NeedsPermission -> "需要安装权限"
+        is UpdateUiState.Installing -> "正在安装…"
+        is UpdateUiState.Error -> if (current.kind == UpdateErrorKind.CHECK) {
+            "检查失败，点击重试"
+        } else {
+            "更新失败，点击查看"
+        }
+        is UpdateUiState.Latest -> "已是最新版本 v${BuildConfig.VERSION_NAME}"
+        else -> null
+    }
+    val autoCheck = AppSettings.autoCheckUpdate
+
     SettingsSection("关于 Bili-Duo")
     SettingsInfoRow(
         title = "版本",
@@ -1321,6 +1505,43 @@ private fun AboutSettings(
         modifier = settingsTopEdge(backFocus),
     )
     SettingsInfoRow("状态", "测试版 RC")
+    SettingsSection("更新")
+    SettingsActionRow(
+        title = "检查更新",
+        subtitle = when {
+            updateInfo != null -> "发现 v${updateInfo.versionName} · 点击查看更新"
+            updateHint != null -> updateHint
+            vm == null -> "更新组件未初始化"
+            else -> "检查国内源与 GitHub 上的最新版本"
+        },
+        icon = Icons.Outlined.Refresh,
+        enabled = vm != null,
+        onClick = {
+            if (!checking && vm != null) {
+                if (updateInfo != null) onOpenUpdate() else vm.check(manual = true)
+            }
+        },
+        trailing = {
+            when {
+                checking -> CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp),
+                    color = DuoPalette.Pink,
+                    strokeWidth = 2.dp,
+                )
+                updateInfo != null -> UpdatePill()
+            }
+        },
+    )
+    SettingsSwitchRow(
+        title = "打开应用时自动检查更新",
+        subtitle = "启动后静默检查；发现新版本在左侧栏提示",
+        checked = autoCheck,
+        onToggle = {
+            val next = !AppSettings.autoCheckUpdate
+            AppSettings.autoCheckUpdate = next
+            if (next) vm?.autoCheckIfEnabled()
+        },
+    )
     SettingsActionRow(
         title = "开源仓库",
         subtitle = "github.com/0sour/bili-duo",
@@ -1340,7 +1561,7 @@ private fun AboutSettings(
     )
     Spacer(Modifier.height(10.dp))
     Text(
-        text = "本应用不会连接 BiliPure 自动更新；更新入口已移除。",
+        text = "更新只访问 bili-duo.sourden.xyz 和 GitHub Releases；不会连接 BiliPure 上游。",
         color = DuoPalette.Tertiary,
         fontSize = 10.sp,
         modifier = Modifier.padding(horizontal = 6.dp),
@@ -1399,26 +1620,55 @@ private fun SettingsSwitchRow(
 private fun SettingsValueRow(
     title: String,
     value: String,
+    vip: Boolean = false,
+    options: List<DuoChoiceOption>? = null,
+    onSelect: ((Int) -> Unit)? = null,
     focusRequester: FocusRequester? = null,
     modifier: Modifier = Modifier,
-    onClick: () -> Unit,
+    onClick: (() -> Unit)? = null,
 ) {
     var focused by remember { mutableStateOf(false) }
+    val localRowFocus = remember { FocusRequester() }
+    val rowFocus = focusRequester ?: localRowFocus
+    val choiceController = LocalDuoChoiceController.current
     Row(
         modifier = modifier
             .fillMaxWidth()
             .height(46.dp)
-            .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
+            .then(
+                if (focusRequester != null) {
+                    Modifier.focusRequester(focusRequester)
+                } else {
+                    Modifier.focusRequester(localRowFocus)
+                }
+            )
             .duoFocusRing(RoundedCornerShape(8.dp))
             .clip(RoundedCornerShape(8.dp))
             .background(if (focused) DuoPalette.SurfaceHigh else DuoPalette.Surface)
             .onFocusChanged { focused = it.isFocused }
-            .duoClickable(onClick = onClick)
+            .duoClickable {
+                if (options != null && onSelect != null && choiceController != null) {
+                    choiceController.show(
+                        DuoChoiceRequest(
+                            title = title,
+                            options = options,
+                            returnFocus = rowFocus,
+                            onSelect = onSelect,
+                        )
+                    )
+                } else {
+                    onClick?.invoke()
+                }
+            }
             .padding(horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(text = title, color = DuoPalette.Text, fontSize = 12.sp, modifier = Modifier.weight(1f))
         Text(text = value, color = DuoPalette.Pink, fontSize = 11.sp)
+        if (vip) {
+            Spacer(Modifier.width(5.dp))
+            DuoVipBadge(compact = true)
+        }
         Spacer(Modifier.width(6.dp))
         Icon(
             imageVector = Icons.Filled.Check,
@@ -1470,6 +1720,7 @@ private fun SettingsActionRow(
     icon: ImageVector? = null,
     focusRequester: FocusRequester? = null,
     modifier: Modifier = Modifier,
+    trailing: (@Composable () -> Unit)? = null,
     onClick: () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
@@ -1513,6 +1764,28 @@ private fun SettingsActionRow(
                 overflow = TextOverflow.Ellipsis,
             )
         }
+        if (trailing != null) {
+            Spacer(Modifier.width(8.dp))
+            trailing()
+        }
+    }
+}
+
+@Composable
+private fun UpdatePill() {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(DuoPalette.Pink)
+            .padding(horizontal = 9.dp, vertical = 4.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = "更新",
+            color = Color.White,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Medium,
+        )
     }
 }
 
@@ -1534,11 +1807,6 @@ private fun SwitchVisual(checked: Boolean) {
                 .background(if (checked) DuoPalette.OnPink else DuoPalette.Secondary),
         )
     }
-}
-
-private fun nextValue(current: Float, options: List<Float>): Float {
-    val index = options.indexOfFirst { kotlin.math.abs(it - current) < 0.01f }
-    return options[(if (index >= 0) index + 1 else 0) % options.size]
 }
 
 private fun speedLabel(value: Float): String = when {

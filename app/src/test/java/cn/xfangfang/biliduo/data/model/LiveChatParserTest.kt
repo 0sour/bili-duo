@@ -31,9 +31,35 @@ class LiveChatParserTest {
         assertEquals("测试用户", message.uname)
         assertEquals("前方高能", message.text)
         assertEquals("粉丝牌 21", message.medal)
+        assertEquals("粉丝牌", message.medalName)
+        assertEquals(21, message.medalLevel)
+        assertNull(message.medalColor)
         assertTrue(message.isAdmin)
         assertEquals(12345L, message.uid)
         assertEquals(1700000000L, message.timestampSec)
+    }
+
+    @Test
+    fun parsesMedalColorFromIndexFour() {
+        val events = LiveChatParser.parse(
+            """
+            {
+              "cmd": "DANMU_MSG",
+              "info": [
+                [0, 1, 25, 16777215, 1700000000, 0, 0, "", 0],
+                "带颜色粉丝牌",
+                [12345, "测试用户", 1],
+                [18, "粉丝牌", "主播", 1, 16777215]
+              ]
+            }
+            """.trimIndent(),
+            ::id,
+        )
+
+        val message = (events.single() as LiveChatEvent.Message).message
+        assertEquals("粉丝牌", message.medalName)
+        assertEquals(18, message.medalLevel)
+        assertEquals(0xFFFFFFFFL, message.medalColor)
     }
 
     @Test

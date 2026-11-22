@@ -4,6 +4,31 @@
 `*.apk`），需要时本地 `./gradlew assembleDebug` / `assembleRelease` 生成，或从
 GitHub Releases 下载。
 
+## 0.2.0-rc59（2026-11-22，第六版测试版）
+
+- `bili-duo-0.2.0-rc59-release.apk`
+  - R8 minify，正式 release keystore 签名；可覆盖安装同 key 的 rc58。
+  - 大小：4,429,008 字节
+  - APK SHA-256：`9facfbec7aa0484a58eb2c10ee011dcf2589df662ee084438bfdbe9bc452ca3d`
+- `bili-duo-0.2.0-rc59-debug.apk`
+  - 调试签名，用于抓日志/开发测试；不能覆盖安装 release 版。
+  - 大小：24,811,512 字节
+  - SHA-256：`376b9ca02bc576ed0f83889dba7de5ab468aa8c2a23837a865909eb393ed0422`
+
+rc59 变更（在 rc58 基础上）：
+- 番剧/影视索引：6 种类型，地区/风格/年份/状态/排序筛选，分页、上屏预览与播放。
+- 音轨选择：自动/无损/杜比/192K/132K/64K；指定档不可用时向下顺位；杜比增加
+  设备能力检测，Duo 不支持 E-AC-3/AC-3 时显示「设备不支持」并回退。
+- HDR/4K 清晰度与粉色「大会员」标记；4K/HDR 解码失败自动回退 1080P60。
+- 多档值行改为点击弹窗；字幕轨道改为列表选择；首页/动态返回恢复原卡片与滚动；
+  网格 Down 保持同列；直播信息卡重排、粉丝牌行内并加空格、评论 5 秒回底。
+- 起播优化：playurl 20s 缓存与在途合并、优先请求道、500ms 起播、source error
+  自动重试 3 次。
+- 应用内检查更新：关于页手动/自动检查、侧栏新版本胶囊、国内源 + GitHub 双源
+  更新弹窗，下载后校验 SHA-256/包名/versionCode/签名。
+- 268 单测通过；Duo 已安装验证。发布页：
+  https://github.com/0sour/bili-duo/releases/tag/v0.2.0-rc59
+
 ## 0.2.0-rc58（2026-11-18，第五版测试版）
 
 - `bili-duo-0.2.0-rc58-release.apk`

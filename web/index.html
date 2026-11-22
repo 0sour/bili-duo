@@ -1,0 +1,727 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0a0a0d">
+<meta name="description" content="Bili-Duo 双屏 B 站客户端下载页">
+<link rel="icon" href="/icon.svg?v=20261122" type="image/svg+xml">
+<title>Bili-Duo 下载</title>
+<style>
+  :root {
+    --bg: #0a0a0d;
+    --panel: rgba(24, 24, 30, .78);
+    --text: #f4f4f7;
+    --muted: #9c9ca8;
+    --line: rgba(255, 255, 255, .10);
+    --pink: #fb7299;
+    --pink-soft: rgba(251, 114, 153, .14);
+    --blue: #4cc3ff;
+  }
+  * { box-sizing: border-box; }
+  html { min-height: 100%; background: var(--bg); }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    overflow-x: hidden;
+    color: var(--text);
+    background: var(--bg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  .bg {
+    position: fixed;
+    inset: 0;
+    z-index: -2;
+    background:
+      radial-gradient(circle at 15% 0%, rgba(251, 114, 153, .18), transparent 34%),
+      radial-gradient(circle at 85% 18%, rgba(76, 195, 255, .10), transparent 30%),
+      linear-gradient(180deg, #0a0a0d 0%, #0c0c11 60%, #09090c 100%);
+  }
+  .bg::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255, 255, 255, .025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, .025) 1px, transparent 1px);
+    background-size: 48px 48px;
+    mask-image: linear-gradient(180deg, rgba(0, 0, 0, .5), transparent 70%);
+  }
+  .shell {
+    width: min(980px, calc(100% - 40px));
+    margin: 0 auto;
+    padding: 24px 0 36px;
+  }
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    min-width: 0;
+    padding: 8px 0 34px;
+  }
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 11px;
+    min-width: 0;
+    color: var(--text);
+    text-decoration: none;
+    font-weight: 750;
+    letter-spacing: .01em;
+  }
+  .logo { width: 38px; height: 38px; flex: none; }
+  .ghost {
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 14px;
+    border: 1px solid var(--line);
+    padding: 8px 12px;
+    border-radius: 999px;
+    transition: color .15s ease, border-color .15s ease, background .15s ease;
+  }
+  .ghost:hover { color: var(--text); border-color: rgba(255,255,255,.22); background: rgba(255,255,255,.04); }
+  .hero { padding: 22px 0 30px; }
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--pink);
+    font-size: 12px;
+    font-weight: 650;
+    letter-spacing: .10em;
+    text-transform: uppercase;
+  }
+  .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--pink);
+    box-shadow: 0 0 12px var(--pink);
+  }
+  h1 {
+    margin: 16px 0;
+    font-size: clamp(34px, 6vw, 64px);
+    line-height: 1.04;
+    letter-spacing: -.045em;
+    font-weight: 800;
+  }
+  h1 span { color: var(--pink); }
+  .lede {
+    max-width: 620px;
+    margin: 0;
+    color: var(--muted);
+    font-size: clamp(15px, 2vw, 18px);
+    line-height: 1.7;
+  }
+  .download-card {
+    min-width: 0;
+    padding: clamp(20px, 3vw, 30px);
+    border: 1px solid var(--line);
+    border-radius: 24px;
+    background: linear-gradient(180deg, rgba(255,255,255,.065), rgba(255,255,255,.035));
+    box-shadow: 0 24px 80px rgba(0,0,0,.35);
+    backdrop-filter: blur(12px);
+  }
+  .card-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    min-width: 0;
+  }
+  .card-head > div { min-width: 0; }
+  h2 { margin: 0; font-size: 22px; letter-spacing: -.02em; }
+  .badge {
+    flex: none;
+    padding: 6px 10px;
+    border: 1px solid rgba(251,114,153,.30);
+    border-radius: 999px;
+    color: var(--pink);
+    background: var(--pink-soft);
+    font-size: 12px;
+    font-weight: 650;
+    white-space: nowrap;
+  }
+  .muted { color: var(--muted); }
+  #versionLine { margin: 7px 0 0; font-size: 14px; line-height: 1.5; }
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    min-width: 0;
+    margin-top: 22px;
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    min-height: 48px;
+    padding: 0 20px;
+    border: 1px solid transparent;
+    border-radius: 12px;
+    color: var(--text);
+    text-decoration: none;
+    max-width: 100%;
+    font-size: 15px;
+    font-weight: 650;
+    transition: transform .15s ease, background .15s ease, border-color .15s ease;
+  }
+  .btn.primary {
+    color: #170a10;
+    background: var(--pink);
+    box-shadow: 0 8px 28px rgba(251,114,153,.22);
+  }
+  .btn.primary:hover { transform: translateY(-1px); background: #ff8bad; }
+  .btn.secondary {
+    color: var(--text);
+    background: rgba(255,255,255,.04);
+    border-color: var(--line);
+  }
+  .btn.secondary:hover { background: rgba(255,255,255,.08); }
+  .btn.disabled { opacity: .45; pointer-events: none; filter: saturate(.6); }
+  .btn.small { min-height: 40px; padding: 0 14px; font-size: 13px; }
+  .btn svg { width: 18px; height: 18px; flex: none; }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 16px;
+    margin-top: 18px;
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .meta .sha-wrap { flex-basis: 100%; }
+  .sha {
+    font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+    font-size: 12px;
+    color: #b9b9c4;
+    overflow-wrap: anywhere;
+    word-break: break-all;
+  }
+  .copy {
+    padding: 0;
+    border: 0;
+    color: var(--pink);
+    background: none;
+    font: inherit;
+    cursor: pointer;
+  }
+  .copy:hover { text-decoration: underline; }
+  .notes {
+    margin-top: 22px;
+    padding-top: 18px;
+    border-top: 1px solid var(--line);
+  }
+  .notes h3 {
+    margin: 0 0 8px;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .notes p {
+    max-height: 220px;
+    margin: 0;
+    overflow: auto;
+    color: #d8d8df;
+    font-size: 14px;
+    line-height: 1.75;
+    white-space: pre-line;
+  }
+  .status {
+    margin: 18px 0 0;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.6;
+  }
+  .history-card {
+    min-width: 0;
+    margin-top: 14px;
+    padding: clamp(20px, 3vw, 28px);
+    border: 1px solid var(--line);
+    border-radius: 24px;
+    background: rgba(255,255,255,.035);
+  }
+  .history-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    min-width: 0;
+  }
+  .history-head > div { min-width: 0; }
+  .history-head p { margin: 7px 0 0; font-size: 13px; line-height: 1.6; }
+  .version-tabs {
+    display: flex;
+    gap: 8px;
+    min-width: 0;
+    margin-top: 16px;
+    padding-bottom: 4px;
+    overflow-x: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,.18) transparent;
+  }
+  .version-tab {
+    flex: none;
+    padding: 8px 13px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    color: var(--muted);
+    background: rgba(255,255,255,.03);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: color .15s ease, background .15s ease, border-color .15s ease;
+  }
+  .version-tab:hover { color: var(--text); border-color: rgba(255,255,255,.22); }
+  .version-tab[aria-selected="true"] {
+    color: #170a10;
+    background: var(--pink);
+    border-color: transparent;
+  }
+  .version-tab .tab-current {
+    display: inline-block;
+    width: 5px;
+    height: 5px;
+    margin: 0 5px 1px 1px;
+    border-radius: 50%;
+    background: currentColor;
+    vertical-align: middle;
+  }
+  .history-panel {
+    min-width: 0;
+    margin-top: 14px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+  }
+  .history-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+  }
+  .history-version { font-size: 20px; font-weight: 750; letter-spacing: -.02em; }
+  .history-date { font-size: 13px; }
+  .history-notes {
+    max-height: 260px;
+    margin: 12px 0 16px;
+    overflow: auto;
+    color: #d8d8df;
+    font-size: 14px;
+    line-height: 1.75;
+    white-space: pre-line;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-top: 14px;
+  }
+  .info-card {
+    padding: 20px;
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    background: rgba(255,255,255,.035);
+  }
+  .info-card h3 { margin: 0 0 10px; font-size: 15px; }
+  .info-card p, .info-card li {
+    margin: 0;
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.7;
+  }
+  .info-card ol { margin: 0; padding-left: 20px; }
+  .info-card li + li { margin-top: 6px; }
+  .info-card a, .footer a { color: #b9b9c4; text-decoration: none; }
+  .info-card a:hover, .footer a:hover { color: var(--pink); }
+  .footer {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 26px 4px 0;
+    color: #71717d;
+    font-size: 12px;
+  }
+  .hidden { display: none !important; }
+  :focus-visible { outline: 2px solid var(--pink); outline-offset: 3px; }
+  @media (max-width: 680px) {
+    .shell { width: calc(100% - 28px); max-width: 980px; padding-top: 18px; }
+    .topbar { padding-bottom: 24px; }
+    .hero { padding-top: 12px; }
+    .card-head { flex-direction: column; gap: 10px; }
+    .actions { flex-direction: column; }
+    .btn { width: 100%; }
+    .history-head { flex-direction: column; gap: 10px; }
+    .version-tabs { flex-wrap: wrap; overflow-x: visible; }
+    .grid { grid-template-columns: 1fr; }
+    .footer { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+<div class="bg" aria-hidden="true"></div>
+<main class="shell">
+  <header class="topbar">
+    <a class="brand" href="/">
+      <svg class="logo" viewBox="0 0 108 108" fill="none" aria-hidden="true">
+        <path fill="#111118" d="M24,0 L84,0 A24,24 0 0 1 108,24 L108,84 A24,24 0 0 1 84,108 L24,108 A24,24 0 0 1 0,84 L0,24 A24,24 0 0 1 24,0 Z"/>
+        <g transform="translate(12.96 12.96) scale(0.76)">
+          <path fill="#FFFFFF" fill-opacity="0.05" d="M32,25 L76,25 A8,8 0 0 1 84,33 L84,48 A8,8 0 0 1 76,56 L32,56 A8,8 0 0 1 24,48 L24,33 A8,8 0 0 1 32,25 Z"/>
+          <path stroke="#F5F5F7" stroke-width="3.2" fill="none" d="M32,25 L76,25 A8,8 0 0 1 84,33 L84,48 A8,8 0 0 1 76,56 L32,56 A8,8 0 0 1 24,48 L24,33 A8,8 0 0 1 32,25 Z"/>
+          <path fill="#FB7299" d="M49,32 L49,48 L63,40 Z"/>
+          <path fill="#FB7299" fill-opacity="0.18" d="M39,68 L69,68 A6,6 0 0 1 75,74 L75,78 A6,6 0 0 1 69,84 L39,84 A6,6 0 0 1 33,78 L33,74 A6,6 0 0 1 39,68 Z"/>
+          <path stroke="#FB7299" stroke-width="3.2" fill="none" d="M39,68 L69,68 A6,6 0 0 1 75,74 L75,78 A6,6 0 0 1 69,84 L39,84 A6,6 0 0 1 33,78 L33,74 A6,6 0 0 1 39,68 Z"/>
+        </g>
+      </svg>
+      <span>Bili-Duo</span>
+    </a>
+    <a class="ghost" href="https://github.com/0sour/bili-duo" target="_blank" rel="noopener">GitHub ↗</a>
+  </header>
+
+  <section class="hero">
+    <div class="eyebrow"><span class="dot"></span> Dual-screen Bilibili client</div>
+    <h1>把 B 站，<br><span>放进双屏掌机。</span></h1>
+    <p class="lede">Bili-Duo 为 Retroid Pocket Duo / AYN Thor 打造：上屏播放，下屏控制。这里下载最新测试版，历次更新内容向下可查。</p>
+  </section>
+
+  <section class="download-card" aria-labelledby="download-title">
+    <div class="card-head">
+      <div>
+        <h2 id="download-title">下载最新版本</h2>
+        <p id="versionLine" class="muted" aria-live="polite">正在获取版本信息…</p>
+      </div>
+      <span id="channelBadge" class="badge">测试版</span>
+    </div>
+
+    <div class="actions">
+      <a id="downloadBtn" class="btn primary disabled" href="#" aria-disabled="true">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M12 3v11m0 0 4-4m-4 4-4-4M5 20h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span id="downloadLabel">正在检查…</span>
+      </a>
+      <a id="githubBtn" class="btn secondary" href="https://github.com/0sour/bili-duo/releases" target="_blank" rel="noopener">
+        GitHub 备用下载
+      </a>
+    </div>
+
+    <div id="metaRow" class="meta hidden">
+      <span id="sizeText"></span>
+      <span id="dateText"></span>
+      <span id="shaWrap" class="sha-wrap hidden">
+        <span id="shaText" class="sha"></span>
+        <button id="copySha" class="copy" type="button">复制</button>
+      </span>
+    </div>
+
+    <div id="notesWrap" class="notes hidden">
+      <h3>本次更新内容</h3>
+      <p id="notes"></p>
+    </div>
+
+    <p id="statusText" class="status" aria-live="polite">正在读取最新版本…</p>
+  </section>
+
+  <section id="historySection" class="history-card hidden" aria-labelledby="history-title">
+    <div class="history-head">
+      <div>
+        <h2 id="history-title">版本历史</h2>
+        <p class="muted">默认显示最新版本。历史版本仅提供更新内容，安装包请到 GitHub Releases 查看。</p>
+      </div>
+      <a class="ghost" href="https://github.com/0sour/bili-duo/releases" target="_blank" rel="noopener">全部 Releases ↗</a>
+    </div>
+    <div id="historyTabs" class="version-tabs" role="tablist" aria-label="选择版本"></div>
+    <div class="history-panel" role="tabpanel" aria-live="polite">
+      <div class="history-meta">
+        <span id="historyVersion" class="history-version">—</span>
+        <span id="historyBadge" class="badge">测试版</span>
+        <span id="historyDate" class="history-date muted"></span>
+      </div>
+      <p id="historyNotes" class="history-notes">正在读取版本历史…</p>
+      <a id="historyGithub" class="btn secondary small" href="https://github.com/0sour/bili-duo/releases" target="_blank" rel="noopener">在 GitHub 查看</a>
+    </div>
+  </section>
+
+  <section class="grid">
+    <article class="info-card">
+      <h3>安装说明</h3>
+      <ol>
+        <li>下载 release APK。</li>
+        <li>首次安装时，在系统设置中允许 Bili-Duo 安装未知应用。</li>
+        <li>覆盖安装会保留登录、设置和观看历史；从 debug 包换到 release 包需要先卸载。</li>
+      </ol>
+    </article>
+    <article class="info-card">
+      <h3>适用设备</h3>
+      <p>Retroid Pocket Duo、AYN Thor 等上下双屏 Android 掌机，需要 Android 7.0 或更高版本。</p>
+      <p style="margin-top:10px;">非 B 站官方客户端。问题反馈请到 <a href="https://github.com/0sour/bili-duo/issues" target="_blank" rel="noopener">GitHub Issues</a>。</p>
+    </article>
+  </section>
+
+  <footer class="footer">
+    <span>Bili-Duo · 双屏 B 站客户端</span>
+    <span><a href="https://github.com/0sour/bili-duo/releases" target="_blank" rel="noopener">Releases</a> · <a href="https://github.com/0sour/bili-duo" target="_blank" rel="noopener">GitHub</a></span>
+  </footer>
+</main>
+
+<noscript>
+  <p style="max-width:980px;margin:0 auto;padding:0 20px 30px;color:#9c9ca8;">需要启用 JavaScript 才能读取最新版本信息；也可以直接访问 GitHub Releases 下载。</p>
+</noscript>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const REPO_RELEASES = 'https://github.com/0sour/bili-duo/releases';
+  const HISTORY_URL = 'update-history.json';
+  let currentSha = '';
+  let latestManifest = null;
+  let historyEntries = [];
+  let releases = [];
+  let selectedRelease = 0;
+  let historyButtons = [];
+
+  const show = (el, visible) => el.classList.toggle('hidden', !visible);
+
+  const formatSize = (bytes) => {
+    const n = Number(bytes);
+    if (!Number.isFinite(n) || n <= 0) return '';
+    const mb = n / 1024 / 1024;
+    return mb >= 1 ? `${mb.toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
+  };
+
+  const formatDate = (value) => {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value);
+    return date.toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' });
+  };
+
+  const safeUrl = (value) => {
+    if (!value) return '';
+    try {
+      const url = new URL(String(value), location.href);
+      return (url.protocol === 'https:' || url.protocol === 'http:') ? url.href : '';
+    } catch {
+      return '';
+    }
+  };
+
+  const tagUrl = (tag) => tag
+    ? `${REPO_RELEASES}/tag/${encodeURIComponent(String(tag))}`
+    : REPO_RELEASES;
+
+  const sameRelease = (a, b) => {
+    if (!a || !b) return false;
+    const at = String(a.tag || '').toLowerCase();
+    const bt = String(b.tag || '').toLowerCase();
+    if (at && bt) return at === bt;
+    return String(a.versionName || '').toLowerCase() === String(b.versionName || '').toLowerCase();
+  };
+
+  const renderEmpty = () => {
+    $('versionLine').textContent = '暂未发布安装包';
+    $('channelBadge').textContent = '等待发布';
+    $('downloadLabel').textContent = '暂无安装包';
+    $('githubBtn').href = REPO_RELEASES;
+    $('statusText').textContent = '最新安装包尚未发布。下方可查看历次更新内容，历史安装包请到 GitHub Releases。';
+    $('downloadBtn').classList.add('disabled');
+    $('downloadBtn').setAttribute('aria-disabled', 'true');
+    show($('metaRow'), false);
+    show($('notesWrap'), false);
+    show($('shaWrap'), false);
+  };
+
+  const renderLatest = (data) => {
+    const downloads = Array.isArray(data.downloads)
+      ? data.downloads.filter((item) => item && typeof item.url === 'string')
+      : [];
+    const normalized = downloads.map((item) => ({
+      name: String(item.name || '').toLowerCase(),
+      url: item.url,
+    }));
+    const cn = normalized.find((item) => ['cn', 'aliyun', 'china'].includes(item.name))
+      || normalized.find((item) => item.name !== 'github')
+      || null;
+    const github = normalized.find((item) => item.name === 'github');
+    const primaryUrl = safeUrl(cn?.url || data.apkUrl || '');
+    const githubUrl = safeUrl(github?.url || '') || REPO_RELEASES;
+    const version = data.versionName || data.tag || '最新版本';
+
+    $('versionLine').textContent = version + (data.versionCode ? ` · versionCode ${data.versionCode}` : '');
+    $('channelBadge').textContent = data.channel === 'stable' ? '稳定版' : '测试版';
+    $('githubBtn').href = githubUrl;
+
+    if (primaryUrl) {
+      const button = $('downloadBtn');
+      button.href = primaryUrl;
+      button.classList.remove('disabled');
+      button.removeAttribute('aria-disabled');
+      button.setAttribute('download', '');
+      $('downloadLabel').textContent = '国内源下载';
+      $('statusText').textContent = '如果国内源下载较慢或不可用，请使用 GitHub 备用下载。历史版本安装包仅在 GitHub 提供。';
+    } else {
+      $('downloadLabel').textContent = '暂无安装包';
+      $('downloadBtn').classList.add('disabled');
+      $('downloadBtn').setAttribute('aria-disabled', 'true');
+      $('statusText').textContent = '当前清单没有国内下载地址，请使用 GitHub 备用下载。';
+    }
+
+    let hasMeta = false;
+    const size = formatSize(data.size);
+    if (size) {
+      $('sizeText').textContent = size;
+      hasMeta = true;
+    }
+    const date = formatDate(data.publishedAt);
+    if (date) {
+      $('dateText').textContent = date;
+      hasMeta = true;
+    }
+    show($('metaRow'), hasMeta);
+
+    if (data.sha256) {
+      currentSha = String(data.sha256);
+      $('shaText').textContent = 'SHA-256 ' + currentSha;
+      show($('shaWrap'), true);
+    } else {
+      currentSha = '';
+      show($('shaWrap'), false);
+    }
+
+    if (data.notes) {
+      $('notes').textContent = String(data.notes);
+      show($('notesWrap'), true);
+    } else {
+      show($('notesWrap'), false);
+    }
+  };
+
+  const manifestEntry = (data) => {
+    if (!data) return null;
+    return {
+      versionName: data.versionName || data.tag || '最新版本',
+      tag: data.tag || '',
+      publishedAt: data.publishedAt || '',
+      channel: data.channel || 'beta',
+      notes: data.notes || '',
+      githubUrl: data.tag ? tagUrl(data.tag) : REPO_RELEASES,
+    };
+  };
+
+  const mergeReleases = () => {
+    const latest = manifestEntry(latestManifest);
+    let list = Array.isArray(historyEntries) ? historyEntries.slice() : [];
+
+    if (latest) {
+      const index = list.findIndex((entry) => sameRelease(entry, latest));
+      if (index >= 0) list[index] = { ...list[index], ...latest };
+      else list.unshift(latest);
+    }
+
+    // The first item is the newest entry. It is the only one that may offer a
+    // download on this page; all older entries link to GitHub instead.
+    const newest = list[0] || null;
+    releases = list
+      .filter((entry) => entry && (entry.versionName || entry.tag))
+      .map((entry) => ({
+        ...entry,
+        versionName: entry.versionName || entry.tag,
+        githubUrl: safeUrl(entry.githubUrl || '') || tagUrl(entry.tag),
+        latest: sameRelease(entry, newest),
+      }));
+
+    selectedRelease = 0;
+    renderHistory();
+  };
+
+  const renderHistory = () => {
+    const section = $('historySection');
+    if (!releases.length) {
+      show(section, false);
+      return;
+    }
+    show(section, true);
+
+    const tabs = $('historyTabs');
+    tabs.innerHTML = '';
+    historyButtons = releases.map((release, index) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'version-tab';
+      button.setAttribute('role', 'tab');
+      button.setAttribute('aria-selected', index === selectedRelease ? 'true' : 'false');
+      if (release.latest) {
+        const dot = document.createElement('span');
+        dot.className = 'tab-current';
+        dot.setAttribute('aria-hidden', 'true');
+        button.appendChild(dot);
+      }
+      button.appendChild(document.createTextNode(release.versionName || release.tag || '版本'));
+      button.addEventListener('click', () => selectRelease(index));
+      tabs.appendChild(button);
+      return button;
+    });
+
+    selectRelease(selectedRelease);
+  };
+
+  const selectRelease = (index) => {
+    if (!releases.length) return;
+    selectedRelease = Math.max(0, Math.min(index, releases.length - 1));
+    historyButtons.forEach((button, i) => {
+      button.setAttribute('aria-selected', i === selectedRelease ? 'true' : 'false');
+    });
+
+    const release = releases[selectedRelease];
+    $('historyVersion').textContent = release.versionName || release.tag || '版本';
+    $('historyBadge').textContent = release.latest
+      ? '当前版本'
+      : (release.channel === 'stable' ? '稳定版' : '测试版');
+    $('historyDate').textContent = formatDate(release.publishedAt);
+    $('historyNotes').textContent = String(release.notes || '该版本没有提供更新说明。').trim();
+    $('historyGithub').href = release.githubUrl || tagUrl(release.tag);
+  };
+
+  const copySha = async () => {
+    if (!currentSha) return;
+    try {
+      await navigator.clipboard.writeText(currentSha);
+      $('copySha').textContent = '已复制';
+      setTimeout(() => { $('copySha').textContent = '复制'; }, 1500);
+    } catch {
+      window.prompt('复制 SHA-256', currentSha);
+    }
+  };
+
+  $('copySha').addEventListener('click', copySha);
+
+  const fetchJson = async (url) => {
+    const response = await fetch(`${url}?ts=${Date.now()}`, { cache: 'no-store' });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return response.json();
+  };
+
+  (async () => {
+    const [manifestResult, historyResult] = await Promise.allSettled([
+      fetchJson('update-beta.json'),
+      fetchJson(HISTORY_URL),
+    ]);
+
+    latestManifest = manifestResult.status === 'fulfilled' ? manifestResult.value : null;
+    historyEntries = historyResult.status === 'fulfilled' && Array.isArray(historyResult.value)
+      ? historyResult.value
+      : [];
+
+    if (latestManifest) renderLatest(latestManifest);
+    else renderEmpty();
+
+    mergeReleases();
+  })();
+})();
+</script>
+</body>
+</html>

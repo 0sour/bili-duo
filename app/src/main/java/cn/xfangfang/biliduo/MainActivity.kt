@@ -69,6 +69,7 @@ import cn.xfangfang.biliduo.duo.DuoImeState
 import cn.xfangfang.biliduo.data.local.PendingReportManager
 import cn.xfangfang.biliduo.data.repository.BilibiliRepository
 import cn.xfangfang.biliduo.duo.BottomUiBridge
+import cn.xfangfang.biliduo.duo.DuoOverlay
 import cn.xfangfang.biliduo.duo.DuoSessionViewModel
 import cn.xfangfang.biliduo.duo.InputRouter
 import cn.xfangfang.biliduo.duo.SecondScreenController
@@ -102,6 +103,8 @@ import cn.xfangfang.biliduo.ui.common.ImageZoomMotion
 import cn.xfangfang.biliduo.ui.player.PlayerScreen
 import cn.xfangfang.biliduo.ui.player.PlayerViewModel
 import cn.xfangfang.biliduo.ui.player.PlaybackSource
+import cn.xfangfang.biliduo.ui.pgc.PgcIndexScreen
+import cn.xfangfang.biliduo.ui.pgc.PgcIndexType
 import cn.xfangfang.biliduo.ui.profile.ProfileScreen
 import cn.xfangfang.biliduo.ui.search.SearchScreen
 import cn.xfangfang.biliduo.ui.top.TopScreenHost
@@ -112,6 +115,8 @@ import cn.xfangfang.biliduo.ui.top.TopPanelUi
 import cn.xfangfang.biliduo.ui.top.TopPersonUi
 import cn.xfangfang.biliduo.ui.top.TopPreviewUi
 import cn.xfangfang.biliduo.ui.settings.SettingsScreen
+import cn.xfangfang.biliduo.ui.update.UpdateOverlay
+import cn.xfangfang.biliduo.ui.update.UpdateViewModel
 import cn.xfangfang.biliduo.data.local.AppSettings
 import cn.xfangfang.biliduo.ui.theme.BilibiliPureTheme
 import cn.xfangfang.biliduo.ui.theme.DuoTheme
@@ -133,6 +138,7 @@ class MainActivity : ComponentActivity() {
     private val playerViewModel: PlayerViewModel by viewModels()
     private val duoSession: DuoSessionViewModel by viewModels()
     private val topScreenViewModel: TopScreenViewModel by viewModels()
+    private val updateViewModel: UpdateViewModel by viewModels()
     private val bottomUiBridge = BottomUiBridge()
     private lateinit var playerController: PlayerController
     private lateinit var inputRouter: InputRouter
@@ -216,6 +222,7 @@ class MainActivity : ComponentActivity() {
                 playerViewModel = playerViewModel,
                 playerController = playerController,
                 duoSession = duoSession,
+                updateViewModel = updateViewModel,
                 displaySwapped = AppSettings.displaySwapped,
                 displaySwapAvailable = secondScreenAvailable,
                 onToggleDisplaySwap = { toggleDisplaySwap() },
@@ -252,6 +259,7 @@ class MainActivity : ComponentActivity() {
         secondScreen.setVideoOnly(AppSettings.displaySwapped)
         bottomUiBridge.setUseLocal(AppSettings.displaySwapped)
         requestNotificationPermissionIfNeeded()
+        updateViewModel.autoCheckIfEnabled()
         handleOpenDownloadsIntent(intent)
         lifecycleScope.launch {
             val pending = PendingReportManager(getSharedPreferences("bili_prefs", MODE_PRIVATE))
@@ -273,6 +281,7 @@ class MainActivity : ComponentActivity() {
                         playerViewModel = playerViewModel,
                         playerController = null,
                         duoSession = duoSession,
+                        updateViewModel = updateViewModel,
                         displaySwapAvailable = false,
                     )
                 }
@@ -479,6 +488,8 @@ private fun duoPageHint(route: String?, style: GamepadStyle): String? = when (ro
     Routes.CHANNEL -> "LB/RB 视频/合集 · ${style.confirmLabel} 播放/进入"
     Routes.PLAYER, Routes.PLAYER_CID, Routes.DOWNLOAD_PLAY, Routes.PGC_PLAYER ->
         "LB/RB 切 tab · L2/R2 评论排序 · ${style.actionLabel} 弹幕 · START 弹幕/字幕"
+    Routes.PGC_INDEX ->
+        "LB/RB 索引类型 · ${style.confirmLabel} 筛选/进入 · ${style.backLabel} 返回"
     Routes.LIVE_PLAYER -> "方向键/${style.confirmLabel} 切换评论与信息 · ${style.actionLabel} 弹幕 · START 弹幕设置"
     Routes.DETAIL, Routes.NOTE -> "方向键移动 · ${style.confirmLabel} 播放/进入"
     else -> null
@@ -492,6 +503,7 @@ fun MainScreen(
     playerViewModel: PlayerViewModel = viewModel(),
     playerController: PlayerController? = null,
     duoSession: DuoSessionViewModel = viewModel(),
+    updateViewModel: UpdateViewModel? = null,
     displaySwapped: Boolean = false,
     displaySwapAvailable: Boolean = false,
     onToggleDisplaySwap: () -> Unit = {},
@@ -524,6 +536,8 @@ fun MainScreen(
     val isDarkTheme = DuoTheme.colors.isDark
     var showGamepadSetup by remember { mutableStateOf(!GamepadStyleStore.hasChosen()) }
     val gamepadStyle by GamepadStyleStore.style.collectAsState()
+    val updateInfo = updateViewModel?.available?.collectAsState()?.value
+    val overlay by duoSession.overlay.collectAsState()
 
     val keyboard = LocalSoftwareKeyboardController.current
     val imeVisible = WindowInsets.isImeVisible
@@ -646,6 +660,11 @@ fun MainScreen(
                     DuoRail(
                         currentRoute = currentDestination?.route,
                         focusState = railFocusState,
+                        showUpdateBadge = updateInfo != null,
+                        onUpdateClick = {
+                            railFocusState.release()
+                            duoSession.openAppOverlay(DuoOverlay.UPDATE)
+                        },
                         onToggleTheme = {
                             AppSettings.themeMode = THEME_MANUAL
                             AppSettings.manualDark = !isDarkTheme
@@ -697,12 +716,33 @@ fun MainScreen(
                         onPgcClick = { seasonId ->
                             navController.navigate(Routes.pgc(seasonId))
                         },
+                        onPgcIndexClick = { typeOrdinal ->
+                            navController.navigate(Routes.pgcIndex(typeOrdinal))
+                        },
                         onLiveClick = { roomId ->
                             navController.navigate(Routes.live(roomId))
                         },
                         onVideoFocused = onTopVideoFocused,
                         onFocusCleared = onTopFocusCleared,
                         onTopAmbient = onTopAmbient,
+                    )
+                }
+
+                composable(
+                    route = Routes.PGC_INDEX,
+                    arguments = listOf(navArgument("indexType") { type = NavType.IntType }),
+                ) { backStackEntry ->
+                    val typeOrdinal = backStackEntry.arguments?.getInt("indexType") ?: 0
+                    PgcIndexScreen(
+                        initialType = PgcIndexType.fromOrdinal(typeOrdinal),
+                        onBack = { navController.popBackStack() },
+                        onPgcClick = { seasonId ->
+                            navController.navigate(Routes.pgc(seasonId))
+                        },
+                        onVideoFocused = onTopVideoFocused,
+                        onFocusCleared = onTopFocusCleared,
+                        onTopAmbient = onTopAmbient,
+                        session = duoSession,
                     )
                 }
 
@@ -1025,6 +1065,8 @@ fun MainScreen(
                     onTopPanel = onTopPanel,
                     session = duoSession,
                     playerViewModel = playerViewModel,
+                    updateViewModel = updateViewModel,
+                    onOpenUpdate = { duoSession.openAppOverlay(DuoOverlay.UPDATE) },
                 )
             }
 
@@ -1065,6 +1107,21 @@ fun MainScreen(
                     session = duoSession,
                 )
             }
+        }
+        val updateVm = updateViewModel
+        if (overlay == DuoOverlay.UPDATE && updateVm != null) {
+            UpdateOverlay(
+                viewModel = updateVm,
+                session = duoSession,
+                onClose = {
+                    duoSession.closeOverlay()
+                    // The sheet can open from Settings or the rail badge. Return
+                    // focus to the rail, which exists on every browse page.
+                    railFocusState.beginNavigation(
+                        currentDestination?.route ?: Screen.Home.route
+                    )
+                },
+            )
         }
     }
 }

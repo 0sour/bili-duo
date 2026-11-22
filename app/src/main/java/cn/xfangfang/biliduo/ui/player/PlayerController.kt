@@ -9,6 +9,7 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.hls.HlsMediaSource
 import androidx.media3.exoplayer.source.MediaSource
@@ -19,7 +20,9 @@ import cn.xfangfang.biliduo.BuildConfig
 import cn.xfangfang.biliduo.data.api.BilibiliApi
 import cn.xfangfang.biliduo.data.local.AppSettings
 import cn.xfangfang.biliduo.data.local.WifiMonitor
+import java.io.IOException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -64,7 +67,22 @@ class PlayerController(
         OkHttpDataSource.Factory(BilibiliApi.httpClient),
     )
 
-    val player: ExoPlayer = ExoPlayer.Builder(appContext).build().apply {
+    val player: ExoPlayer = ExoPlayer.Builder(appContext)
+        .setLoadControl(
+            // ExoPlayer's default waits for 2.5s of media before the first
+            // frame. On the Duo's WiFi that reads as a long black screen, so
+            // start after 0.5s and rebuffer after 1.2s; keep a generous 50s
+            // forward buffer for normal playback.
+            DefaultLoadControl.Builder()
+                .setBufferDurationsMs(
+                    15_000,
+                    50_000,
+                    500,
+                    1_200,
+                )
+                .build()
+        )
+        .build().apply {
         playWhenReady = false
         repeatMode = Player.REPEAT_MODE_OFF
         setHandleAudioBecomingNoisy(true)
@@ -98,6 +116,7 @@ class PlayerController(
                     if (now - lastLiveRecoveryAt > 5_000L) {
                         lastLiveRecoveryAt = now
                         lastUrl = null
+                        lastAudioUrl = null
                         lastCid = null
                         _state.update {
                             it.copy(error = null, isBuffering = true, isPlaying = false)
@@ -108,6 +127,18 @@ class PlayerController(
                         viewModel.refreshLive()
                         return
                     }
+                }
+                val currentQn = viewModel.uiState.value.currentQuality?.quality ?: 0
+                if (maybeRetrySource(error)) return
+                if (!qualityFallbackAttempted && currentQn >= 120 &&
+                    viewModel.fallbackFromUnsupportedQuality()
+                ) {
+                    qualityFallbackAttempted = true
+                    Log.w(
+                        BilibiliApp.TAG,
+                        "PlayerController: quality $currentQn failed, falling back",
+                    )
+                    return
                 }
                 Log.e(BilibiliApp.TAG, "PlayerController: error=${error.message}", error)
                 _state.update {
@@ -131,6 +162,7 @@ class PlayerController(
     private var enabled = false
     private var released = false
     private var lastUrl: String? = null
+    private var lastAudioUrl: String? = null
     private var lastCid: Long? = null
     private var pendingSeekMs: Long? = null
     private var activeAid: Long = 0L
@@ -138,6 +170,10 @@ class PlayerController(
     private var pausedByWifi = false
     private var handlingEnded = false
     private var lastLiveRecoveryAt = 0L
+    private var qualityFallbackAttempted = false
+    private var sourceRetryCount = 0
+    private var lastSourceErrorAt = 0L
+    private var sourceRetryJob: Job? = null
 
     init {
         scope.launch {
@@ -277,6 +313,7 @@ class PlayerController(
         } else {
             // Local/unknown source: re-prepare the same URL.
             lastUrl = null
+            lastAudioUrl = null
             handleUiState(ui)
         }
     }
@@ -297,6 +334,7 @@ class PlayerController(
         player.stop()
         player.clearMediaItems()
         lastUrl = null
+        lastAudioUrl = null
         lastCid = null
         pendingSeekMs = null
         activeAid = 0L
@@ -356,7 +394,8 @@ class PlayerController(
         }
 
         val cid = uiState.currentPage?.cid
-        if (url == lastUrl && cid == lastCid) return
+        val audioUrl = uiState.dashAudio?.getUrl()
+        if (url == lastUrl && cid == lastCid && audioUrl == lastAudioUrl) return
 
         val firstPrepare = lastCid == null
         val pageChanged = lastCid != null && cid != null && cid != lastCid
@@ -370,7 +409,15 @@ class PlayerController(
 
         activeAid = uiState.videoInfo?.aid ?: uiState.localAid
         activeCid = cid
+        if (firstPrepare || pageChanged) {
+            qualityFallbackAttempted = false
+            sourceRetryCount = 0
+            // Show the top-screen preview/poster again until the new source
+            // renders, instead of leaving the previous video's last frame up.
+            _state.update { it.copy(hasRenderedFrame = false) }
+        }
         lastUrl = url
+        lastAudioUrl = audioUrl
         lastCid = cid
         pausedByWifi = false
         handlingEnded = false
@@ -402,6 +449,9 @@ class PlayerController(
         if (uiState.isLive) {
             return if (url.contains(".m3u8", ignoreCase = true)) {
                 HlsMediaSource.Factory(dataSourceFactory)
+                    // fMP4/TS streams can prepare from the multivariant
+                    // playlist instead of downloading every variant first.
+                    .setAllowChunklessPreparation(true)
                     .createMediaSource(MediaItem.fromUri(url))
             } else {
                 // Some lines only expose FLV.
@@ -425,6 +475,59 @@ class PlayerController(
         }
         return ProgressiveMediaSource.Factory(dataSourceFactory)
             .createMediaSource(MediaItem.fromUri(uiState.videoUrl ?: ""))
+    }
+
+    /**
+     * Transient CDN/network failures used to leave the console on "Source
+     * error" until the user left and re-entered the video. Refresh the stream
+     * automatically, preserving the current position, and only surface an
+     * error after two consecutive failures.
+     */
+    private fun maybeRetrySource(error: PlaybackException): Boolean {
+        if (!isTransientSourceError(error)) return false
+        val state = viewModel.uiState.value
+        if (state.videoUrl == null) return false
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastSourceErrorAt > 30_000L) sourceRetryCount = 0
+        lastSourceErrorAt = now
+        if (sourceRetryCount >= 3) return false
+        sourceRetryCount++
+        Log.w(
+            BilibiliApp.TAG,
+            "PlayerController: source error, retry $sourceRetryCount/3 " +
+                "live=${state.isLive} code=${error.errorCode}",
+        )
+        _state.update { it.copy(error = null, isBuffering = true, isPlaying = false) }
+        sourceRetryJob?.cancel()
+        sourceRetryJob = scope.launch {
+            // Back off a little further each time so a short WiFi/CDN flap can
+            // recover without leaving the user on a permanent error screen.
+            delay(700L * sourceRetryCount)
+            val current = viewModel.uiState.value
+            when {
+                current.isLive || current.isPgc || current.videoInfo != null -> {
+                    viewModel.retryCurrentPlayback()
+                }
+                // Local/downloaded media has no URL to refresh.
+                else -> player.prepare()
+            }
+        }
+        return true
+    }
+
+    private fun isTransientSourceError(error: PlaybackException): Boolean {
+        if (error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) return false
+        if (error.errorCode == PlaybackException.ERROR_CODE_TIMEOUT) return true
+        // IO errors are 2000..2999, parsing errors 3000..3999.
+        if (error.errorCode in 2000..3999) return true
+        var cause: Throwable? = error.cause
+        var depth = 0
+        while (cause != null && depth < 6) {
+            if (cause is IOException) return true
+            cause = cause.cause
+            depth++
+        }
+        return false
     }
 
     private fun handleEnded() {
@@ -463,6 +566,7 @@ class PlayerController(
         player.stop()
         player.clearMediaItems()
         lastUrl = null
+        lastAudioUrl = null
         lastCid = null
         pendingSeekMs = null
         activeAid = 0L

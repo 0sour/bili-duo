@@ -3,7 +3,6 @@ package cn.xfangfang.biliduo.ui.dynamic
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
-import android.os.SystemClock
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -53,6 +52,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -167,15 +167,31 @@ fun DynamicScreen(
     val authorFocus = remember { FocusRequester() }
     val retryFocus = remember { FocusRequester() }
     val scope = rememberCoroutineScope()
-    var firstFocused by remember { mutableStateOf(false) }
     val filterFocusers = remember { List(DynamicFilter.entries.size) { FocusRequester() } }
     val authorFocusers = remember(state.authors) {
         List(state.authors.size + 1) { FocusRequester() }
     }
+    val itemFocusers = remember { mutableMapOf<String, FocusRequester>() }
+    var lastFocusedId by rememberSaveable { mutableStateOf<String?>(null) }
+    var restorePending by remember { mutableStateOf(true) }
+    var lastFilterKey by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingFilterFocus by remember { mutableStateOf(false) }
     var pendingAuthorFocus by remember { mutableStateOf(false) }
     var focusContentOnFilterShortcut by remember { mutableStateOf(false) }
-    var lastShortcutAt by remember { mutableStateOf(0L) }
+
+    fun itemFocusRequester(id: String): FocusRequester =
+        itemFocusers.getOrPut(id) { FocusRequester() }
+
+    fun focusItem(index: Int) {
+        val card = state.items.getOrNull(index) ?: return
+        val requester = if (index == 0) firstFocus else itemFocusRequester(card.id)
+        if (runCatching { requester.requestFocus() }.isSuccess) return
+        scope.launch {
+            runCatching { listState.scrollToItem(index) }
+            delay(64L)
+            runCatching { requester.requestFocus() }
+        }
+    }
 
     LaunchedEffect(state.filter, pendingFilterFocus) {
         if (pendingFilterFocus) {
@@ -230,17 +246,38 @@ fun DynamicScreen(
 
     LaunchedEffect(loggedIn) {
         if (loggedIn) {
-            viewModel.refresh()
+            // The ViewModel owns the first-load flag, so a screen re-entry
+            // restores the retained feed instead of refreshing and reordering.
+            viewModel.loadInitial()
         } else {
             delay(80L)
             runCatching { retryFocus.requestPageFocus() }
         }
     }
     LaunchedEffect(state.filter, state.authorMid) {
-        // Keep the initial first-card focus only for the first load. On a
-        // user-initiated filter change the chip keeps focus; the list is
-        // reachable with Down.
-        runCatching { listState.scrollToItem(0) }
+        // Only a real filter/author change resets the list. Re-entering the
+        // page must not jump back to the first row.
+        val key = "${state.filter.name}:${state.authorMid}"
+        if (lastFilterKey != null && lastFilterKey != key) {
+            runCatching { listState.scrollToItem(0) }
+        }
+        lastFilterKey = key
+    }
+    LaunchedEffect(state.items.size, state.isLoading, state.error) {
+        if (!restorePending || state.isLoading || state.items.isEmpty()) {
+            return@LaunchedEffect
+        }
+        restorePending = false
+        delay(80L)
+        val savedId = lastFocusedId
+        val savedIndex = savedId?.let { id ->
+            state.items.indexOfFirst { it.id == id }
+        } ?: -1
+        if (savedIndex >= 0) {
+            focusItem(savedIndex)
+        } else {
+            runCatching { firstFocus.requestPageFocus() }
+        }
     }
     LaunchedEffect(
         state.filter,
@@ -249,21 +286,18 @@ fun DynamicScreen(
         state.isLoading,
         focusContentOnFilterShortcut,
     ) {
-        // Wait for the new filter's response; while loading we keep the old
-        // cards visible, but focusing them would leave focus on a card that
-        // is about to be replaced.
-        val needsContentFocus = !firstFocused || focusContentOnFilterShortcut
-        if (needsContentFocus && !state.isLoading && state.items.isNotEmpty()) {
-            delay(120L)
-            if (!focusContentOnFilterShortcut &&
-                SystemClock.uptimeMillis() - lastShortcutAt < 600L
-            ) {
-                return@LaunchedEffect
-            }
-            runCatching { firstFocus.requestPageFocus() }
-            firstFocused = true
-            focusContentOnFilterShortcut = false
+        // L1/R1 is a deliberate tab change: land on the first card once the
+        // new filter's response arrives. A directly tapped filter keeps focus
+        // on its chip.
+        if (!focusContentOnFilterShortcut ||
+            state.isLoading ||
+            state.items.isEmpty()
+        ) {
+            return@LaunchedEffect
         }
+        delay(120L)
+        runCatching { firstFocus.requestPageFocus() }
+        focusContentOnFilterShortcut = false
     }
     LaunchedEffect(loggedIn, state.filter, state.isLoading, state.items.size, state.error) {
         onTopAmbient(dynamicAmbient(loggedIn, state))
@@ -310,23 +344,19 @@ fun DynamicScreen(
                     viewModel.cycleFilter(-1)
                     pendingFilterFocus = false
                     focusContentOnFilterShortcut = true
-                    lastShortcutAt = SystemClock.uptimeMillis()
                 }) else null,
                 onNextTab = if (loggedIn && overlay == null) ({
                     viewModel.cycleFilter(1)
                     pendingFilterFocus = false
                     focusContentOnFilterShortcut = true
-                    lastShortcutAt = SystemClock.uptimeMillis()
                 }) else null,
                 onPreviousSection = if (loggedIn && overlay == null) ({
                     viewModel.cycleAuthor(-1)
                     pendingAuthorFocus = true
-                    lastShortcutAt = SystemClock.uptimeMillis()
                 }) else null,
                 onNextSection = if (loggedIn && overlay == null) ({
                     viewModel.cycleAuthor(1)
                     pendingAuthorFocus = true
-                    lastShortcutAt = SystemClock.uptimeMillis()
                 }) else null,
             ),
     ) {
@@ -388,7 +418,7 @@ fun DynamicScreen(
                     modifier = Modifier.fillMaxSize(),
                 ) {
                     itemsIndexed(state.items, key = { _, item -> item.id }) { index, card ->
-                        val itemFocus = remember(card.id) { FocusRequester() }
+                        val itemFocus = remember(card.id) { itemFocusRequester(card.id) }
                         DynamicCard(
                             card = card,
                             focusRequester = itemFocus,
@@ -399,6 +429,7 @@ fun DynamicScreen(
                                 null
                             },
                             onFocused = {
+                                lastFocusedId = card.id
                                 focusedIndex = index
                                 onVideoFocused(it.toTopPreview())
                             },
@@ -406,6 +437,7 @@ fun DynamicScreen(
                                 if (overlay == null) onFocusCleared()
                             },
                             onClick = {
+                                lastFocusedId = card.id
                                 val readerCard = card.withReaderImages()
                                 when {
                                     card.playbackBvid != null -> onVideoClick(card.playbackBvid!!)

@@ -102,3 +102,64 @@ data class PgcNewEp(
 data class PgcFollowRating(
     val score: Float = 0f,
 )
+
+/**
+ * `pgc/page/index/condition` and `pgc/page/index/result` use the older
+ * `data` wrapper (not PGC's usual `result`), so they get their own response.
+ */
+data class PgcIndexResponse<T>(
+    val code: Int = 0,
+    val message: String = "",
+    val data: T? = null,
+    val ttl: Int = 0,
+)
+
+data class PgcIndexConditionData(
+    val filter: List<PgcIndexFilter>? = null,
+    val order: List<PgcIndexOrder>? = null,
+)
+
+data class PgcIndexFilter(
+    /** Query parameter name, e.g. `area`, `style_id`, `season_status`. */
+    val field: String = "",
+    val name: String = "",
+    val values: List<PgcIndexFilterValue>? = null,
+)
+
+data class PgcIndexFilterValue(
+    val keyword: String = "",
+    val name: String = "",
+)
+
+data class PgcIndexOrder(
+    /** Sort id passed back as `order`. */
+    val field: String = "0",
+    val name: String = "",
+    val sort: String = "0",
+)
+
+data class PgcIndexResultData(
+    @SerializedName("has_next") val hasNext: Int = 0,
+    val list: List<PgcIndexItem>? = null,
+    val num: Int = 0,
+    val size: Int = 0,
+    val total: Int = 0,
+)
+
+data class PgcIndexItem(
+    @SerializedName("season_id") val seasonId: Long = 0,
+    val title: String? = null,
+    val cover: String? = null,
+    val badge: String? = null,
+    @SerializedName("index_show") val indexShow: String? = null,
+    /** e.g. "1813.5万追番" / "1.2亿播放". */
+    val order: String? = null,
+    @SerializedName("is_finish") val isFinish: Int = 0,
+    @SerializedName("season_type") val seasonType: Int = 0,
+    @SerializedName("season_type_name") val seasonTypeName: String? = null,
+    val rating: PgcIndexRating? = null,
+)
+
+data class PgcIndexRating(
+    val score: Float = 0f,
+)

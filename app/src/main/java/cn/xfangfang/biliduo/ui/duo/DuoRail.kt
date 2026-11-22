@@ -3,6 +3,7 @@
 package cn.xfangfang.biliduo.ui.duo
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -104,10 +105,13 @@ fun DuoRail(
     focusState: DuoRailFocusState,
     onNavigate: (Screen) -> Unit,
     onToggleTheme: () -> Unit,
+    showUpdateBadge: Boolean = false,
+    onUpdateClick: () -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
     val itemFocuses = remember(railItems.size) { List(railItems.size) { FocusRequester() } }
     val themeFocus = remember { FocusRequester() }
+    val updateFocus = remember { FocusRequester() }
 
     DisposableEffect(focusState) {
         onDispose { focusState.reset() }
@@ -201,7 +205,7 @@ fun DuoRail(
                 .focusRequester(themeFocus)
                 .focusProperties {
                     up = itemFocuses.lastOrNull() ?: FocusRequester.Cancel
-                    down = FocusRequester.Cancel
+                    down = if (showUpdateBadge) updateFocus else FocusRequester.Cancel
                 }
                 .duoFocusRing(RoundedCornerShape(8.dp))
                 .clip(RoundedCornerShape(8.dp))
@@ -222,6 +226,32 @@ fun DuoRail(
                 color = DuoTheme.colors.secondary,
                 fontSize = 9.sp,
             )
+        }
+        if (showUpdateBadge) {
+            Spacer(Modifier.height(6.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 6.dp)
+                    .height(24.dp)
+                    .focusRequester(updateFocus)
+                    .focusProperties {
+                        up = themeFocus
+                        down = FocusRequester.Cancel
+                    }
+                    .duoFocusRing(RoundedCornerShape(50))
+                    .clip(RoundedCornerShape(50))
+                    .background(DuoTheme.colors.pinkInk)
+                    .duoClickable(onClick = onUpdateClick),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "有新版本",
+                    color = Color.White,
+                    fontSize = 9.sp,
+                    maxLines = 1,
+                )
+            }
         }
         Spacer(Modifier.height(8.dp))
     }
