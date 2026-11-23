@@ -22,3 +22,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "bili-duo"
 include(":app")
+include(":danmaku")

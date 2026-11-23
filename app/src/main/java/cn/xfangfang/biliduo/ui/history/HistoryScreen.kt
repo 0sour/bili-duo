@@ -60,6 +60,7 @@ import cn.xfangfang.biliduo.ui.common.DuoPalette
 import cn.xfangfang.biliduo.ui.common.DuoPillButton
 import cn.xfangfang.biliduo.ui.common.DuoSearchField
 import cn.xfangfang.biliduo.ui.duo.requestPageFocus
+import cn.xfangfang.biliduo.ui.duo.restoreDuoPageFocusLater
 import cn.xfangfang.biliduo.ui.duo.duoClickable
 import cn.xfangfang.biliduo.ui.duo.duoFocusRing
 import cn.xfangfang.biliduo.ui.top.TopAmbientUi
@@ -181,10 +182,7 @@ fun HistoryScreen(
     fun closeDeleteConfirm() {
         val focus = deleteFocus
         confirmDelete = null
-        scope.launch {
-            delay(120)
-            runCatching { focus?.requestPageFocus() }
-        }
+        restoreDuoPageFocusLater(focus, scope)
     }
 
     LaunchedEffect(searchMode, confirmDelete, session) {

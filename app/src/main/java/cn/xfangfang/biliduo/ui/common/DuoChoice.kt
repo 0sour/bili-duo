@@ -47,6 +47,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cn.xfangfang.biliduo.ui.duo.duoClickable
 import cn.xfangfang.biliduo.ui.duo.duoFocusRing
+import cn.xfangfang.biliduo.ui.duo.restoreDuoFocus
+import cn.xfangfang.biliduo.ui.duo.restoreDuoFocusNow
 import cn.xfangfang.biliduo.ui.theme.DuoTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
@@ -96,18 +98,15 @@ fun dismissDuoChoice(controller: DuoChoiceController, scope: CoroutineScope) {
 }
 
 /**
- * Selecting an option usually changes a setting, which recomposes (and may
- * re-attach) the row that opened the popup. A single 80ms request can land
- * before that row is focusable again, so retry once after the update settles.
+ * Selecting an option usually changes a setting, which recomposes the row that
+ * opened the popup. Try to return focus immediately; if the row is temporarily
+ * detached, retry on the next frame only. Delayed retries at 80/260ms stole a
+ * quick Down press that the user had already sent to the next row.
  */
 private fun restoreChoiceFocus(target: FocusRequester?, scope: CoroutineScope) {
     if (target == null) return
-    scope.launch {
-        for (wait in longArrayOf(80L, 260L)) {
-            delay(wait)
-            runCatching { target.requestFocus() }
-        }
-    }
+    if (restoreDuoFocusNow(target)) return
+    scope.launch { restoreDuoFocus(target) }
 }
 
 /**

@@ -1,5 +1,13 @@
 [
   {
+    "versionName": "0.2.0-rc63",
+    "tag": "v0.2.0-rc63",
+    "publishedAt": "2026-11-23T12:40:19Z",
+    "channel": "beta",
+    "githubUrl": "https://github.com/0sour/bili-duo/releases/tag/v0.2.0-rc63",
+    "notes": "· 视频弹幕升级为 DanmakuFlameMaster（DFM）：密集场景同屏数量更高，滚动弹幕占满屏幕，固定顶/底可与滚动重叠；自研 Canvas 引擎已移除\n· 修复关闭选择弹窗/播放设置/直播设置后快速按方向键被吞、焦点环回闪；同步覆盖历史/收藏/关注/下载/稍后再看/设置确认层\n· 保留「泳道满时」开关（默认丢弃超出，可允许重叠）；设置→弹幕不再提供引擎切换\n· 直播弹幕保持原实时引擎，本次不迁移\n· 安装：rc63 release 可覆盖安装 rc61/rc62 本地测试包（同 release key）；288 单测通过"
+  },
+  {
     "versionName": "0.2.0-rc61",
     "tag": "v0.2.0-rc61",
     "publishedAt": "2026-11-23T07:10:00Z",

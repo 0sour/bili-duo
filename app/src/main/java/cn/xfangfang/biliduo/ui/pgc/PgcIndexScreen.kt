@@ -80,6 +80,8 @@ import cn.xfangfang.biliduo.ui.duo.duoGridVertical
 import cn.xfangfang.biliduo.ui.duo.duoTabCycling
 import cn.xfangfang.biliduo.ui.duo.rememberGridFocusNavigator
 import cn.xfangfang.biliduo.ui.duo.requestPageFocus
+import cn.xfangfang.biliduo.ui.duo.restoreDuoFocus
+import cn.xfangfang.biliduo.ui.duo.restoreDuoFocusNow
 import cn.xfangfang.biliduo.ui.top.TopAmbientUi
 import cn.xfangfang.biliduo.ui.top.TopGlyph
 import cn.xfangfang.biliduo.ui.top.TopPreviewUi
@@ -238,9 +240,8 @@ fun PgcIndexScreen(
         val target = pickerReturnFocus
         pickerField = null
         if (restoreFocus && target != null) {
-            scope.launch {
-                delay(80)
-                runCatching { target.requestPageFocus() }
+            if (!restoreDuoFocusNow(target)) {
+                scope.launch { restoreDuoFocus(target) }
             }
         }
     }

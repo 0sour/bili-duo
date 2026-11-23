@@ -105,6 +105,7 @@ import cn.xfangfang.biliduo.ui.common.rememberDuoChoiceController
 import cn.xfangfang.biliduo.ui.common.DuoPageHeader
 import cn.xfangfang.biliduo.ui.common.DuoPalette
 import cn.xfangfang.biliduo.ui.duo.requestPageFocus
+import cn.xfangfang.biliduo.ui.duo.restoreDuoPageFocusLater
 import cn.xfangfang.biliduo.ui.duo.duoClickable
 import cn.xfangfang.biliduo.ui.duo.duoTabCycling
 import cn.xfangfang.biliduo.ui.theme.SunSchedule
@@ -321,34 +322,22 @@ fun SettingsScreen(
         }
     fun closeClearDownloads() {
         confirmClearDownloads = false
-        scope.launch {
-            delay(120)
-            runCatching { clearRowFocus.requestPageFocus() }
-        }
+        restoreDuoPageFocusLater(clearRowFocus, scope)
     }
 
     fun closeClearAllDownloads() {
         confirmClearAllDownloads = false
-        scope.launch {
-            delay(120)
-            runCatching { clearAllFocus.requestPageFocus() }
-        }
+        restoreDuoPageFocusLater(clearAllFocus, scope)
     }
 
     fun closeClearSearchHistory() {
         confirmClearSearchHistory = false
-        scope.launch {
-            delay(120)
-            runCatching { clearRowFocus.requestPageFocus() }
-        }
+        restoreDuoPageFocusLater(clearRowFocus, scope)
     }
 
     fun closeClearImageCache() {
         confirmClearImageCache = false
-        scope.launch {
-            delay(120)
-            runCatching { clearRowFocus.requestPageFocus() }
-        }
+        restoreDuoPageFocusLater(clearRowFocus, scope)
     }
 
     LaunchedEffect(
@@ -546,6 +535,7 @@ fun SettingsScreen(
                         backFocus = backFocus,
                         bottomModifier = bottomEdgeModifier,
                         onEnabled = { playerViewModel?.setDanmakuEnabled(it) },
+                        onAllowOverlap = { playerViewModel?.setDanmakuAllowOverlap(it) },
                         onOpacity = { playerViewModel?.setDanmakuOpacity(it) },
                         onSpeed = { playerViewModel?.setDanmakuSpeed(it) },
                         onSize = { playerViewModel?.setDanmakuTextSize(it) },
@@ -1093,6 +1083,7 @@ private fun DanmakuSettings(
     backFocus: FocusRequester,
     bottomModifier: Modifier,
     onEnabled: (Boolean) -> Unit,
+    onAllowOverlap: (Boolean) -> Unit,
     onOpacity: (Float) -> Unit,
     onSpeed: (Float) -> Unit,
     onSize: (Float) -> Unit,
@@ -1124,6 +1115,7 @@ private fun DanmakuSettings(
     val noRight = rowFocus.then(Modifier.focusProperties { right = FocusRequester.Cancel })
 
     val enabled = ui?.danmakuEnabled ?: true
+    val allowOverlap = ui?.danmakuAllowOverlap ?: false
     val opacity = ui?.danmakuOpacity ?: 0.9f
     val speed = ui?.danmakuSpeed ?: 1f
     val size = ui?.danmakuTextSize ?: 16f
@@ -1187,6 +1179,22 @@ private fun DanmakuSettings(
                 right = FocusRequester.Cancel
             }.then(rowFocus),
             onToggle = { onEnabled(!enabled) },
+        )
+        SettingsValueRow(
+            title = "泳道满时",
+            value = if (allowOverlap) "允许重叠" else "丢弃超出（不重叠）",
+            options = listOf(
+                DuoChoiceOption(
+                    label = "丢弃超出（不重叠）",
+                    selected = !allowOverlap,
+                ),
+                DuoChoiceOption(
+                    label = "允许重叠",
+                    selected = allowOverlap,
+                ),
+            ),
+            onSelect = { index -> onAllowOverlap(index == 1) },
+            modifier = noRight,
         )
         SettingsValueRow(
             title = "不透明度",
@@ -1566,7 +1574,7 @@ private fun AboutSettings(
         icon = Icons.Outlined.Language,
         onClick = onOpenRepository,
     )
-    SettingsInfoRow("许可证", "MIT License · NOTICE")
+    SettingsInfoRow("许可证", "MIT License · NOTICE · DanmakuFlameMaster (Apache-2.0)")
     SettingsInfoRow("上游", "bilibili-pure-apk（MIT）")
     Spacer(Modifier.height(10.dp))
     SettingsSection("反馈")

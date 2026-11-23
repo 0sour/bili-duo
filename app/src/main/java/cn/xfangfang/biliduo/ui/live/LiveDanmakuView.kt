@@ -11,9 +11,9 @@ import android.view.View
 import cn.xfangfang.biliduo.data.model.LiveChatMessage
 
 /**
- * Scrolling live danmaku for the top screen. Unlike the VOD [DanmakuView] this
- * layer has no player timeline: messages are queued as they arrive and each one
- * is assigned a free lane when it can start.
+ * Scrolling live danmaku for the top screen. Unlike the player-timeline VOD
+ * layer this has no clock: messages are queued as they arrive and each one is
+ * assigned a free lane when it can start.
  *
  * The view is transparent, non-focusable and non-clickable.
  */

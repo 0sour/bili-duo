@@ -10,28 +10,27 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc61-FB7299">
+  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc63-FB7299">
   <img alt="status" src="https://img.shields.io/badge/status-test%20build-orange">
   <img alt="Android" src="https://img.shields.io/badge/Android-24%2B-3DDC84?logo=android&logoColor=white">
   <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-1.9.23-7F52FF?logo=kotlin&logoColor=white">
   <img alt="Compose" src="https://img.shields.io/badge/Jetpack%20Compose-2024.04-4285F4?logo=jetpackcompose&logoColor=white">
   <img alt="Media3" src="https://img.shields.io/badge/Media3-1.4.1-FF6D00">
-  <img alt="tests" src="https://img.shields.io/badge/tests-281%20passing-brightgreen">
+  <img alt="tests" src="https://img.shields.io/badge/tests-288%20passing-brightgreen">
   <img alt="license" src="https://img.shields.io/badge/license-MIT-blue">
 </p>
 
 上屏只负责视频画面，下屏用一块 `Presentation` 承载完整 UI；手柄和触摸共用同一棵
 Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，也没有上屏 OSD。
 
-> 当前版本：**0.2.0-rc61**（versionCode 62，第八版测试版）
-> 下载：https://github.com/0sour/bili-duo/releases/tag/v0.2.0-rc61
+> 当前版本：**0.2.0-rc63**（versionCode 64，第九版测试版）
+> 下载：https://github.com/0sour/bili-duo/releases/tag/v0.2.0-rc63
 > 国内下载站：https://bili-duo.sourden.xyz/
-> 状态：功能完整的 **测试版**，281 个单元测试通过；rc61 汇总 17 项反馈修复与
-> 播放器增强：**自动连播、跳过片头/片尾、睡眠定时**，首页**不感兴趣**，
-> 搜索新增**专栏 / 直播**并迁移到 WBI 搜索接口（修复 412、慢和一直加载），
-> 动态长图适应宽度并与上屏同步缩放，网格连续 Up、刷新回顶首卡、评论/搜索结果
-> 焦点环等修复。rc50–rc60 的上下屏交换、番剧/影视索引、音轨/HDR/4K、追番追剧、
-> 视频合集与弹幕过滤继续保留。
+> 状态：功能完整的 **测试版**，288 个单元测试通过；rc63 将视频弹幕引擎升级为
+> **DanmakuFlameMaster**，密集场景更接近官方，滚动弹幕占满屏幕、固定顶/底可重叠；
+> 同时修复关闭选择弹窗/播放设置/直播设置后快速按方向键被吞、焦点环回闪的问题。
+> 自研 Canvas 弹幕引擎已移除；直播弹幕仍使用原实时引擎。rc50–rc62 的上下屏交换、
+> 番剧/影视索引、音轨/HDR/4K、追番追剧、视频合集与弹幕过滤继续保留。
 
 ## 界面预览
 
@@ -103,11 +102,12 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
   （15/30/45/60/90 分钟到点暂停）。
 - **评论**：分页、热门/最新排序、楼中楼回复分页、评论/回复点赞与点踩、长评论
   展开、评论图片缩略图与全屏查看器；登录后可发布评论/回复，并可删除自己的评论。
-- **弹幕**：按 cid 拉取 XML（手动解 raw deflate）、上屏 Canvas 渲染、滚动/顶部/
-  底部泳道、暂停冻结、seek 重建；下屏开关、透明度/速度/字号/显示区域、屏蔽词、
-  同屏上限；**弹幕过滤**支持官方屏蔽等级 0–10、滚动/顶部/底部类型开关、正则
-  屏蔽与按作者屏蔽/恢复；**离线弹幕**随下载保存 XML，本地播放断网也有弹幕；
-  普通视频支持发送与撤回。
+- **弹幕**：按 cid 拉取 XML（手动解 raw deflate），视频弹幕使用
+  **DanmakuFlameMaster** 渲染（全高滚动、固定顶/底可与滚动重叠、暂停冻结、
+  seek 重建）；下屏开关、透明度/速度/字号/显示区域、屏蔽词、同屏上限与
+  「泳道满时」开关；**弹幕过滤**支持官方屏蔽等级 0–10、滚动/顶部/底部类型开关、
+  正则屏蔽与按作者屏蔽/恢复；**离线弹幕**随下载保存 XML，本地播放断网也有弹幕；
+  普通视频支持发送与撤回。直播弹幕仍使用独立的实时引擎。
 - **字幕**：多字幕轨选择、开关、上屏只读字幕层；控制台「播放设置」内可调字号/
   背景/位置，播放页修改只作用于当前视频；默认值在 设置 → 播放。
 - **直播**：分区 chips（一级 + 子分区）、关注主播行、双列房间、HLS 播放、
@@ -158,7 +158,7 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
 | 图片 | Coil 2.6（含 GIF）、telephoto-zoomable |
 | 登录 | ZXing 二维码、极验 Geetest WebView |
 | 构建 | Gradle 8.7、AGP 8.4.0、JDK 17、R8 |
-| 测试 | JUnit4，268 个单元测试 |
+| 测试 | JUnit4，288 个单元测试 |
 | 架构 | Activity + Presentation、MVVM + StateFlow、单一 `PlayerController` |
 | 界面语言 | 简体中文（当前未做多语言资源） |
 
@@ -168,7 +168,7 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
 
 ### 已验证
 
-- **单元测试**：268 个用例通过（`./gradlew testDebugUnitTest`）。
+- **单元测试**：288 个用例通过（`./gradlew testDebugUnitTest`）。
 - **MuMu（1280×960 / 320dpi）**：双屏壳层、首页、搜索、播放控制台、直播列表与
   HLS 播放、动态空态/登录态、单屏回退提示、签名包安装与冷启动。
 - **Retroid Pocket Duo 真机**：
@@ -333,6 +333,10 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
     与 1600w 原图；网格任意列连续 Up 回第一行、刷新回顶首卡、评论展开/图片/
     加载更多焦点、评论排序 chip 间距、搜索结果行焦点环顶部裁切等。
     281 单测通过；Duo 统一复测无阻塞问题。
+  - rc63 第九版测试版：视频弹幕升级为 **DanmakuFlameMaster**，自研 Canvas 引擎
+    移除；密集场景同屏数量提升，滚动弹幕占满屏幕高度，固定顶/底可与滚动重叠；
+    保留「泳道满时」开关；修复选择弹窗/播放设置/直播设置关闭后快速按方向键被
+    延迟焦点恢复吞掉、焦点环回闪的问题；288 单测通过。
   - 登录、个人中心、历史/收藏/关注只读浏览；弹幕发送→撤回闭环。
 
 ### 未实现（代码层面）
@@ -543,7 +547,8 @@ docs/
 - [Wayfinder](https://github.com/Thor-Wayfinder/thor-wayfinder) — Android 双屏焦点限制
 
 技术栈：Jetpack Compose、Media3/ExoPlayer、Retrofit + OkHttp、Coil、ZXing、
-telephoto-zoomable、Gson；直播实时弹幕使用 WebSocket + zlib。
+telephoto-zoomable、Gson、DanmakuFlameMaster 0.9.25（Apache-2.0）；直播实时弹幕
+使用 WebSocket + zlib。
 
 > 参考项目各自的许可证独立于本项目。`bilimiao2`、`wiliwili` 为 GPL-3.0，
 > 本项目**未复制其代码**；如未来移植，需要重新评估整体许可证策略。
@@ -563,3 +568,6 @@ telephoto-zoomable、Gson；直播实时弹幕使用 WebSocket + zlib。
 ## License
 
 MIT。基座版权归 `yearzen1` 所有，详见 [LICENSE](LICENSE) 与 [NOTICE](NOTICE)。
+
+视频弹幕使用 [DanmakuFlameMaster](https://github.com/bilibili/DanmakuFlameMaster)
+v0.9.25，Apache-2.0，许可证与 NOTICE 见 [`danmaku/`](danmaku/)。

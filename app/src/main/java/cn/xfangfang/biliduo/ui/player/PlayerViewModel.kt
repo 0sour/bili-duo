@@ -80,6 +80,8 @@ data class PlayerUiState(
     val danmakuSpeed: Float = 1f,
     val danmakuTextSize: Float = 16f,
     val danmakuArea: Float = 1f,
+    /** False drops overflow when all DFM lanes are full. */
+    val danmakuAllowOverlap: Boolean = false,
     val danmakuBlockedWords: Set<String> = emptySet(),
     val danmakuBlockedRegex: String = "",
     /** Official-style shield level 0–10; keeps weight >= level (0 = off). */
@@ -154,6 +156,7 @@ class PlayerViewModel(
             danmakuSpeed = saved.speed,
             danmakuTextSize = saved.textSizeSp,
             danmakuArea = saved.area,
+            danmakuAllowOverlap = saved.allowOverlap,
             danmakuBlockedWords = saved.blockedWords,
             danmakuBlockedRegex = saved.blockedRegex,
             danmakuShieldLevel = saved.shieldLevel,
@@ -796,6 +799,7 @@ class PlayerViewModel(
             danmakuSpeed = current.danmakuSpeed,
             danmakuTextSize = current.danmakuTextSize,
             danmakuArea = current.danmakuArea,
+            danmakuAllowOverlap = current.danmakuAllowOverlap,
             danmakuBlockedWords = current.danmakuBlockedWords,
             danmakuBlockedRegex = current.danmakuBlockedRegex,
             danmakuShieldLevel = current.danmakuShieldLevel,
@@ -840,6 +844,10 @@ class PlayerViewModel(
 
     fun setDanmakuArea(value: Float) {
         updateDanmakuState { it.copy(danmakuArea = value.coerceIn(0.25f, 1f)) }
+    }
+
+    fun setDanmakuAllowOverlap(value: Boolean) {
+        updateDanmakuState { it.copy(danmakuAllowOverlap = value) }
     }
 
     fun setDanmakuBlockedWords(words: Set<String>) {
@@ -923,6 +931,7 @@ class PlayerViewModel(
                 speed = state.danmakuSpeed,
                 textSizeSp = state.danmakuTextSize,
                 area = state.danmakuArea,
+                allowOverlap = state.danmakuAllowOverlap,
                 blockedWords = state.danmakuBlockedWords,
                 blockedRegex = state.danmakuBlockedRegex,
                 shieldLevel = state.danmakuShieldLevel,

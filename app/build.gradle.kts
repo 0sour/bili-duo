@@ -26,8 +26,8 @@ android {
         applicationId = "cn.xfangfang.biliduo"
         minSdk = 24
         targetSdk = 34
-        versionCode = 63
-        versionName = "0.2.0-rc62"
+        versionCode = 64
+        versionName = "0.2.0-rc63"
     }
 
     signingConfigs {
@@ -115,6 +115,8 @@ dependencies {
     implementation("androidx.media3:media3-datasource-okhttp:1.4.1")
 
     implementation("com.google.zxing:core:3.5.3")
+
+    implementation(project(":danmaku"))
 
     implementation("com.github.jeziellago:compose-markdown:0.5.7")
 

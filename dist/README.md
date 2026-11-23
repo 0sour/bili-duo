@@ -4,6 +4,22 @@
 `*.apk`），需要时本地 `./gradlew assembleDebug` / `assembleRelease` 生成，或从
 GitHub Releases 下载。
 
+## 0.2.0-rc63（2026-11-23，第九版测试版）
+
+- `bili-duo-0.2.0-rc63-release.apk`
+  - R8 minify，正式 release keystore 签名；可覆盖安装同 key 的 rc61/rc62 本地测试包。
+  - 大小：4,547,348 字节
+  - APK SHA-256：`a89f7c257ee48335052c0a07225dd1a5e13b01547e3b6ca6ee1732b58433a8d5`
+
+rc63 变更：
+- 视频弹幕升级为 DanmakuFlameMaster（DFM），自研 Canvas 引擎移除；密集场景
+  同屏数量提升，滚动弹幕占满屏幕高度，固定顶/底可与滚动重叠。
+- 保留「泳道满时」开关；设置/播放设置不再提供引擎切换。
+- 修复关闭选择弹窗/播放设置/直播设置后快速按方向键被吞、焦点环回闪；同步覆盖
+  历史/收藏/关注/下载/稍后再看/设置确认层。
+- 直播弹幕仍使用原实时引擎；288 单测通过。
+- 发布页：https://github.com/0sour/bili-duo/releases/tag/v0.2.0-rc63
+
 ## 0.2.0-rc61（2026-11-23，第八版测试版）
 
 - `bili-duo-0.2.0-rc61-release.apk`

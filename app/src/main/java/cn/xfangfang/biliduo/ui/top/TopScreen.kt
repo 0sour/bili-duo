@@ -33,6 +33,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -69,7 +70,7 @@ import cn.xfangfang.biliduo.ui.theme.DuoTheme
 import cn.xfangfang.biliduo.ui.common.DuoLogo
 import cn.xfangfang.biliduo.ui.live.LiveChatStore
 import cn.xfangfang.biliduo.ui.live.LiveDanmakuView
-import cn.xfangfang.biliduo.ui.player.DanmakuView
+import cn.xfangfang.biliduo.ui.player.DfmDanmakuView
 import cn.xfangfang.biliduo.ui.player.PlayerController
 import cn.xfangfang.biliduo.ui.player.PlayerViewModel
 import cn.xfangfang.biliduo.ui.player.TopPlayerSurface
@@ -141,22 +142,45 @@ fun TopScreenHost(
         // Keep the layer while the list is empty so a slow XML fetch does not
         // tear down and recreate the AndroidView mid-video.
         if (playback.hasRenderedFrame && playerUi.danmakuEnabled && !playerUi.isLive) {
-            DanmakuOverlay(
-                player = controller.player,
-                items = playerUi.danmaku,
-                opacity = playerUi.danmakuOpacity,
-                speed = playerUi.danmakuSpeed,
-                textSizeSp = playerUi.danmakuTextSize,
-                area = playerUi.danmakuArea,
-                blockedWords = playerUi.danmakuBlockedWords,
-                blockedRegex = playerUi.danmakuBlockedRegex,
-                shieldLevel = playerUi.danmakuShieldLevel,
-                showScroll = playerUi.danmakuShowScroll,
-                showTop = playerUi.danmakuShowTop,
-                showBottom = playerUi.danmakuShowBottom,
-                blockedUidHashes = playerUi.danmakuBlockedUidHashes,
-                maxOnScreen = playerUi.danmakuMaxOnScreen,
-            )
+            // DFM prepare() is one-shot and its incremental list replacement is
+            // unreliable. Key the whole view by the list identity and the
+            // layout-affecting settings so every change goes through the full
+            // ListParser path (which is also the high-density path). Wait for
+            // the first non-empty list; the PlayerView surface already exists
+            // because hasRenderedFrame is true.
+            if (playerUi.danmaku.isNotEmpty()) {
+                key(
+                    playerUi.currentPage?.cid,
+                    System.identityHashCode(playerUi.danmaku),
+                    playerUi.danmakuTextSize,
+                    playerUi.danmakuArea,
+                    playerUi.danmakuBlockedWords,
+                    playerUi.danmakuBlockedRegex,
+                    playerUi.danmakuShieldLevel,
+                    playerUi.danmakuShowScroll,
+                    playerUi.danmakuShowTop,
+                    playerUi.danmakuShowBottom,
+                    playerUi.danmakuBlockedUidHashes,
+                ) {
+                    DfmDanmakuOverlay(
+                        player = controller.player,
+                        items = playerUi.danmaku,
+                        opacity = playerUi.danmakuOpacity,
+                        speed = playerUi.danmakuSpeed,
+                        textSizeSp = playerUi.danmakuTextSize,
+                        area = playerUi.danmakuArea,
+                        blockedWords = playerUi.danmakuBlockedWords,
+                        blockedRegex = playerUi.danmakuBlockedRegex,
+                        shieldLevel = playerUi.danmakuShieldLevel,
+                        showScroll = playerUi.danmakuShowScroll,
+                        showTop = playerUi.danmakuShowTop,
+                        showBottom = playerUi.danmakuShowBottom,
+                        blockedUidHashes = playerUi.danmakuBlockedUidHashes,
+                        maxOnScreen = playerUi.danmakuMaxOnScreen,
+                        allowOverlap = playerUi.danmakuAllowOverlap,
+                    )
+                }
+            }
         }
         if (playback.hasRenderedFrame && playerUi.isLive) {
             LiveDanmakuOverlay(
@@ -275,7 +299,7 @@ private fun TopSubtitleOverlay(
 }
 
 @Composable
-private fun DanmakuOverlay(
+private fun DfmDanmakuOverlay(
     player: Player,
     items: List<DanmakuItem>,
     opacity: Float,
@@ -290,9 +314,10 @@ private fun DanmakuOverlay(
     showBottom: Boolean,
     blockedUidHashes: Set<String>,
     maxOnScreen: Int,
+    allowOverlap: Boolean,
 ) {
     AndroidView(
-        factory = { context -> DanmakuView(context) },
+        factory = { context -> DfmDanmakuView(context) },
         update = { view ->
             view.bind(
                 player = player,
@@ -309,6 +334,7 @@ private fun DanmakuOverlay(
                 showBottom = showBottom,
                 blockedUidHashes = blockedUidHashes,
                 maxOnScreen = maxOnScreen,
+                allowOverlap = allowOverlap,
             )
         },
         modifier = Modifier.fillMaxSize(),

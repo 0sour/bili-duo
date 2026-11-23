@@ -150,6 +150,8 @@ import cn.xfangfang.biliduo.ui.duo.duoFocusRing
 import cn.xfangfang.biliduo.ui.duo.DuoTextFieldGate
 import cn.xfangfang.biliduo.ui.duo.duoTextFieldNavigation
 import cn.xfangfang.biliduo.ui.duo.rememberDuoTextFieldState
+import cn.xfangfang.biliduo.ui.duo.restoreDuoFocus
+import cn.xfangfang.biliduo.ui.duo.restoreDuoFocusNow
 import cn.xfangfang.biliduo.util.fixPic
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -295,21 +297,10 @@ fun PlayerConsoleScreen(
         if (previous != null && overlay == null) {
             val target = pendingOverlayFocus ?: playFocus
             pendingOverlayFocus = null
-            if (previous == DuoOverlay.IMAGE) {
-                // The image viewer is a full-screen sibling over already
-                // composed comment thumbnails, so the thumbnail can take the
-                // ring as soon as the viewer leaves. Try at once and retry
-                // once in case the removal frame clears it; the generic 300ms
-                // restore felt visibly slow here.
-                runCatching { target.requestFocus() }
-                delay(80L)
-                runCatching { target.requestFocus() }
-            } else {
-                // Other overlays' focused rows are removed in the same frames
-                // that clear their focus; a short restore can be overwritten.
-                delay(300L)
-                runCatching { target.requestFocus() }
-            }
+            // Immediate restore keeps a quick Down after B on the opener and
+            // moves it to the next row. The old 300ms retry snapped the ring
+            // back to the opener after the user had already moved.
+            restoreDuoFocus(target)
         }
     }
     var nextCursor by remember(aid) { mutableIntStateOf(0) }
@@ -585,9 +576,8 @@ fun PlayerConsoleScreen(
     DisposableEffect(Unit) {
         session.setFocusBackInterceptor {
             if (rightPaneFocusedState) {
-                scope.launch {
-                    delay(80L)
-                    runCatching { playFocus.requestFocus() }
+                if (!restoreDuoFocusNow(playFocus)) {
+                    scope.launch { restoreDuoFocus(playFocus) }
                 }
                 true
             } else {
@@ -2805,7 +2795,11 @@ fun PlayerConsoleScreen(
                                 }
                                 else -> false
                             }
-                        },
+                        }
+                        // The danmaku page can exceed the 440dp card. Inset the
+                        // scroll viewport so focus rings are not clipped.
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -2867,6 +2861,27 @@ fun PlayerConsoleScreen(
                             focusRequester = danmakuFirstFocus,
                             modifier = Modifier.focusProperties { up = sectionTabFocus[0] },
                             onClick = { vm.setDanmakuEnabled(!ui.danmakuEnabled) },
+                        )
+                        DanmakuSettingRow(
+                            label = "泳道满时",
+                            value = if (ui.danmakuAllowOverlap) {
+                                "允许重叠"
+                            } else {
+                                "丢弃超出（不重叠）"
+                            },
+                            choices = listOf(
+                                DuoChoiceOption(
+                                    label = "丢弃超出（不重叠）",
+                                    selected = !ui.danmakuAllowOverlap,
+                                ),
+                                DuoChoiceOption(
+                                    label = "允许重叠",
+                                    selected = ui.danmakuAllowOverlap,
+                                ),
+                            ),
+                            onChoice = { index ->
+                                vm.setDanmakuAllowOverlap(index == 1)
+                            },
                         )
                         DanmakuSettingRow(
                             label = "不透明度",

@@ -59,6 +59,7 @@ import cn.xfangfang.biliduo.ui.common.DuoPageHeader
 import cn.xfangfang.biliduo.ui.common.DuoPalette
 import cn.xfangfang.biliduo.ui.duo.duoClickable
 import cn.xfangfang.biliduo.ui.duo.requestPageFocus
+import cn.xfangfang.biliduo.ui.duo.restoreDuoPageFocusLater
 import cn.xfangfang.biliduo.ui.top.TopAmbientUi
 import cn.xfangfang.biliduo.ui.top.TopGlyph
 import cn.xfangfang.biliduo.ui.top.TopPreviewUi
@@ -139,10 +140,7 @@ fun WatchLaterScreen(
     fun closeRemoveConfirm() {
         val focus = removeFocus
         confirmRemove = null
-        scope.launch {
-            delay(120)
-            runCatching { focus?.requestPageFocus() }
-        }
+        restoreDuoPageFocusLater(focus, scope)
     }
 
     LaunchedEffect(confirmRemove, session) {

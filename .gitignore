@@ -9,6 +9,7 @@
 .cxx
 local.properties
 app/build/
+danmaku/build/
 /apk/
 /android-sdk/
 /keystore/

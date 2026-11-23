@@ -27,6 +27,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
@@ -65,7 +66,9 @@ import androidx.compose.runtime.Stable
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusProperties
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 private val BarBg: Color @Composable get() = DuoTheme.colors.surface1
 private val BarText: Color @Composable get() = DuoTheme.colors.text
@@ -88,6 +91,44 @@ object DuoPageFocusGate {
 fun FocusRequester.requestPageFocus() {
     if (DuoPageFocusGate.railLocked) return
     runCatching { requestFocus() }
+}
+
+/**
+ * Restores focus to the control that opened an overlay.
+ *
+ * Try synchronously first: the opener usually remains composed while the
+ * overlay is removed, so a quick D-pad press immediately after B must move
+ * from that row instead of being swallowed by a delayed focus request. Only
+ * retry on the next frame if the node was not attached yet; long 80/260/300ms
+ * retries used to snap the ring back after the user had already moved.
+ */
+fun restoreDuoFocusNow(target: FocusRequester?): Boolean =
+    target != null && runCatching { target.requestFocus() }.isSuccess
+
+suspend fun restoreDuoFocus(target: FocusRequester?) {
+    if (restoreDuoFocusNow(target)) return
+    withFrameNanos { }
+    restoreDuoFocusNow(target)
+}
+
+/** Page-level restore that must not pull focus away from a locked app rail. */
+fun restoreDuoPageFocusNow(target: FocusRequester?): Boolean {
+    if (DuoPageFocusGate.railLocked) return true
+    return restoreDuoFocusNow(target)
+}
+
+suspend fun restoreDuoPageFocus(target: FocusRequester?) {
+    if (DuoPageFocusGate.railLocked) return
+    if (restoreDuoFocusNow(target)) return
+    withFrameNanos { }
+    if (DuoPageFocusGate.railLocked) return
+    restoreDuoFocusNow(target)
+}
+
+/** Non-suspending close-path entry point for page screens. */
+fun restoreDuoPageFocusLater(target: FocusRequester?, scope: CoroutineScope) {
+    if (restoreDuoPageFocusNow(target)) return
+    scope.launch { restoreDuoPageFocus(target) }
 }
 
 /**

@@ -130,6 +130,8 @@ import cn.xfangfang.biliduo.ui.duo.duoClickable
 import cn.xfangfang.biliduo.ui.duo.duoFocusRing
 import cn.xfangfang.biliduo.ui.duo.DuoTextFieldGate
 import cn.xfangfang.biliduo.ui.duo.rememberDuoTextFieldState
+import cn.xfangfang.biliduo.ui.duo.restoreDuoFocus
+import cn.xfangfang.biliduo.ui.duo.restoreDuoFocusNow
 import cn.xfangfang.biliduo.ui.player.PlayerController
 import cn.xfangfang.biliduo.ui.player.PlayerUiState
 import cn.xfangfang.biliduo.ui.player.PlayerViewModel
@@ -396,9 +398,8 @@ fun LiveConsoleScreen(
     DisposableEffect(Unit) {
         session.setFocusBackInterceptor {
             if (rightPaneFocusedState) {
-                scope.launch {
-                    delay(80L)
-                    runCatching { playFocus.requestFocus() }
+                if (!restoreDuoFocusNow(playFocus)) {
+                    scope.launch { restoreDuoFocus(playFocus) }
                 }
                 true
             } else {
@@ -427,16 +428,13 @@ fun LiveConsoleScreen(
                 runCatching { danmakuSettingsFirstFocus.requestFocus() }
             }
             previous == DuoOverlay.QUALITY && overlay == null -> {
-                delay(300L)
-                runCatching { (qualityOpener ?: playFocus).requestFocus() }
+                restoreDuoFocus(qualityOpener ?: playFocus)
             }
             previous == DuoOverlay.VOLUME && overlay == null -> {
-                delay(300L)
-                runCatching { (volumeOpener ?: playFocus).requestFocus() }
+                restoreDuoFocus(volumeOpener ?: playFocus)
             }
             previous == DuoOverlay.LIVE_DANMAKU_SETTINGS && overlay == null -> {
-                delay(300L)
-                runCatching { (danmakuSettingsOpener ?: playFocus).requestFocus() }
+                restoreDuoFocus(danmakuSettingsOpener ?: playFocus)
             }
         }
     }

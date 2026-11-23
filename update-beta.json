@@ -1,21 +1,21 @@
 {
-  "versionCode": 62,
-  "versionName": "0.2.0-rc61",
-  "tag": "v0.2.0-rc61",
+  "versionCode": 64,
+  "versionName": "0.2.0-rc63",
+  "tag": "v0.2.0-rc63",
   "downloads": [
     {
       "name": "cn",
-      "url": "https://bili-duo.sourden.xyz/releases/bili-duo-0.2.0-rc61-release.apk"
+      "url": "https://bili-duo.sourden.xyz/releases/bili-duo-0.2.0-rc63-release.apk"
     },
     {
       "name": "github",
-      "url": "https://github.com/0sour/bili-duo/releases/download/v0.2.0-rc61/bili-duo-0.2.0-rc61-release.apk"
+      "url": "https://github.com/0sour/bili-duo/releases/download/v0.2.0-rc63/bili-duo-0.2.0-rc63-release.apk"
     }
   ],
-  "size": 4481004,
-  "sha256": "a9490a2e116cc0e844147edc2eead494c565ac48460bcb7b3e037fb42174b7ef",
-  "notes": "· 播放器：自动连播下一P/下一集（默认开）、跳过片头/片尾（默认关，UGC 使用 view_points、PGC 使用剧集 skip 数据）、睡眠定时（15/30/45/60/90 分钟到点暂停）\n· 首页推荐 START「不感兴趣」：可按内容或 UP 主屏蔽，成功后立即从当前列表移除\n· 搜索新增专栏、直播类型（共 6 种：视频/用户/专栏/直播/番剧/影视）；迁移到 WBI 搜索接口，修复 HTTP 412、搜索慢和一直加载\n· 搜索 L1/R1 切换类型后焦点跟随类型 chip，可连续切换；搜索结果行焦点环不再被顶部裁切\n· 动态 UP 筛选 Down/Up 焦点修复；长图自适应屏幕宽度、最高 8x 缩放并与上屏同步，全屏图改用 1600w 原图\n· 网格任意列连续 Up 回第一行（连按不跳过第一行）；刷新回顶并选中首卡\n· 评论展开/图片返回/加载更多焦点、评论排序 chip 间距；个人页末项焦点环\n· 弹幕 CDN 假 deflate 头导致大面积不显示；恒定速度、同屏满则丢弃、字号增大\n· 合集 L1/R1、排行分区 id、直播信息/评论滚动位置等其他 rc61 反馈修复\n· 安装：release APK 可覆盖安装 rc60；test APK 为 debug 变体 + release key 签名，用于抓日志\n· 281 个单元测试通过；Duo 统一复测无阻塞问题",
-  "publishedAt": "2026-11-23T07:10:00Z",
+  "size": 4547348,
+  "sha256": "a89f7c257ee48335052c0a07225dd1a5e13b01547e3b6ca6ee1732b58433a8d5",
+  "notes": "· 视频弹幕升级为 DanmakuFlameMaster（DFM）：密集场景同屏数量更高，滚动弹幕占满屏幕，固定顶/底可与滚动重叠；自研 Canvas 引擎已移除\n· 修复关闭选择弹窗/播放设置/直播设置后快速按方向键被吞、焦点环回闪；同步覆盖历史/收藏/关注/下载/稍后再看/设置确认层\n· 保留「泳道满时」开关（默认丢弃超出，可允许重叠）；设置→弹幕不再提供引擎切换\n· 直播弹幕保持原实时引擎，本次不迁移\n· 安装：rc63 release 可覆盖安装 rc61/rc62 本地测试包（同 release key）；288 单测通过",
+  "publishedAt": "2026-11-23T12:40:19Z",
   "minSdk": 24,
   "channel": "beta"
 }

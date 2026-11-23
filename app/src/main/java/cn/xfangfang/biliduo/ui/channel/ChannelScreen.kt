@@ -54,6 +54,7 @@ import cn.xfangfang.biliduo.ui.common.DuoPillButton
 import cn.xfangfang.biliduo.ui.common.DuoSearchField
 import cn.xfangfang.biliduo.ui.common.ScrollToTopFab
 import cn.xfangfang.biliduo.ui.duo.requestPageFocus
+import cn.xfangfang.biliduo.ui.duo.restoreDuoPageFocusLater
 import cn.xfangfang.biliduo.ui.duo.duoClickable
 import cn.xfangfang.biliduo.ui.duo.duoFocusRing
 import cn.xfangfang.biliduo.ui.duo.duoTabCycling
@@ -133,10 +134,7 @@ fun ChannelScreen(
 
     fun closeUnfollowConfirm() {
         showUnfollowConfirm = false
-        scope.launch {
-            delay(120)
-            runCatching { followFocus.requestPageFocus() }
-        }
+        restoreDuoPageFocusLater(followFocus, scope)
     }
 
     LaunchedEffect(showUnfollowConfirm, inSeason, inSearch) {

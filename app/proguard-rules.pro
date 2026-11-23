@@ -34,3 +34,8 @@
 
 -keep class io.noties.markwon.** { *; }
 -keep class dev.jeziellago.compose.markdowntext.** { *; }
+
+# DanmakuFlameMaster is vendored as a Java library. Keep its public surface so
+# release builds cannot strip renderer/factory classes that are only reached
+# through interface dispatch or optional native/caching paths.
+-keep class master.flame.danmaku.** { *; }

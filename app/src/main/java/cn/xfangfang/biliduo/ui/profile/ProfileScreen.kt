@@ -74,6 +74,7 @@ import cn.xfangfang.biliduo.duo.DuoSessionViewModel
 import cn.xfangfang.biliduo.ui.theme.DuoTheme
 import cn.xfangfang.biliduo.ui.common.DuoPalette
 import cn.xfangfang.biliduo.ui.duo.requestPageFocus
+import cn.xfangfang.biliduo.ui.duo.restoreDuoPageFocusLater
 import cn.xfangfang.biliduo.ui.duo.duoClickable
 import cn.xfangfang.biliduo.ui.duo.duoFocusRing
 import cn.xfangfang.biliduo.ui.top.TopAmbientUi
@@ -173,8 +174,7 @@ fun ProfileScreen(
     LaunchedEffect(showLogoutConfirm) {
         if (!showLogoutConfirm && restoreLogoutFocus) {
             restoreLogoutFocus = false
-            delay(120)
-            runCatching { logoutFocus.requestPageFocus() }
+            restoreDuoPageFocusLater(logoutFocus, menuScope)
         }
     }
     // B is routed by InputRouter -> DuoSessionViewModel; while an in-screen
