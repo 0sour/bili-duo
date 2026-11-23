@@ -4,22 +4,6 @@
 `*.apk`），需要时本地 `./gradlew assembleDebug` / `assembleRelease` 生成，或从
 GitHub Releases 下载。
 
-## 0.2.0-rc62（2026-11-23，弹幕修复版）
-
-- `bili-duo-0.2.0-rc62-release.apk`
-  - R8 minify，正式 release keystore 签名；可覆盖安装同 key 的 rc61。
-  - 大小：4,481,164 字节
-  - APK SHA-256：`100be58b4a1ad31f41db48f065bac8f41c1c022a058cf45c3e8971c27ec3fbdd`
-
-rc62 变更：
-- 修复弹幕只在首次播放有效、后续视频不显示：旧接口 `x/v1/dm/list.so` 频繁返回
-  HTTP 412，改用 `comment.bilibili.com/<cid>.xml` 作为主源，API 接口兜底。
-- 切换视频时取消旧弹幕任务并清空 cid；XML 加载失败在 1.2s / 3.5s 各重试一次；
-  首帧/媒体激活时兜底补拉；弹幕层首帧后保持挂载，列表变化时强制重建泳道。
-- Duo 实测连续播放 3 个视频，后两个（661 / 4232 条弹幕）正常滚动；
-  281 单测通过。发布页：
-  https://github.com/0sour/bili-duo/releases/tag/v0.2.0-rc62
-
 ## 0.2.0-rc61（2026-11-23，第八版测试版）
 
 - `bili-duo-0.2.0-rc61-release.apk`

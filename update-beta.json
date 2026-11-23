@@ -1,21 +1,21 @@
 {
-  "versionCode": 63,
-  "versionName": "0.2.0-rc62",
-  "tag": "v0.2.0-rc62",
+  "versionCode": 62,
+  "versionName": "0.2.0-rc61",
+  "tag": "v0.2.0-rc61",
   "downloads": [
     {
       "name": "cn",
-      "url": "https://bili-duo.sourden.xyz/releases/bili-duo-0.2.0-rc62-release.apk"
+      "url": "https://bili-duo.sourden.xyz/releases/bili-duo-0.2.0-rc61-release.apk"
     },
     {
       "name": "github",
-      "url": "https://github.com/0sour/bili-duo/releases/download/v0.2.0-rc62/bili-duo-0.2.0-rc62-release.apk"
+      "url": "https://github.com/0sour/bili-duo/releases/download/v0.2.0-rc61/bili-duo-0.2.0-rc61-release.apk"
     }
   ],
-  "size": 4481164,
-  "sha256": "100be58b4a1ad31f41db48f065bac8f41c1c022a058cf45c3e8971c27ec3fbdd",
-  "notes": "· 修复弹幕只在首次播放有效、后续视频不显示：旧接口 x/v1/dm/list.so 频繁返回 HTTP 412，改以 comment.bilibili.com/<cid>.xml 为主源，API 接口作为兜底\n· 切换视频时取消旧弹幕任务并清空 cid；XML 加载失败在 1.2s / 3.5s 各重试一次；首帧/媒体激活时兜底补拉，空列表不再被误判为已加载\n· 弹幕层在首帧后保持挂载，列表更新时强制重建泳道，避免 Compose 复用视图导致弹幕不再出现\n· 安装：release APK 可覆盖安装 rc61（versionCode 63）\n· Duo 实测连续播放 3 个视频，第 2/3 个视频（661 / 4232 条弹幕）正常滚动\n· 其余功能与 rc61 相同；281 个单元测试通过",
-  "publishedAt": "2026-11-23T10:10:00Z",
+  "size": 4481004,
+  "sha256": "a9490a2e116cc0e844147edc2eead494c565ac48460bcb7b3e037fb42174b7ef",
+  "notes": "· 播放器：自动连播下一P/下一集（默认开）、跳过片头/片尾（默认关，UGC 使用 view_points、PGC 使用剧集 skip 数据）、睡眠定时（15/30/45/60/90 分钟到点暂停）\n· 首页推荐 START「不感兴趣」：可按内容或 UP 主屏蔽，成功后立即从当前列表移除\n· 搜索新增专栏、直播类型（共 6 种：视频/用户/专栏/直播/番剧/影视）；迁移到 WBI 搜索接口，修复 HTTP 412、搜索慢和一直加载\n· 搜索 L1/R1 切换类型后焦点跟随类型 chip，可连续切换；搜索结果行焦点环不再被顶部裁切\n· 动态 UP 筛选 Down/Up 焦点修复；长图自适应屏幕宽度、最高 8x 缩放并与上屏同步，全屏图改用 1600w 原图\n· 网格任意列连续 Up 回第一行（连按不跳过第一行）；刷新回顶并选中首卡\n· 评论展开/图片返回/加载更多焦点、评论排序 chip 间距；个人页末项焦点环\n· 弹幕 CDN 假 deflate 头导致大面积不显示；恒定速度、同屏满则丢弃、字号增大\n· 合集 L1/R1、排行分区 id、直播信息/评论滚动位置等其他 rc61 反馈修复\n· 安装：release APK 可覆盖安装 rc60；test APK 为 debug 变体 + release key 签名，用于抓日志\n· 281 个单元测试通过；Duo 统一复测无阻塞问题",
+  "publishedAt": "2026-11-23T07:10:00Z",
   "minSdk": 24,
   "channel": "beta"
 }

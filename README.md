@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc62-FB7299">
+  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc61-FB7299">
   <img alt="status" src="https://img.shields.io/badge/status-test%20build-orange">
   <img alt="Android" src="https://img.shields.io/badge/Android-24%2B-3DDC84?logo=android&logoColor=white">
   <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-1.9.23-7F52FF?logo=kotlin&logoColor=white">
@@ -23,14 +23,14 @@
 上屏只负责视频画面，下屏用一块 `Presentation` 承载完整 UI；手柄和触摸共用同一棵
 Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，也没有上屏 OSD。
 
-> 当前版本：**0.2.0-rc62**（versionCode 63，弹幕修复版）
-> 下载：https://github.com/0sour/bili-duo/releases/tag/v0.2.0-rc62
+> 当前版本：**0.2.0-rc61**（versionCode 62，第八版测试版）
+> 下载：https://github.com/0sour/bili-duo/releases/tag/v0.2.0-rc61
 > 国内下载站：https://bili-duo.sourden.xyz/
-> 状态：功能完整的 **测试版**，281 个单元测试通过；rc62 修复弹幕只在首次播放
-> 有效、后续视频不显示的问题（`x/v1/dm/list.so` 返回 HTTP 412，改用弹幕 CDN
-> XML 主源并保留 API 兜底），并补充切视频清理、失败重试与首帧兜底加载。
-> rc61 的自动连播、跳过片头/片尾、睡眠定时、首页不感兴趣、搜索专栏/直播等
-> 功能全部保留。rc50–rc61 的上下屏交换、番剧/影视索引、音轨/HDR/4K、追番追剧、
+> 状态：功能完整的 **测试版**，281 个单元测试通过；rc61 汇总 17 项反馈修复与
+> 播放器增强：**自动连播、跳过片头/片尾、睡眠定时**，首页**不感兴趣**，
+> 搜索新增**专栏 / 直播**并迁移到 WBI 搜索接口（修复 412、慢和一直加载），
+> 动态长图适应宽度并与上屏同步缩放，网格连续 Up、刷新回顶首卡、评论/搜索结果
+> 焦点环等修复。rc50–rc60 的上下屏交换、番剧/影视索引、音轨/HDR/4K、追番追剧、
 > 视频合集与弹幕过滤继续保留。
 
 ## 界面预览
@@ -333,11 +333,6 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
     与 1600w 原图；网格任意列连续 Up 回第一行、刷新回顶首卡、评论展开/图片/
     加载更多焦点、评论排序 chip 间距、搜索结果行焦点环顶部裁切等。
     281 单测通过；Duo 统一复测无阻塞问题。
-  - rc62 弹幕修复版：修复弹幕只在首次播放有效、后续视频不显示。旧接口
-    `x/v1/dm/list.so` 频繁返回 HTTP 412，改用 `comment.bilibili.com/<cid>.xml`
-    主源并保留 API 兜底；切换视频清理旧弹幕任务，加载失败 1.2s/3.5s 重试，
-    首帧/媒体激活时兜底补拉，弹幕层首帧后保持挂载并按新列表重建泳道。
-    Duo 实测连续 3 个视频，后两个（661/4232 条弹幕）正常滚动；281 单测通过。
   - 登录、个人中心、历史/收藏/关注只读浏览；弹幕发送→撤回闭环。
 
 ### 未实现（代码层面）

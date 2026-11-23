@@ -1,13 +1,5 @@
 [
   {
-    "versionName": "0.2.0-rc62",
-    "tag": "v0.2.0-rc62",
-    "publishedAt": "2026-11-23T10:10:00Z",
-    "channel": "beta",
-    "githubUrl": "https://github.com/0sour/bili-duo/releases/tag/v0.2.0-rc62",
-    "notes": "· 修复弹幕只在首次播放有效、后续视频不显示：旧接口 x/v1/dm/list.so 频繁返回 HTTP 412，改以 comment.bilibili.com/<cid>.xml 为主源，API 接口作为兜底\n· 切换视频时取消旧弹幕任务并清空 cid；XML 加载失败在 1.2s / 3.5s 各重试一次；首帧/媒体激活时兜底补拉，空列表不再被误判为已加载\n· 弹幕层在首帧后保持挂载，列表更新时强制重建泳道，避免 Compose 复用视图导致弹幕不再出现\n· 安装：release APK 可覆盖安装 rc61（versionCode 63）\n· Duo 实测连续播放 3 个视频，第 2/3 个视频（661 / 4232 条弹幕）正常滚动\n· 其余功能与 rc61 相同；281 个单元测试通过"
-  },
-  {
     "versionName": "0.2.0-rc61",
     "tag": "v0.2.0-rc61",
     "publishedAt": "2026-11-23T07:10:00Z",
