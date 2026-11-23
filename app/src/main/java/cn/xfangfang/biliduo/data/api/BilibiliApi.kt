@@ -33,7 +33,7 @@ import kotlinx.coroutines.launch
 
 interface BilibiliApi {
 
-    @GET("x/web-interface/search/type")
+    @GET("x/web-interface/wbi/search/type")
     suspend fun search(
         @Query("search_type") searchType: String = "video",
         @Query("keyword") keyword: String,
@@ -41,19 +41,33 @@ interface BilibiliApi {
         @Query("order") order: String? = null
     ): ApiResponse<SearchResult>
 
-    @GET("x/web-interface/search/type")
+    @GET("x/web-interface/wbi/search/type")
     suspend fun searchUsers(
         @Query("search_type") searchType: String = "bili_user",
         @Query("keyword") keyword: String,
         @Query("page") page: Int = 1
     ): ApiResponse<SearchUserResult>
 
-    @GET("x/web-interface/search/type")
+    @GET("x/web-interface/wbi/search/type")
     suspend fun searchPgc(
         @Query("search_type") searchType: String,
         @Query("keyword") keyword: String,
         @Query("page") page: Int = 1
     ): ApiResponse<SearchPgcResult>
+
+    @GET("x/web-interface/wbi/search/type")
+    suspend fun searchArticles(
+        @Query("search_type") searchType: String = "article",
+        @Query("keyword") keyword: String,
+        @Query("page") page: Int = 1
+    ): ApiResponse<SearchArticleResult>
+
+    @GET("x/web-interface/wbi/search/type")
+    suspend fun searchLiveRooms(
+        @Query("search_type") searchType: String = "live_room",
+        @Query("keyword") keyword: String,
+        @Query("page") page: Int = 1
+    ): ApiResponse<SearchLiveResult>
 
     @GET("https://s.search.bilibili.com/main/suggest")
     suspend fun suggestSearch(
@@ -96,6 +110,26 @@ interface BilibiliApi {
         @Query("rid") rid: Int = 0,
         @Query("type") type: String = "all"
     ): ApiResponse<HomeRankingData>
+
+    /**
+     * Home recommend "not interested" feedback. The web player sends the same
+     * app_id/platform/spmid payload; reason 1 = 内容不感兴趣, 4 = 不想看此UP主.
+     */
+    @FormUrlEncoded
+    @POST("x/web-interface/feedback/dislike")
+    suspend fun dislikeRecommend(
+        @Field("app_id") appId: Int = 100,
+        @Field("platform") platform: Int = 5,
+        @Field("from_spmid") fromSpmid: String = "",
+        @Field("spmid") spmid: String = "333.1007.0.0",
+        @Field("goto") goto: String = "av",
+        @Field("id") id: Long,
+        @Field("mid") mid: Long,
+        @Field("track_id") trackId: String,
+        @Field("feedback_page") feedbackPage: Int = 1,
+        @Field("reason_id") reasonId: Int,
+        @Field("csrf") csrf: String,
+    ): ApiResponse<Any>
 
     @GET("pgc/web/rank/list")
     suspend fun getPgcRank(
@@ -599,6 +633,9 @@ interface BilibiliApi {
     @GET("x/space/acc/info")
     suspend fun getSpaceAccInfo(@Query("mid") mid: Long): ApiResponse<SpaceAccInfo>
 
+    @GET("x/frontend/finger/spi")
+    suspend fun getBuvidSpi(): ApiResponse<BuvidSpiData>
+
     @GET("x/web-interface/nav")
     suspend fun getNavInfo(): ApiResponse<NavInfo>
 
@@ -620,6 +657,7 @@ interface BilibiliApi {
     companion object {
         private const val BASE_URL = "https://api.bilibili.com/"
         lateinit var buvid3: String
+        var buvid4: String = ""
         var loginCookies: String = ""
         var biliJct: String = ""
 
@@ -652,6 +690,29 @@ interface BilibiliApi {
         }
 
         private var buvidActivated = false
+
+        /**
+         * Search/type risk control rejects the locally generated UUID that
+         * older installs use: 412 Precondition Failed even though other APIs
+         * work. Fetch the browser-issued b_3/b_4 once and use them for all
+         * cookies. Returns null when the endpoint is unreachable.
+         */
+        suspend fun fetchBuvidSpi(): Pair<String, String>? {
+            return try {
+                val response = create().getBuvidSpi()
+                val data = response.data
+                val b3 = data?.b3
+                val b4 = data?.b4
+                if (response.code == 0 && !b3.isNullOrBlank() && !b4.isNullOrBlank()) {
+                    b3 to b4
+                } else {
+                    null
+                }
+            } catch (e: Exception) {
+                if (BuildConfig.DEBUG) Log.w(BilibiliApp.TAG, "buvid spi failed", e)
+                null
+            }
+        }
 
         fun activateBuvidIfNeeded(scope: CoroutineScope) {
             if (buvidActivated || buvid3.isBlank()) return
@@ -848,9 +909,15 @@ interface BilibiliApi {
 
         private class RetryInterceptor : Interceptor {
             override fun intercept(chain: Interceptor.Chain): Response {
+                val isSearch = chain.request().url.toString().contains("search/type")
                 var response = chain.proceed(chain.request())
                 var retryCount = 0
-                while (retryCount < MAX_RETRIES && (response.code == 429 || response.code == 412)) {
+                // Search 412 is risk control. Retrying the same signed URL
+                // three times kept the spinner alive ~14s and sent even more
+                // requests; fail fast so the UI can show "搜索太频繁".
+                while (retryCount < MAX_RETRIES &&
+                    (response.code == 429 || (response.code == 412 && !isSearch))
+                ) {
                     response.close()
                     val retryAfter = response.header("Retry-After")?.toLongOrNull()
                     val backoff = retryAfter ?: ((1L shl retryCount) * if (response.code == 412) 2000L else 1000L)
@@ -914,7 +981,7 @@ interface BilibiliApi {
                         builder.header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.2 Safari/605.1.15")
                             .header("Origin", spaceOrigin)
                             .header("Cookie", buildString {
-                                append("buvid3=$buvid3; buvid4=$buvid3")
+                                append("buvid3=$buvid3; buvid4=${buvid4.ifBlank { buvid3 }}")
                                 if (loginCookies.isNotEmpty()) {
                                     append("; $loginCookies")
                                 }
@@ -928,7 +995,7 @@ interface BilibiliApi {
                         builder.header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
                             .header("Origin", liveOrigin)
                             .header("Cookie", buildString {
-                                append("buvid3=$buvid3; buvid4=$buvid3")
+                                append("buvid3=$buvid3; buvid4=${buvid4.ifBlank { buvid3 }}")
                                 if (loginCookies.isNotEmpty()) {
                                     append("; $loginCookies")
                                 }
@@ -947,7 +1014,7 @@ interface BilibiliApi {
                             .header("Origin", apiOrigin)
                         if (!skipCookie) {
                             builder.header("Cookie", buildString {
-                                append("buvid3=$buvid3; buvid4=$buvid3")
+                                append("buvid3=$buvid3; buvid4=${buvid4.ifBlank { buvid3 }}")
                                 if (loginCookies.isNotEmpty()) {
                                     append("; $loginCookies")
                                 }

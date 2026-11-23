@@ -20,6 +20,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -33,6 +34,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import cn.xfangfang.biliduo.data.local.GamepadStyleStore
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -146,6 +148,7 @@ fun DuoChoiceOverlay(
     }
     val focusers = remember(request) { List(options.size) { FocusRequester() } }
     val colors = DuoTheme.colors
+    val gamepadStyle by GamepadStyleStore.style.collectAsState()
 
     LaunchedEffect(request) {
         if (options.isEmpty()) return@LaunchedEffect
@@ -206,7 +209,7 @@ fun DuoChoiceOverlay(
                     modifier = Modifier.weight(1f),
                 )
                 Text(
-                    text = "B 关闭",
+                    text = "${gamepadStyle.backLabel} 关闭",
                     color = colors.tertiary,
                     fontSize = 10.sp,
                 )

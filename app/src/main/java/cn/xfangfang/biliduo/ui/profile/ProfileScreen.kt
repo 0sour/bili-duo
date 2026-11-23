@@ -43,6 +43,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -79,6 +80,7 @@ import cn.xfangfang.biliduo.ui.top.TopAmbientUi
 import cn.xfangfang.biliduo.ui.top.TopGlyph
 import cn.xfangfang.biliduo.ui.top.TopPersonUi
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 private val ProfileBg: Color @Composable get() = DuoTheme.colors.bg
 private val ProfileSurface: Color @Composable get() = DuoTheme.colors.surface1
@@ -114,6 +116,8 @@ fun ProfileScreen(
     val menuFocuses = remember { List(7) { FocusRequester() } }
     val swapFocus = remember { FocusRequester() }
     val logoutFocus = remember { FocusRequester() }
+    val menuScroll = rememberScrollState()
+    val menuScope = rememberCoroutineScope()
     var restoreLogoutFocus by remember { mutableStateOf(false) }
     // The preview always lives on the video screen; the lists and forms live
     // on the control screen. Both swap together with the layout.
@@ -231,7 +235,7 @@ fun ProfileScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
-                    .verticalScroll(rememberScrollState())
+                    .verticalScroll(menuScroll)
                     .padding(horizontal = 8.dp, vertical = 4.dp),
             ) {
                 if (displaySwapAvailable) {
@@ -266,6 +270,24 @@ fun ProfileScreen(
                                 } else {
                                     Modifier
                                 }
+                            )
+                            .then(
+                                if (index == entries.lastIndex) {
+                                    // The ring is drawn outside the row. Keep a
+                                    // bottom gutter and pull the last row up so
+                                    // the ring is never clipped by the scroll
+                                    // viewport's bottom edge.
+                                    Modifier.onFocusChanged { focusState ->
+                                        if (focusState.isFocused) {
+                                            menuScope.launch {
+                                                delay(80)
+                                                menuScroll.animateScrollTo(menuScroll.maxValue)
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    Modifier
+                                }
                             ),
                     )
                     if (index != entries.lastIndex) {
@@ -278,6 +300,7 @@ fun ProfileScreen(
                         )
                     }
                 }
+                Spacer(Modifier.height(12.dp))
             }
 
             if (!state.isLoggedIn) {

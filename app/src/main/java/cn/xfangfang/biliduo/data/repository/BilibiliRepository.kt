@@ -37,6 +37,8 @@ data class PlaybackMeta(
     /** Cloud playback position in milliseconds; 0 when the account has none. */
     val lastPlayTimeMs: Long = 0L,
     val lastPlayCid: Long = 0L,
+    /** Uploader-defined opening/ending markers for this page. */
+    val viewPoints: List<VideoViewPoint> = emptyList(),
 )
 
 class BilibiliRepository(
@@ -87,6 +89,34 @@ class BilibiliRepository(
                 throw Exception(response.message)
             }
         }.onFailure { Log.e(BilibiliApp.TAG, "searchPgc failed", it) }
+    }
+
+    suspend fun searchArticles(keyword: String, page: Int = 1): Result<Pair<List<SearchArticleItem>, Int>> {
+        if (BuildConfig.DEBUG) Log.d(BilibiliApp.TAG, "searchArticles: keyword=$keyword page=$page")
+        return runCatching<Pair<List<SearchArticleItem>, Int>> {
+            val response = api.searchArticles(keyword = keyword, page = page)
+            if (BuildConfig.DEBUG) Log.d(BilibiliApp.TAG, "searchArticles response: code=${response.code} msg=${response.message}")
+            if (response.code == 0) {
+                val data = response.data
+                Pair(data?.result.orEmpty(), data?.totalPages ?: 1)
+            } else {
+                throw Exception(response.message)
+            }
+        }.onFailure { Log.e(BilibiliApp.TAG, "searchArticles failed", it) }
+    }
+
+    suspend fun searchLiveRooms(keyword: String, page: Int = 1): Result<Pair<List<SearchLiveItem>, Int>> {
+        if (BuildConfig.DEBUG) Log.d(BilibiliApp.TAG, "searchLiveRooms: keyword=$keyword page=$page")
+        return runCatching<Pair<List<SearchLiveItem>, Int>> {
+            val response = api.searchLiveRooms(keyword = keyword, page = page)
+            if (BuildConfig.DEBUG) Log.d(BilibiliApp.TAG, "searchLiveRooms response: code=${response.code} msg=${response.message}")
+            if (response.code == 0) {
+                val data = response.data
+                Pair(data?.result.orEmpty(), data?.totalPages ?: 1)
+            } else {
+                throw Exception(response.message)
+            }
+        }.onFailure { Log.e(BilibiliApp.TAG, "searchLiveRooms failed", it) }
     }
 
     suspend fun getHotSearches(limit: Int = 20): Result<List<String>> {
@@ -190,42 +220,13 @@ class BilibiliRepository(
         val body = response.body() ?: throw Exception("弹幕为空")
         val raw = body.bytes()
         val encoding = response.headers()["Content-Encoding"].orEmpty().lowercase()
-        val bytes = when (encoding) {
-            "deflate" -> {
-                // B 站 dm/list.so 返回 raw deflate（无 zlib 头），个别 CDN 节点
-                // 仍带 zlib 头，所以先按 raw 解，失败再退回带头的解一次。
-                val inflated = runCatching { inflate(raw, nowrap = true) }
-                    .getOrDefault(ByteArray(0))
-                if (inflated.isNotEmpty()) inflated else inflate(raw, nowrap = false)
-            }
-            "gzip" -> GZIPInputStream(raw.inputStream()).use { it.readBytes() }
-            else -> raw
-        }
+        val bytes = decodeDanmakuBody(raw, encoding)
+        if (!looksLikeDanmakuXml(bytes)) throw Exception("弹幕格式无效")
         String(bytes, Charsets.UTF_8)
     }
 
     /** Parses a saved danmaku XML file (offline playback). */
     fun parseDanmakuXmlText(xml: String): List<DanmakuItem> = parseDanmakuXml(xml)
-
-    private fun inflate(data: ByteArray, nowrap: Boolean): ByteArray {
-        val inflater = Inflater(nowrap)
-        return try {
-            inflater.setInput(data)
-            val out = ByteArrayOutputStream(data.size.coerceAtLeast(1024))
-            val buffer = ByteArray(8192)
-            while (!inflater.finished()) {
-                val count = inflater.inflate(buffer)
-                if (count == 0) {
-                    if (inflater.needsInput() || inflater.needsDictionary()) break
-                    continue
-                }
-                out.write(buffer, 0, count)
-            }
-            out.toByteArray()
-        } finally {
-            inflater.end()
-        }
-    }
 
     private fun parseDanmakuXml(xml: String): List<DanmakuItem> {
         val result = mutableListOf<DanmakuItem>()
@@ -257,6 +258,23 @@ class BilibiliRepository(
         }
         return result.sortedBy { it.timeMs }
     }
+
+    /** Report a home recommend card as "not interested" (1) or "hide this UP" (4). */
+    suspend fun dislikeRecommend(item: HomeVideoItem, reasonId: Int): Result<Unit> = runCatching {
+        val csrf = BilibiliApi.biliJct
+        if (csrf.isBlank()) throw Exception("请先登录")
+        val targetId = item.aid.takeIf { it > 0L } ?: item.id
+        if (targetId <= 0L) throw Exception("视频信息不完整")
+        val response = api.dislikeRecommend(
+            goto = item.goto.ifBlank { "av" },
+            id = targetId,
+            mid = item.owner?.mid ?: 0L,
+            trackId = item.trackId,
+            reasonId = reasonId,
+            csrf = csrf,
+        )
+        if (response.code != 0) throw Exception(response.message.ifBlank { "操作失败" })
+    }.onFailure { Log.e(BilibiliApp.TAG, "dislikeRecommend failed", it) }
 
     suspend fun getHomeFeed(
         tab: HomeTab,
@@ -1772,6 +1790,7 @@ class BilibiliRepository(
                     }.filter { it.subtitleUrl.isNotBlank() },
                     lastPlayTimeMs = data?.lastPlayTime?.coerceAtLeast(0L) ?: 0L,
                     lastPlayCid = data?.lastPlayCid ?: 0L,
+                    viewPoints = data?.viewPoints.orEmpty(),
                 )
             } else {
                 throw Exception(response.message)
@@ -1845,5 +1864,76 @@ class BilibiliRepository(
             }
         val playUrlInFlight = mutableMapOf<String, Deferred<Result<PlayUrlInfo>>>()
         val playUrlScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    }
+}
+
+/**
+ * Decodes the danmaku XML body. The CDN is inconsistent: it may send raw
+ * deflate, zlib, gzip, or plain XML while still advertising
+ * `Content-Encoding: deflate`. That last case used to throw during inflation
+ * and leave almost every video with no danmaku, so detect the body signature
+ * first and only decompress when it is actually compressed.
+ */
+internal fun decodeDanmakuBody(raw: ByteArray, contentEncoding: String): ByteArray {
+    return when {
+        looksLikeDanmakuXml(raw) -> raw
+        isGzip(raw) -> GZIPInputStream(raw.inputStream()).use { it.readBytes() }
+        contentEncoding.lowercase() == "deflate" -> {
+            // B 站 dm/list.so 多数节点返回 raw deflate（无 zlib 头），
+            // 个别节点仍带 zlib 头。先按 raw 解；结果不是 XML 时再按带头解。
+            val rawInflated = runCatching { inflateDanmaku(raw, nowrap = true) }
+                .getOrDefault(ByteArray(0))
+            if (looksLikeDanmakuXml(rawInflated)) {
+                rawInflated
+            } else {
+                val zlibInflated = runCatching { inflateDanmaku(raw, nowrap = false) }
+                    .getOrDefault(ByteArray(0))
+                if (looksLikeDanmakuXml(zlibInflated) || zlibInflated.isNotEmpty()) {
+                    zlibInflated
+                } else {
+                    rawInflated
+                }
+            }
+        }
+        else -> raw
+    }
+}
+
+private fun looksLikeDanmakuXml(bytes: ByteArray): Boolean {
+    var index = 0
+    // Skip a UTF-8 BOM if present.
+    if (bytes.size >= 3 &&
+        bytes[0] == 0xEF.toByte() &&
+        bytes[1] == 0xBB.toByte() &&
+        bytes[2] == 0xBF.toByte()
+    ) {
+        index = 3
+    }
+    while (index < bytes.size && bytes[index].toInt().toChar().isWhitespace()) {
+        index++
+    }
+    return index < bytes.size && bytes[index] == '<'.code.toByte()
+}
+
+private fun isGzip(bytes: ByteArray): Boolean =
+    bytes.size >= 2 && bytes[0] == 0x1F.toByte() && bytes[1] == 0x8B.toByte()
+
+private fun inflateDanmaku(data: ByteArray, nowrap: Boolean): ByteArray {
+    val inflater = Inflater(nowrap)
+    return try {
+        inflater.setInput(data)
+        val out = ByteArrayOutputStream(data.size.coerceAtLeast(1024))
+        val buffer = ByteArray(8192)
+        while (!inflater.finished()) {
+            val count = inflater.inflate(buffer)
+            if (count == 0) {
+                if (inflater.needsInput() || inflater.needsDictionary()) break
+                continue
+            }
+            out.write(buffer, 0, count)
+        }
+        out.toByteArray()
+    } finally {
+        inflater.end()
     }
 }

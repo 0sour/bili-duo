@@ -180,20 +180,21 @@ class LiveDanmakuView @JvmOverloads constructor(
         super.onDraw(canvas)
         if (!enabled || width == 0 || height == 0) return
         val now = SystemClock.uptimeMillis()
-        val baseSize = height * 0.026f * (textSizeSp / 16f)
-        val laneHeight = baseSize * 1.6f
+        val baseSize = height * 0.034f * (textSizeSp / 16f)
+        val laneHeight = baseSize * 1.45f
         val contentHeight = height * area
         val usable = contentHeight * 0.82f - laneHeight * 0.7f
-        val laneCount = (usable / laneHeight).toInt().coerceIn(2, 20)
+        val laneCount = (usable / laneHeight).toInt().coerceIn(2, 24)
         if (laneFreeAt.size != laneCount) {
             laneFreeAt = FloatArray(laneCount)
             nodes.clear()
         }
 
-        drainPending(now, laneCount, baseSize)
+        val viewWidth = width.toFloat()
+        val pxPerMs = (viewWidth / 8_000f) * speed.coerceAtLeast(0.1f)
+        drainPending(now, laneCount, baseSize, pxPerMs)
         nodes.removeAll { now - it.startMs > it.durationMs }
 
-        val viewWidth = width.toFloat()
         val topInset = laneHeight * 0.35f
         fillPaint.textSize = baseSize
         strokePaint.textSize = baseSize
@@ -204,7 +205,9 @@ class LiveDanmakuView @JvmOverloads constructor(
         for (node in nodes) {
             val age = (now - node.startMs).toFloat()
             if (age > node.durationMs) continue
-            val x = viewWidth - (age / node.durationMs) * (viewWidth + node.width)
+            // All live messages move at the same px/ms, so a fast wide line
+            // cannot catch up with a narrow one ahead of it.
+            val x = viewWidth - age * pxPerMs
             val y = topInset + laneHeight * (node.lane + 1) - baseSize * 0.18f
             canvas.drawText(node.text, x, y, strokePaint)
             canvas.drawText(node.text, x, y, fillPaint)
@@ -212,11 +215,15 @@ class LiveDanmakuView @JvmOverloads constructor(
         updateTicker()
     }
 
-    private fun drainPending(now: Long, laneCount: Int, baseSize: Float) {
+    private fun drainPending(
+        now: Long,
+        laneCount: Int,
+        baseSize: Float,
+        pxPerMs: Float,
+    ) {
         if (pending.isEmpty()) return
         val viewWidth = width.toFloat()
-        val duration = (8_000f / speed).coerceAtLeast(2_000f)
-        val gap = baseSize * 1.5f
+        val gap = baseSize * 1.2f
         while (pending.isNotEmpty()) {
             if (maxOnScreen > 0 && nodes.size >= maxOnScreen) {
                 pending.clear()
@@ -233,12 +240,12 @@ class LiveDanmakuView @JvmOverloads constructor(
             val text = pending.removeFirst()
             measurePaint.textSize = baseSize
             val textWidth = measurePaint.measureText(text)
-            laneFreeAt[lane] = now + duration * (textWidth + gap) / (viewWidth + textWidth)
+            laneFreeAt[lane] = now + (textWidth + gap) / pxPerMs
             nodes += Node(
                 text = text,
                 width = textWidth,
                 startMs = now,
-                durationMs = duration,
+                durationMs = (viewWidth + textWidth) / pxPerMs,
                 lane = lane,
             )
         }

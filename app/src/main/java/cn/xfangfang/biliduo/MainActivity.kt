@@ -725,6 +725,7 @@ fun MainScreen(
                         onVideoFocused = onTopVideoFocused,
                         onFocusCleared = onTopFocusCleared,
                         onTopAmbient = onTopAmbient,
+                        session = duoSession,
                     )
                 }
 
@@ -770,6 +771,12 @@ fun MainScreen(
                         },
                         onPgcClick = { seasonId ->
                             navController.navigate(Routes.pgc(seasonId))
+                        },
+                        onArticleClick = { cvid ->
+                            navController.navigate(Routes.note(cvid.toString()))
+                        },
+                        onLiveClick = { roomId ->
+                            navController.navigate(Routes.live(roomId))
                         },
                         onBack = { navController.popBackStack() },
                         onVideoFocused = onTopVideoFocused,

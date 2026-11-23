@@ -53,7 +53,7 @@ import cn.xfangfang.biliduo.ui.common.DuoPageHeader
 import cn.xfangfang.biliduo.ui.common.DuoPalette
 import cn.xfangfang.biliduo.ui.duo.duoClickable
 import cn.xfangfang.biliduo.ui.duo.duoFocusRing
-import cn.xfangfang.biliduo.ui.duo.duoGridDown
+import cn.xfangfang.biliduo.ui.duo.duoGridVertical
 import cn.xfangfang.biliduo.ui.duo.duoTabCycling
 import cn.xfangfang.biliduo.ui.duo.rememberGridFocusNavigator
 import cn.xfangfang.biliduo.ui.duo.requestPageFocus
@@ -77,8 +77,8 @@ fun MyFollowsScreen(
     val ui by viewModel.uiState.collectAsState()
     val loggedIn = BilibiliApi.parseSelfMid() != null
     val gridState = rememberLazyGridState()
-    val navigator = rememberGridFocusNavigator(4, gridState)
     val firstItemFocus = remember { FocusRequester() }
+    val navigator = rememberGridFocusNavigator(4, gridState, firstItemFocus)
     val retryFocus = remember { FocusRequester() }
     val typeFocuses = remember { List(2) { FocusRequester() } }
 
@@ -228,7 +228,7 @@ fun MyFollowsScreen(
                         FollowCard(
                             item = item,
                             firstFocus = if (index == 0) firstItemFocus else null,
-                            modifier = Modifier.duoGridDown(index, ui.items.size, navigator),
+                            modifier = Modifier.duoGridVertical(index, ui.items.size, navigator),
                             focusRequester = if (index == 0) {
                                 null
                             } else {

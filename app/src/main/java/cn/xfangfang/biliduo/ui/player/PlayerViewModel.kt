@@ -107,6 +107,8 @@ data class PlayerUiState(
     val liveDetail: LiveRoomDetail? = null,
     val liveQualities: List<QualityOption> = emptyList(),
     val liveQn: Int = 10000,
+    /** Opening/ending windows for the current page; empty when unmarked. */
+    val skipRanges: List<PlaybackSkipRange> = emptyList(),
 )
 
 class PlayerViewModel(
@@ -530,6 +532,7 @@ class PlayerViewModel(
                             title = detail.title.ifBlank { episode.longTitle },
                             shareUrl = "https://www.bilibili.com/bangumi/play/ep${episode.epId}",
                             resumePositionMs = resumeMs,
+                            skipRanges = episode.skip.toPlaybackSkipRanges(),
                         ).withVideoDefaults()
                     )
                     loadPlaybackMeta(episode.aid, episode.cid, applySubtitles = false)
@@ -625,6 +628,7 @@ class PlayerViewModel(
                 previewToast = "",
                 danmaku = emptyList(),
                 shareUrl = "https://www.bilibili.com/bangumi/play/ep${episode.epId}",
+                skipRanges = episode.skip.toPlaybackSkipRanges(),
                 videoInfo = info?.copy(
                     bvid = episode.bvid,
                     aid = episode.aid,
@@ -668,7 +672,8 @@ class PlayerViewModel(
                 subtitleEnabled = enabled,
                 subtitleOffsetX = 0f,
                 subtitleOffsetY = 0f,
-                danmaku = emptyList()
+                danmaku = emptyList(),
+                skipRanges = emptyList(),
             )
             loadLocalDanmakuAsync(downloadInfo?.danmakuUri)
             Log.d(BilibiliApp.TAG, "selectPage LOCAL result: enabled=$enabled currentSub=${currentSub?.lan} subtitleEnabled=$enabled subTracks=${subTracks.size}")
@@ -688,6 +693,7 @@ class PlayerViewModel(
             isLoading = true,
             videoUrl = null,
             danmaku = emptyList(),
+            skipRanges = emptyList(),
         )
         playUrlJob?.cancel()
         loadPlaybackMeta(info.aid, page.cid)
@@ -702,6 +708,7 @@ class PlayerViewModel(
         metaJob = null
         danmakuJob?.cancel()
         danmakuScheduleJob?.cancel()
+        danmakuCid = null
         liveJob?.cancel()
         cachedDashData = null
         pgcEpisodeByCid.clear()
@@ -931,15 +938,19 @@ class PlayerViewModel(
             _uiState.value = _uiState.value.copy(danmaku = emptyList())
         }
         danmakuJob = viewModelScope.launch {
-            repository.getDanmaku(cid)
-                .onSuccess { list ->
-                    if (_uiState.value.currentPage?.cid == cid) {
-                        _uiState.value = _uiState.value.copy(danmaku = list)
-                    }
+            var items = repository.getDanmaku(cid).getOrNull()
+            // The XML endpoint occasionally answers with a transient error or
+            // an empty body from one CDN node. One retry turns those into a
+            // visible danmaku layer instead of a permanently empty one.
+            if (items.isNullOrEmpty() && _uiState.value.currentPage?.cid == cid) {
+                delay(1_200L)
+                if (_uiState.value.currentPage?.cid == cid) {
+                    items = repository.getDanmaku(cid).getOrNull()
                 }
-                .onFailure { error ->
-                    Log.w(BilibiliApp.TAG, "PlayerVM: danmaku load failed: ${error.message}")
-                }
+            }
+            if (!items.isNullOrEmpty() && _uiState.value.currentPage?.cid == cid) {
+                _uiState.value = _uiState.value.copy(danmaku = items)
+            }
         }
     }
 
@@ -1285,6 +1296,9 @@ class PlayerViewModel(
                 .getOrNull() ?: return@launch
             if (_uiState.value.currentPage?.cid != cid) return@launch
             applySubtitleTracks(aid, cid, meta.subtitleTracks)
+            _uiState.value = _uiState.value.copy(
+                skipRanges = meta.viewPoints.toPlaybackSkipRanges(),
+            )
         }
     }
 

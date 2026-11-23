@@ -21,12 +21,64 @@ data class SearchResult(
     @SerializedName("numPages") val totalPages: Int = 0
 )
 
+/** Server-issued browser buvid cookies (x/frontend/finger/spi). */
+data class BuvidSpiData(
+    @SerializedName("b_3") val b3: String? = null,
+    @SerializedName("b_4") val b4: String? = null,
+)
+
 data class SearchUserResult(
     val result: List<SearchUserItem>?,
     val page: Int = 1,
     val pagesize: Int = 20,
     @SerializedName("numResults") val totalResults: Int = 0,
     @SerializedName("numPages") val totalPages: Int = 0
+)
+
+/** `search/type` with `search_type=article`. */
+data class SearchArticleResult(
+    val result: List<SearchArticleItem>?,
+    val page: Int = 1,
+    val pagesize: Int = 20,
+    @SerializedName("numResults") val totalResults: Int = 0,
+    @SerializedName("numPages") val totalPages: Int = 0
+)
+
+data class SearchArticleItem(
+    val id: Long = 0,
+    val title: String? = null,
+    val desc: String? = null,
+    @SerializedName("image_urls") val imageUrls: List<String>? = null,
+    val author: String? = null,
+    val mid: Long = 0,
+    val view: Long = 0,
+    val like: Long = 0,
+    val reply: Long = 0,
+    @SerializedName("pub_time") val pubTime: Long = 0,
+    @SerializedName("category_name") val categoryName: String? = null,
+)
+
+/** `search/type` with `search_type=live_room`. */
+data class SearchLiveResult(
+    val result: List<SearchLiveItem>?,
+    val page: Int = 1,
+    val pagesize: Int = 20,
+    @SerializedName("numResults") val totalResults: Int = 0,
+    @SerializedName("numPages") val totalPages: Int = 0
+)
+
+data class SearchLiveItem(
+    @SerializedName("roomid") val roomId: Long = 0,
+    val uid: Long = 0,
+    val uname: String? = null,
+    val title: String? = null,
+    val cover: String? = null,
+    val pic: String? = null,
+    val online: Long = 0,
+    val area: String? = null,
+    @SerializedName("cate_name") val cateName: String? = null,
+    @SerializedName("live_status") val liveStatus: Int = 0,
+    val uface: String? = null,
 )
 
 /** `search/type` with `search_type=media_bangumi` or `media_ft`. */
@@ -156,6 +208,23 @@ data class VideoInfo(
     val pages: List<VideoPage>? = null,
     @SerializedName("ugc_season") val ugcSeason: UgcSeason? = null,
     @SerializedName("is_upower_exclusive") val isUpowerExclusive: Boolean = false,
+    /** Uploader-defined opening/ending markers; absent for most videos. */
+    @SerializedName("view_points") val viewPoints: List<VideoViewPoint>? = null,
+)
+
+/** 1 = 片头, 2 = 片尾; times are seconds from the start. */
+data class VideoViewPoint(
+    val type: Int = 0,
+    val from: Double = 0.0,
+    val to: Double = 0.0,
+    val content: String = "",
+)
+
+/** A resolved skip window in milliseconds. [kind] 1 = opening, 2 = ending. */
+data class PlaybackSkipRange(
+    val kind: Int,
+    val startMs: Long,
+    val endMs: Long,
 )
 
 data class VideoOwner(
@@ -758,7 +827,8 @@ data class PlayerInfo(
     val subtitle: SubtitleData? = null,
     /** Milliseconds; the last reported playback position for this page. */
     @SerializedName("last_play_time") val lastPlayTime: Long = 0,
-    @SerializedName("last_play_cid") val lastPlayCid: Long = 0
+    @SerializedName("last_play_cid") val lastPlayCid: Long = 0,
+    @SerializedName("view_points") val viewPoints: List<VideoViewPoint>? = null,
 )
 
 data class SubtitleData(

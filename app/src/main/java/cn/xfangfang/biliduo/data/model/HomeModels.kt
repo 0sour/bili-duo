@@ -38,11 +38,16 @@ data class HomeRankingData(
 data class HomeVideoItem(
     val bvid: String = "",
     val cid: Long = 0,
+    /** Recommend feed uses `id` for the aid; popular/ranking use `aid`. */
+    val id: Long = 0,
+    val aid: Long = 0,
     val pic: String = "",
     val title: String = "",
     val duration: Long = 0,
     val pubdate: Long = 0,
     val goto: String = "",
+    /** Opaque recommendation tracking token used by the dislike feedback API. */
+    @SerializedName("track_id") val trackId: String = "",
     val owner: HomeVideoOwner? = null,
     val stat: HomeVideoStat? = null,
     @SerializedName("rcmd_reason") val reason: HomeRcmdReason? = null

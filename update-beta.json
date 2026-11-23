@@ -1,21 +1,21 @@
 {
-  "versionCode": 61,
-  "versionName": "0.2.0-rc60",
-  "tag": "v0.2.0-rc60",
+  "versionCode": 62,
+  "versionName": "0.2.0-rc61",
+  "tag": "v0.2.0-rc61",
   "downloads": [
     {
       "name": "cn",
-      "url": "https://bili-duo.sourden.xyz/releases/bili-duo-0.2.0-rc60-release.apk"
+      "url": "https://bili-duo.sourden.xyz/releases/bili-duo-0.2.0-rc61-release.apk"
     },
     {
       "name": "github",
-      "url": "https://github.com/0sour/bili-duo/releases/download/v0.2.0-rc60/bili-duo-0.2.0-rc60-release.apk"
+      "url": "https://github.com/0sour/bili-duo/releases/download/v0.2.0-rc61/bili-duo-0.2.0-rc61-release.apk"
     }
   ],
-  "size": 4449004,
-  "sha256": "8d6ec33f242225e27d924af83e80e10e93eb627bd2ef2b9e3cf7c39d6a45ff96",
-  "notes": "· 修复 release 包检查更新失败：R8 移除了更新清单 DTO 字段，清单解析总是失败\n· rc59 用户请手动安装本版；安装后应用内检查更新恢复可用\n· 其余内容与 rc59 相同：番剧/影视索引、音轨/HDR/4K、多档值行弹窗、首页/动态焦点恢复、直播信息卡/粉丝牌、起播优化",
-  "publishedAt": "2026-11-22T10:21:46Z",
+  "size": 4481004,
+  "sha256": "a9490a2e116cc0e844147edc2eead494c565ac48460bcb7b3e037fb42174b7ef",
+  "notes": "· 新增自动连播（默认开）、跳过片头/片尾（默认关）与睡眠定时（15/30/45/60/90 分钟）\n· 首页推荐 START「不感兴趣」，可按内容或 UP 主屏蔽并立即从列表移除\n· 搜索新增专栏/直播（共 6 种类型），迁移到 WBI 搜索接口，修复 412、搜索慢和一直加载；L1/R1 切类型焦点跟随 chip\n· 动态 UP 筛选 Down/Up 修复；长图自适应宽度、上下屏同步缩放，全屏改用 1600w 原图\n· 网格任意列连续 Up 回第一行（连按不跳过）、刷新回顶首卡、评论/搜索结果焦点环等 17 项修复\n· 281 个单元测试通过",
+  "publishedAt": "2026-11-23T07:10:00Z",
   "minSdk": 24,
   "channel": "beta"
 }

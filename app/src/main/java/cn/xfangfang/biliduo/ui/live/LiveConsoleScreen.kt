@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
@@ -103,6 +104,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import cn.xfangfang.biliduo.data.api.BilibiliApi
 import cn.xfangfang.biliduo.data.live.LiveChatClient
+import cn.xfangfang.biliduo.data.local.GamepadStyleStore
 import cn.xfangfang.biliduo.data.model.LiveChatEvent
 import cn.xfangfang.biliduo.data.model.LiveChatMessage
 import cn.xfangfang.biliduo.data.model.LiveChatState
@@ -179,6 +181,10 @@ fun LiveConsoleScreen(
 
     var selectedTab by remember { mutableIntStateOf(CHAT_TAB) }
     var unread by remember { mutableIntStateOf(0) }
+    // Hoisted so 直播信息 -> 直播评论 returns to the same scroll position and
+    // can immediately jump to the newest message instead of the top.
+    val chatListState = rememberLazyListState()
+    var chatEnterToken by remember { mutableIntStateOf(0) }
     var messages by remember(roomId) { mutableStateOf<List<LiveChatMessage>>(emptyList()) }
     // Fetched once over HTTP; kept out of LiveChatStore so the top-screen
     // overlay never replays old messages as if they just arrived.
@@ -354,7 +360,12 @@ fun LiveConsoleScreen(
     }
 
     LaunchedEffect(selectedTab) {
-        if (selectedTab == CHAT_TAB) unread = 0
+        if (selectedTab == CHAT_TAB) {
+            unread = 0
+            // Entering the chat tab should show the newest messages even if
+            // the info tab was open while the list grew.
+            chatEnterToken++
+        }
     }
 
     LaunchedEffect(detail?.uid, loggedIn) {
@@ -519,6 +530,8 @@ fun LiveConsoleScreen(
                 isLoading = ui.isLoading,
                 chatState = chatState,
                 messages = visibleMessages,
+                chatListState = chatListState,
+                chatEnterToken = chatEnterToken,
                 draft = draft,
                 sending = sending,
                 sendError = sendError,
@@ -873,6 +886,8 @@ private fun RowScope.LiveRightPane(
     isLoading: Boolean,
     chatState: LiveChatState,
     messages: List<LiveChatMessage>,
+    chatListState: LazyListState,
+    chatEnterToken: Int,
     draft: String,
     sending: Boolean,
     sendError: String?,
@@ -930,6 +945,8 @@ private fun RowScope.LiveRightPane(
                 CHAT_TAB -> LiveChatTab(
                     messages = messages,
                     chatState = chatState,
+                    listState = chatListState,
+                    enterToken = chatEnterToken,
                     draft = draft,
                     sending = sending,
                     sendError = sendError,
@@ -957,6 +974,8 @@ private fun RowScope.LiveRightPane(
 private fun LiveChatTab(
     messages: List<LiveChatMessage>,
     chatState: LiveChatState,
+    listState: LazyListState,
+    enterToken: Int,
     draft: String,
     sending: Boolean,
     sendError: String?,
@@ -966,7 +985,6 @@ private fun LiveChatTab(
     playFocus: FocusRequester,
     session: DuoSessionViewModel,
 ) {
-    val listState = rememberLazyListState()
     val keyboard = LocalSoftwareKeyboardController.current
     val fieldFocus = remember { FocusRequester() }
     var fieldFocused by remember { mutableStateOf(false) }
@@ -1005,9 +1023,22 @@ private fun LiveChatTab(
         }
         snapshotFlow { listState.isScrollInProgress }.collect { scrolling ->
             if (!scrolling) {
-                scrolledUp = listState.canScrollForward
+                // `canScrollForward` is also true before the first programmatic
+                // scroll, so an untouched fresh list used to look "scrolled
+                // up" and the 5s return never ran. Require a real user drag.
+                scrolledUp = lastUserScrollAt > 0L && listState.canScrollForward
                 if (!scrolledUp) lastUserScrollAt = 0L
             }
+        }
+    }
+
+    // Returning from the info tab (or first opening this tab) shows the newest
+    // message immediately, even if the list kept its old scroll position.
+    LaunchedEffect(enterToken) {
+        if (chatMessages.isNotEmpty()) {
+            scrolledUp = false
+            lastUserScrollAt = 0L
+            runCatching { listState.scrollToItem(chatMessages.lastIndex) }
         }
     }
 
@@ -1877,6 +1908,7 @@ private fun LiveDanmakuSettingsOverlay(
     onSize: (Float) -> Unit,
     onArea: (Float) -> Unit,
 ) {
+    val gamepadStyle by GamepadStyleStore.style.collectAsState()
     CompositionLocalProvider(LocalDuoChoiceController provides choiceController) {
     Box(
         modifier = Modifier
@@ -1977,7 +2009,7 @@ private fun LiveDanmakuSettingsOverlay(
                 )
             }
             Text(
-                "B/返回关闭 · 调整立即生效",
+                "${gamepadStyle.backLabel} 关闭 · 调整立即生效",
                 color = LiveTextTertiary,
                 fontSize = 10.sp,
                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),

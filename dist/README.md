@@ -4,6 +4,33 @@
 `*.apk`），需要时本地 `./gradlew assembleDebug` / `assembleRelease` 生成，或从
 GitHub Releases 下载。
 
+## 0.2.0-rc61（2026-11-23，第八版测试版）
+
+- `bili-duo-0.2.0-rc61-release.apk`
+  - R8 minify，正式 release keystore 签名；可覆盖安装同 key 的 rc60。
+  - 大小：4,481,004 字节
+  - APK SHA-256：`a9490a2e116cc0e844147edc2eead494c565ac48460bcb7b3e037fb42174b7ef`
+- `bili-duo-0.2.0-rc61-test.apk`
+  - **debug 变体**，但用 release keystore 重新签名，可覆盖安装 release 版本，
+    用于抓日志/开发测试。
+  - 大小：25,825,415 字节
+  - SHA-256：`115068607147268509636b524eb4a2cfe7521a3fefb929675a4401c526a7b54a`
+
+rc61 变更：
+- 播放器：自动连播（默认开）、跳过片头/片尾（默认关，UGC `view_points` /
+  PGC 剧集 `skip`）、播放设置「播放」tab 里的睡眠定时（15–90 分钟）。
+- 首页推荐 START「不感兴趣」：内容/UP 主两种原因，接口成功后从当前列表移除。
+- 搜索新增专栏/直播（共 6 种类型）；接口迁移到
+  `x/web-interface/wbi/search/type`，修复 412、搜索慢和一直加载；L1/R1 切类型
+  后焦点跟随类型 chip，可连续切换；搜索结果行焦点环不再被顶部裁切。
+- 动态 UP 筛选 Down/Up 焦点修复；长图自适应宽度、8x 缩放并与上屏同步，
+  全屏图改用 1600w 原图。
+- 网格任意列连续 Up 回第一行（连按不跳过第一行）、刷新回顶并选中首卡、
+  评论展开/图片返回/加载更多焦点、评论排序 chip 间距、个人页末项焦点环、
+  弹幕假 deflate 头、直播信息/评论滚动位置等 17 项反馈修复。
+- 281 单测通过；Duo 统一复测无阻塞问题。发布页：
+  https://github.com/0sour/bili-duo/releases/tag/v0.2.0-rc61
+
 ## 0.2.0-rc60（2026-11-22，第七版测试版，rc59 修复版）
 
 - `bili-duo-0.2.0-rc60-release.apk`

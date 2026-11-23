@@ -77,6 +77,8 @@ class DanmakuView @JvmOverloads constructor(
     private var layoutArea = 0f
     private var laneOf = IntArray(0)
     private var zoneOf = IntArray(0)
+    /** Text widths measured during lane assignment; avoids per-frame measureText. */
+    private var widthOf = FloatArray(0)
     private var fixedLaneCount = 1
     private var scrollLaneCount = 1
 
@@ -197,6 +199,7 @@ class DanmakuView @JvmOverloads constructor(
         super.onSizeChanged(w, h, oldw, oldh)
         laneOf = IntArray(0)
         zoneOf = IntArray(0)
+        widthOf = FloatArray(0)
         layoutItems = null
     }
 
@@ -231,16 +234,33 @@ class DanmakuView @JvmOverloads constructor(
         val topInset = laneHeight * 0.35f
         val bottomInset = laneHeight * 0.35f
         val contentHeight = viewHeight * area
-        val windowMs = 12_000L
+        val pxPerMs = scrollPxPerMs(viewWidth)
+        // Wide or slow items can stay on screen longer than 12s. The lookup
+        // window has to cover the slowest text at the current speed setting.
+        val windowMs = ((viewWidth * 2.4f) / pxPerMs).toLong().coerceAtLeast(12_000L)
 
         var index = lowerBound(positionMs - windowMs)
         var drawnCount = 0
         while (index < items.size && items[index].timeMs <= positionMs) {
             val item = items[index]
+            val zone = zoneOf[index]
+            val lane = laneOf[index]
             val age = positionMs - item.timeMs
-            val fixed = item.mode == 4 || item.mode == 5
-            val duration = durationMs(fixed)
-            if (age <= duration) {
+            val fixed = zone != ZONE_SCROLL
+            // lane < 0 means the scene was too dense for a free lane; showing
+            // it would overlap the item already in that lane.
+            if (lane >= 0 && (!fixed || age <= FIXED_DURATION_MS)) {
+                val textWidth = if (fixed) {
+                    measurePaint.textSize = itemTextSize(item, baseSize)
+                    measurePaint.measureText(item.text)
+                } else {
+                    widthOf[index]
+                }
+                // Cheap off-screen rejection before touching the paint setup.
+                if (!fixed && viewWidth - age * pxPerMs + textWidth <= 0f) {
+                    index++
+                    continue
+                }
                 if (!limitDanmakuOnScreen(drawnCount, maxOnScreen)) break
                 val textSize = itemTextSize(item, baseSize)
                 fillPaint.textSize = textSize
@@ -251,9 +271,6 @@ class DanmakuView @JvmOverloads constructor(
                 fillPaint.alpha = (255 * opacity).toInt().coerceIn(0, 255)
                 strokePaint.alpha = (170 * opacity).toInt().coerceIn(0, 255)
 
-                val textWidth = fillPaint.measureText(item.text)
-                val zone = zoneOf[index]
-                val lane = laneOf[index]
                 val y = when (zone) {
                     ZONE_FIXED_TOP ->
                         topInset + laneHeight * (lane + 1) - baseSize * 0.18f
@@ -265,7 +282,9 @@ class DanmakuView @JvmOverloads constructor(
                 val x = if (fixed) {
                     (viewWidth - textWidth) / 2f
                 } else {
-                    viewWidth - (age / duration) * (viewWidth + textWidth)
+                    // Constant px/ms for every scrolling item, matching the
+                    // lane reservation in ensureLayout().
+                    viewWidth - age * pxPerMs
                 }
                 if (x < viewWidth && x + textWidth > 0f) {
                     canvas.drawText(item.text, x, y, strokePaint)
@@ -300,16 +319,18 @@ class DanmakuView @JvmOverloads constructor(
         val bottomInset = laneHeight * 0.35f
         val contentHeight = height * area
         val usable = contentHeight * 0.82f - topInset - bottomInset
-        val laneCount = (usable / laneHeight).toInt().coerceIn(3, 20)
+        val laneCount = (usable / laneHeight).toInt().coerceIn(3, 24)
         fixedLaneCount = (laneCount / 5).coerceIn(1, 3)
         scrollLaneCount = max(1, laneCount - fixedLaneCount * 2)
 
         laneOf = IntArray(items.size)
         zoneOf = IntArray(items.size)
+        widthOf = FloatArray(items.size)
         val scrollFree = FloatArray(scrollLaneCount)
         val topFree = FloatArray(fixedLaneCount)
         val bottomFree = FloatArray(fixedLaneCount)
-        val gap = baseSize * 1.5f
+        val pxPerMs = scrollPxPerMs(width.toFloat())
+        val gap = baseSize * 1.2f
 
         for (i in items.indices) {
             val item = items[i]
@@ -319,43 +340,53 @@ class DanmakuView @JvmOverloads constructor(
                 val free = if (isBottom) bottomFree else topFree
                 val lane = earliestFreeLane(free, item.timeMs)
                 zoneOf[i] = if (isBottom) ZONE_FIXED_BOTTOM else ZONE_FIXED_TOP
-                laneOf[i] = lane
-                free[lane] = max(free[lane], item.timeMs + FIXED_DURATION_MS)
+                laneOf[i] = lane ?: -1
+                if (lane != null) {
+                    free[lane] = max(free[lane], item.timeMs + FIXED_DURATION_MS)
+                }
             } else {
                 measurePaint.textSize = itemTextSize(item, baseSize)
                 val textWidth = measurePaint.measureText(item.text)
+                widthOf[i] = textWidth
                 val lane = earliestFreeLane(scrollFree, item.timeMs)
                 zoneOf[i] = ZONE_SCROLL
-                laneOf[i] = lane
-                val duration = durationMs(fixed = false)
-                val busy = duration * (textWidth + gap) / (width + textWidth)
-                scrollFree[lane] = max(scrollFree[lane], item.timeMs + busy)
+                laneOf[i] = lane ?: -1
+                if (lane != null) {
+                    // All scrolling items share one px/ms speed, so a lane is
+                    // free as soon as the previous tail has entered the screen
+                    // plus a gap. The old same-duration scheme made wide texts
+                    // faster, so they could catch up and overlap narrower ones.
+                    scrollFree[lane] = max(
+                        scrollFree[lane],
+                        item.timeMs + (textWidth + gap) / pxPerMs,
+                    )
+                }
             }
         }
     }
 
-    private fun earliestFreeLane(free: FloatArray, timeMs: Long): Int {
-        var best = 0
+    /** Returns a lane free at [timeMs], or null when the scene is too dense. */
+    private fun earliestFreeLane(free: FloatArray, timeMs: Long): Int? {
         for (i in free.indices) {
             if (free[i] <= timeMs) return i
-            if (free[i] < free[best]) best = i
         }
-        return best
+        return null
     }
 
     private fun baseTextSize(): Float =
-        height * 0.026f * (baseTextSizeSp / 16f)
+        // 16sp is the "standard" tier. At 1080p this is ~37px (was ~28px);
+        // 24sp reaches ~55px so the largest tier is no longer smaller than
+        // other players' default.
+        height * 0.034f * (baseTextSizeSp / 16f)
 
-    private fun laneHeight(baseSize: Float): Float = baseSize * 1.6f
+    private fun laneHeight(baseSize: Float): Float = baseSize * 1.45f
 
     private fun itemTextSize(item: DanmakuItem, baseSize: Float): Float =
         (baseSize * (item.fontSize / 25f)).coerceIn(baseSize * 0.75f, baseSize * 1.3f)
 
-    private fun durationMs(fixed: Boolean): Float = if (fixed) {
-        FIXED_DURATION_MS
-    } else {
-        (8_000f / speed).coerceAtLeast(2_000f)
-    }
+    /** Constant scrolling speed for every item: one screen width in 8s at 1x. */
+    private fun scrollPxPerMs(viewWidth: Float): Float =
+        (viewWidth / 8_000f) * speed.coerceAtLeast(0.1f)
 
     private fun lowerBound(timeMs: Long): Int {
         var low = 0

@@ -18,14 +18,21 @@ import kotlinx.coroutines.launch
 
 data class HomeRankingArea(val rid: Int, val label: String)
 
+/**
+ * Ranking zone ids must match the current web config (`channel_list` KV,
+ * `popular_page_sort`). The legacy ids (1/3/4/36/160/181) still answer with
+ * code 0 but serve a frozen March-2025 list; the 1000-series ids are the live
+ * rankings used by bilibili.com/v/popular/rank/<zone>.
+ */
 val homeRankingAreas = listOf(
     HomeRankingArea(0, "全站"),
-    HomeRankingArea(1, "动画"),
-    HomeRankingArea(3, "音乐"),
-    HomeRankingArea(4, "游戏"),
-    HomeRankingArea(36, "知识"),
-    HomeRankingArea(160, "生活"),
-    HomeRankingArea(181, "影视"),
+    HomeRankingArea(1005, "动画"),
+    HomeRankingArea(1008, "游戏"),
+    HomeRankingArea(1003, "音乐"),
+    HomeRankingArea(1001, "影视"),
+    HomeRankingArea(1010, "知识"),
+    HomeRankingArea(1012, "科技数码"),
+    HomeRankingArea(1020, "美食"),
 )
 
 data class HomeUiState(
@@ -264,6 +271,26 @@ class HomeViewModel(
                         hasMore = if (current.items.isEmpty()) false else current.hasMore,
                         error = error.message ?: "首页加载失败",
                     )
+                }
+        }
+    }
+
+    /** Feedback only applies to the recommend tab; the card is removed locally. */
+    fun dislikeRecommend(
+        item: HomeVideoItem,
+        reasonId: Int,
+        onDone: (Boolean, String?) -> Unit,
+    ) {
+        viewModelScope.launch {
+            repository.dislikeRecommend(item, reasonId)
+                .onSuccess {
+                    _state.value = _state.value.copy(
+                        items = _state.value.items.filterNot { it.bvid == item.bvid },
+                    )
+                    onDone(true, null)
+                }
+                .onFailure { failure ->
+                    onDone(false, failure.message ?: "操作失败")
                 }
         }
     }

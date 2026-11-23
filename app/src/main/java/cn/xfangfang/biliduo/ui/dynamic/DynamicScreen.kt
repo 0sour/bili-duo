@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -54,6 +55,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -108,6 +110,7 @@ import cn.xfangfang.biliduo.util.fixPic
 import cn.xfangfang.biliduo.util.formatCount
 import coil.compose.AsyncImage
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 
 private val CardShape = RoundedCornerShape(10.dp)
@@ -163,6 +166,7 @@ fun DynamicScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val listState = rememberLazyListState()
+    val authorRowState = rememberLazyListState()
     val firstFocus = remember { FocusRequester() }
     val authorFocus = remember { FocusRequester() }
     val retryFocus = remember { FocusRequester() }
@@ -171,12 +175,25 @@ fun DynamicScreen(
     val authorFocusers = remember(state.authors) {
         List(state.authors.size + 1) { FocusRequester() }
     }
+    val selectedAuthorIndex = if (state.authorMid == null) {
+        0
+    } else {
+        state.authors.indexOfFirst { it.mid == state.authorMid } + 1
+    }
+    // The "全部 UP" chip is wired to [authorFocus], not to authorFocusers[0];
+    // resolve index 0 to the requester that is actually attached.
+    val selectedAuthorFocus = if (selectedAuthorIndex == 0) {
+        authorFocus
+    } else {
+        authorFocusers.getOrNull(selectedAuthorIndex) ?: authorFocus
+    }
     val itemFocusers = remember { mutableMapOf<String, FocusRequester>() }
     var lastFocusedId by rememberSaveable { mutableStateOf<String?>(null) }
     var restorePending by remember { mutableStateOf(true) }
     var lastFilterKey by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingFilterFocus by remember { mutableStateOf(false) }
     var pendingAuthorFocus by remember { mutableStateOf(false) }
+    var pendingContentFocus by remember { mutableStateOf(false) }
     var focusContentOnFilterShortcut by remember { mutableStateOf(false) }
 
     fun itemFocusRequester(id: String): FocusRequester =
@@ -190,6 +207,44 @@ fun DynamicScreen(
             runCatching { listState.scrollToItem(index) }
             delay(64L)
             runCatching { requester.requestFocus() }
+        }
+    }
+
+    /**
+     * The UP chips point their Down at the first card, but while a filtered
+     * feed is reloading the first card can be absent for a frame. Requesting
+     * focus then silently fails and Down appears dead. If the list is empty
+     * and still loading, remember the intent and land on the first card when
+     * the response arrives.
+     */
+    fun focusContent() {
+        // Never move into cards that are about to be replaced by the filtered
+        // response: the old first card would be removed and take focus with
+        // it. Wait for the reload, then land on the new first card.
+        if (state.isLoading) {
+            pendingContentFocus = true
+            return
+        }
+        if (state.items.isEmpty()) return
+        pendingContentFocus = false
+        focusItem(0)
+    }
+
+    /**
+     * Up from the first card returns to the selected UP chip. That chip can
+     * be off-screen in the author LazyRow (the row scrolls to it), and an
+     * uncomposed chip has no attached requester, so scroll it in and retry
+     * instead of requesting an unattached node.
+     */
+    fun focusSelectedAuthor() {
+        val index = selectedAuthorIndex
+        val requester = selectedAuthorFocus
+        scope.launch {
+            runCatching { authorRowState.scrollToItem(index) }
+            repeat(4) {
+                requester.requestPageFocus()
+                delay(16L)
+            }
         }
     }
 
@@ -209,7 +264,8 @@ fun DynamicScreen(
                 state.authors.indexOfFirst { it.mid == state.authorMid } + 1
             }
             if (index in authorFocusers.indices) {
-                runCatching { authorFocusers[index].requestPageFocus() }
+                val requester = if (index == 0) authorFocus else authorFocusers[index]
+                runCatching { requester.requestPageFocus() }
             }
             pendingAuthorFocus = false
         }
@@ -299,6 +355,15 @@ fun DynamicScreen(
         runCatching { firstFocus.requestPageFocus() }
         focusContentOnFilterShortcut = false
     }
+    LaunchedEffect(state.items.size, state.isLoading, pendingContentFocus) {
+        if (!pendingContentFocus || state.isLoading) return@LaunchedEffect
+        // Load finished (possibly empty): either land on the first card or
+        // keep focus on the UP chip when there is nothing to focus.
+        pendingContentFocus = false
+        if (state.items.isEmpty()) return@LaunchedEffect
+        delay(80L)
+        focusItem(0)
+    }
     LaunchedEffect(loggedIn, state.filter, state.isLoading, state.items.size, state.error) {
         onTopAmbient(dynamicAmbient(loggedIn, state))
     }
@@ -343,19 +408,23 @@ fun DynamicScreen(
                 onPreviousTab = if (loggedIn && overlay == null) ({
                     viewModel.cycleFilter(-1)
                     pendingFilterFocus = false
+                    pendingContentFocus = false
                     focusContentOnFilterShortcut = true
                 }) else null,
                 onNextTab = if (loggedIn && overlay == null) ({
                     viewModel.cycleFilter(1)
                     pendingFilterFocus = false
+                    pendingContentFocus = false
                     focusContentOnFilterShortcut = true
                 }) else null,
                 onPreviousSection = if (loggedIn && overlay == null) ({
                     viewModel.cycleAuthor(-1)
+                    pendingContentFocus = false
                     pendingAuthorFocus = true
                 }) else null,
                 onNextSection = if (loggedIn && overlay == null) ({
                     viewModel.cycleAuthor(1)
+                    pendingContentFocus = false
                     pendingAuthorFocus = true
                 }) else null,
             ),
@@ -370,11 +439,19 @@ fun DynamicScreen(
             DynamicAuthorRow(
                 authors = state.authors,
                 selectedMid = state.authorMid,
+                rowState = authorRowState,
                 firstFocus = authorFocus,
                 downFocusRequester = firstFocus,
                 focusRequesters = authorFocusers,
-                onAll = viewModel::clearAuthor,
-                onSelect = viewModel::selectAuthor,
+                onDownToContent = { focusContent() },
+                onAll = {
+                    pendingContentFocus = false
+                    viewModel.clearAuthor()
+                },
+                onSelect = { author ->
+                    pendingContentFocus = false
+                    viewModel.selectAuthor(author)
+                },
             )
         }
         Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -419,12 +496,21 @@ fun DynamicScreen(
                 ) {
                     itemsIndexed(state.items, key = { _, item -> item.id }) { index, card ->
                         val itemFocus = remember(card.id) { itemFocusRequester(card.id) }
+                        val authorRowPresent = state.authors.isNotEmpty()
                         DynamicCard(
                             card = card,
                             focusRequester = itemFocus,
                             firstFocus = if (index == 0) firstFocus else null,
-                            upFocusRequester = if (index == 0 && state.authors.isNotEmpty()) {
-                                authorFocus
+                            upFocusRequester = if (index == 0 && authorRowPresent) {
+                                // Return to the UP that is selected, not always
+                                // "全部 UP": the row scrolls the selected chip
+                                // into view, so that node is actually attached.
+                                selectedAuthorFocus
+                            } else {
+                                null
+                            },
+                            onUpToAuthors = if (index == 0 && authorRowPresent) {
+                                ({ focusSelectedAuthor() })
                             } else {
                                 null
                             },
@@ -488,6 +574,7 @@ fun DynamicScreen(
         DynamicReaderLayer(
             overlay = current,
             session = session,
+            onDynamicReader = onDynamicReader,
             onBack = {
                 if (current is DynamicOverlay.Gallery) {
                     val detail = DynamicOverlay.Detail(
@@ -546,15 +633,16 @@ private fun DynamicHeader(
 private fun DynamicAuthorRow(
     authors: List<DynamicAuthorUi>,
     selectedMid: Long?,
+    rowState: LazyListState,
     firstFocus: FocusRequester,
     downFocusRequester: FocusRequester,
     focusRequesters: List<FocusRequester> = emptyList(),
+    onDownToContent: (() -> Unit)? = null,
     onAll: () -> Unit,
     onSelect: (DynamicAuthorUi) -> Unit,
 ) {
     // L2/R2 can pick an author that is scrolled out of the row; keep the
     // selected chip visible so the shortcut has visible feedback.
-    val rowState = rememberLazyListState()
     LaunchedEffect(selectedMid, authors.size) {
         val index = if (selectedMid == null) {
             0
@@ -584,6 +672,7 @@ private fun DynamicAuthorRow(
                 selected = selectedMid == null,
                 focusRequester = firstFocus,
                 downFocusRequester = downFocusRequester,
+                onDownToContent = onDownToContent,
                 onClick = onAll,
             )
         }
@@ -593,6 +682,7 @@ private fun DynamicAuthorRow(
                 selected = selectedMid == author.mid,
                 focusRequester = focusRequesters.getOrNull(index + 1),
                 downFocusRequester = downFocusRequester,
+                onDownToContent = onDownToContent,
                 onClick = { onSelect(author) },
             )
         }
@@ -605,6 +695,7 @@ private fun DynamicAuthorChip(
     selected: Boolean,
     focusRequester: FocusRequester? = null,
     downFocusRequester: FocusRequester? = null,
+    onDownToContent: (() -> Unit)? = null,
     onClick: () -> Unit,
 ) {
     val shape = RoundedCornerShape(15.dp)
@@ -615,6 +706,22 @@ private fun DynamicAuthorChip(
             .then(
                 if (downFocusRequester != null) {
                     Modifier.focusProperties { down = downFocusRequester }
+                } else {
+                    Modifier
+                }
+            )
+            .then(
+                if (onDownToContent != null) {
+                    Modifier.onPreviewKeyEvent { event ->
+                        if (event.type == KeyEventType.KeyDown &&
+                            event.key == Key.DirectionDown
+                        ) {
+                            onDownToContent()
+                            true
+                        } else {
+                            false
+                        }
+                    }
                 } else {
                     Modifier
                 }
@@ -717,6 +824,7 @@ private fun DynamicCard(
     focusRequester: FocusRequester,
     firstFocus: FocusRequester?,
     upFocusRequester: FocusRequester?,
+    onUpToAuthors: (() -> Unit)? = null,
     onFocused: (DynamicCardUi) -> Unit,
     onFocusCleared: () -> Unit,
     onClick: () -> Unit,
@@ -740,9 +848,15 @@ private fun DynamicCard(
                 if (it.hasFocus) onFocused(card) else onFocusCleared()
             }
             .onPreviewKeyEvent { event ->
-                if (event.type == KeyEventType.KeyDown &&
-                    (event.key == Key.X || event.key == Key.ButtonX)
-                ) {
+                if (event.type != KeyEventType.KeyDown) {
+                    false
+                } else if (onUpToAuthors != null && event.key == Key.DirectionUp) {
+                    // The author LazyRow may have scrolled the selected chip
+                    // out of composition; scroll it back and request focus
+                    // instead of letting the key hit an unattached node.
+                    onUpToAuthors()
+                    true
+                } else if (event.key == Key.X || event.key == Key.ButtonX) {
                     onToggleLike()
                     true
                 } else {
@@ -1211,10 +1325,18 @@ private fun DynamicFooter(
     }
 }
 
+private data class GalleryTopTransform(
+    val zoomX: Float,
+    val centerX: Float,
+    val centerY: Float,
+    val aspect: Float,
+)
+
 @Composable
 private fun DynamicReaderLayer(
     overlay: DynamicOverlay,
     session: DuoSessionViewModel?,
+    onDynamicReader: (TopDynamicReaderUi) -> Unit,
     onBack: () -> Unit,
     onOpenGallery: (Int) -> Unit,
     onIndexChange: (Int) -> Unit,
@@ -1238,17 +1360,41 @@ private fun DynamicReaderLayer(
     LaunchedEffect(overlay.card.id, overlay.kind, overlay.imageIndex) {
         galleryZoom.reset()
     }
+    // Mirror the bottom gallery's zoom/pan onto the large top screen. The
+    // payload is normalized (width fraction + image-space center), so the top
+    // can map it to its own viewport and show a larger, readable view.
+    LaunchedEffect(overlay) {
+        val gallery = overlay as? DynamicOverlay.Gallery ?: return@LaunchedEffect
+        val base = gallery.card.toTopReader(TopDynamicKind.GALLERY, gallery.imageIndex)
+        snapshotFlow {
+            GalleryTopTransform(
+                zoomX = galleryZoom.zoomX,
+                centerX = galleryZoom.centerX,
+                centerY = galleryZoom.centerY,
+                aspect = galleryZoom.aspect,
+            )
+        }.collect { transform ->
+            onDynamicReader(
+                base.copy(
+                    galleryZoomX = transform.zoomX,
+                    galleryCenterX = transform.centerX,
+                    galleryCenterY = transform.centerY,
+                    galleryAspect = transform.aspect,
+                )
+            )
+        }
+    }
+    val hasReaderTabs = overlay is DynamicOverlay.Detail || overlay is DynamicOverlay.Text
     DisposableEffect(session, overlay, detailTab) {
         session?.setHintOverride(
             when (overlay) {
-                is DynamicOverlay.Detail -> if (detailTab == 1) {
+                is DynamicOverlay.Detail, is DynamicOverlay.Text -> if (detailTab == 1) {
                     "LB/RB 正文/评论 · Y 点赞 · 方向键滚动"
                 } else {
                     "LB/RB 正文/评论 · Y 复制链接 · 方向键滚动"
                 }
                 is DynamicOverlay.Gallery ->
                     "R2/L2 缩放 · 左摇杆/拖动移动 · 方向键切换"
-                is DynamicOverlay.Text -> "Y 复制链接 · 方向键滚动"
             },
         )
         onDispose { session?.setHintOverride(null) }
@@ -1269,6 +1415,7 @@ private fun DynamicReaderLayer(
                     dismissComposer()
                 }
                 overlay is DynamicOverlay.Detail && detailTab == 1 -> detailTab = 0
+                overlay is DynamicOverlay.Text && detailTab == 1 -> detailTab = 0
                 else -> onBack()
             }
             true
@@ -1278,6 +1425,23 @@ private fun DynamicReaderLayer(
 
     val shareCurrent = { shareDynamic(context, overlay.card) }
 
+    // Shared by the image/text readers: both expose the same 正文/评论 tabs.
+    val commentsContent: @Composable () -> Unit = {
+        DynamicCommentsOverlay(
+            card = overlay.card,
+            session = session,
+            onReaderBack = onBack,
+            onClose = { detailTab = 0 },
+            embedded = true,
+            tabFocus = detailCommentsFocus,
+            sentRpid = sentRpid,
+            onSentRpid = { sentRpid = it },
+            onComposerDismiss = { composerDismiss = it },
+            sentNotice = sentNotice,
+            onSentNotice = { sentNotice = it },
+        )
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -1285,7 +1449,7 @@ private fun DynamicReaderLayer(
             .focusRequester(focus)
             .onPreviewKeyEvent { event ->
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                if (overlay is DynamicOverlay.Detail && detailTab == 1) {
+                if (hasReaderTabs && detailTab == 1) {
                     return@onPreviewKeyEvent when (event.key) {
                         Key.ButtonL1 -> {
                             detailTab = 0
@@ -1327,7 +1491,7 @@ private fun DynamicReaderLayer(
                         true
                     }
                     Key.ButtonL1 -> {
-                        if (overlay is DynamicOverlay.Detail) {
+                        if (hasReaderTabs) {
                             detailTab = 0
                             true
                         } else {
@@ -1335,7 +1499,7 @@ private fun DynamicReaderLayer(
                         }
                     }
                     Key.ButtonR1 -> {
-                        if (overlay is DynamicOverlay.Detail) {
+                        if (hasReaderTabs) {
                             detailTab = 1
                             true
                         } else {
@@ -1383,21 +1547,7 @@ private fun DynamicReaderLayer(
                 onTab = { detailTab = it },
                 bodyTabFocus = detailBodyFocus,
                 commentsTabFocus = detailCommentsFocus,
-                commentsContent = {
-                    DynamicCommentsOverlay(
-                        card = overlay.card,
-                        session = session,
-                        onReaderBack = onBack,
-                        onClose = { detailTab = 0 },
-                        embedded = true,
-                        tabFocus = detailCommentsFocus,
-                        sentRpid = sentRpid,
-                        onSentRpid = { sentRpid = it },
-                        onComposerDismiss = { composerDismiss = it },
-                        sentNotice = sentNotice,
-                        onSentNotice = { sentNotice = it },
-                    )
-                },
+                commentsContent = commentsContent,
             )
             is DynamicOverlay.Gallery -> DynamicGalleryOverlay(
                 card = overlay.card,
@@ -1412,6 +1562,11 @@ private fun DynamicReaderLayer(
                 scroll = scroll,
                 onBack = onBack,
                 onShare = shareCurrent,
+                tab = detailTab,
+                onTab = { detailTab = it },
+                bodyTabFocus = detailBodyFocus,
+                commentsTabFocus = detailCommentsFocus,
+                commentsContent = commentsContent,
             )
         }
     }
@@ -2247,7 +2402,9 @@ private fun DetailImageGrid(
                             AsyncImage(
                                 model = fixPic(url),
                                 contentDescription = null,
-                                contentScale = ContentScale.Crop,
+                                // Full image, not a center crop: long
+                                // infographics were unreadable in the grid.
+                                contentScale = ContentScale.Fit,
                                 modifier = Modifier.fillMaxSize(),
                             )
                         }
@@ -2406,6 +2563,11 @@ private fun DynamicTextOverlay(
     scroll: androidx.compose.foundation.ScrollState,
     onBack: () -> Unit,
     onShare: () -> Unit,
+    tab: Int,
+    onTab: (Int) -> Unit,
+    bodyTabFocus: FocusRequester,
+    commentsTabFocus: FocusRequester,
+    commentsContent: @Composable () -> Unit,
 ) {
     Column(Modifier.fillMaxSize().background(DuoPalette.Bg)) {
         ReaderHeader(
@@ -2414,6 +2576,27 @@ private fun DynamicTextOverlay(
             onBack = onBack,
             onShare = onShare,
         )
+        Row(
+            modifier = Modifier.fillMaxWidth().height(44.dp).padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(18.dp),
+        ) {
+            ReaderTab("正文", tab == 0, bodyTabFocus) { onTab(0) }
+            ReaderTab(
+                "评论 ${formatCount(card.commentCount.toLong())}",
+                tab == 1,
+                commentsTabFocus,
+            ) { onTab(1) }
+        }
+        LaunchedEffect(tab) {
+            delay(80L)
+            runCatching {
+                if (tab == 0) bodyTabFocus.requestPageFocus() else commentsTabFocus.requestPageFocus()
+            }
+        }
+        if (tab == 1) {
+            commentsContent()
+        } else {
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -2465,11 +2648,12 @@ private fun DynamicTextOverlay(
             DynamicStatsRow(card, showLike = true)
             Spacer(Modifier.height(10.dp))
             Text(
-                text = "方向键滚动 · LB/RB 评论 · Y 复制链接 · A 返回列表",
+                text = "方向键滚动 · LB/RB 切换 正文/评论 · Y 复制链接 · A 返回列表",
                 color = DuoPalette.Tertiary,
                 fontSize = 10.sp,
             )
             Spacer(Modifier.height(16.dp))
+        }
         }
     }
 }

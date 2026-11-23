@@ -49,6 +49,18 @@ data class PgcEpisode(
     val duration: Long = 0,
     /** Absent for free episodes; Gson leaves it null rather than "". */
     val badge: String? = null,
+    /** Episode opening/ending markers; ranges are 0/0 when unset. */
+    val skip: PgcSkip? = null,
+)
+
+data class PgcSkip(
+    val op: PgcSkipRange? = null,
+    val ed: PgcSkipRange? = null,
+)
+
+data class PgcSkipRange(
+    val start: Long = 0,
+    val end: Long = 0,
 )
 
 data class PgcStat(

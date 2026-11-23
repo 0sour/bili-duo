@@ -53,6 +53,17 @@ fun bilibiliThumbnailUrl(url: String, targetWidthPx: Int): String? {
     return "$base@${width}w.webp$suffix"
 }
 
+/**
+ * Full-screen viewers need the image's intrinsic pixels, not a decode sized to
+ * the viewport; a tall infographic would otherwise be downsampled to the box
+ * height and then stretched back to fit-width. Cap the CDN width at 1600 but
+ * keep the full aspect ratio. Pair this with Coil `Size.ORIGINAL`.
+ */
+fun galleryImageUrl(url: String): String {
+    val fixed = fixPic(url)
+    return bilibiliThumbnailUrl(fixed, 1600) ?: fixed
+}
+
 private fun isBilibiliImageHost(host: String): Boolean =
     host == "hdslb.com" || host.endsWith(".hdslb.com") ||
         host == "biliimg.com" || host.endsWith(".biliimg.com") ||

@@ -38,6 +38,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import cn.xfangfang.biliduo.data.local.GamepadStyleStore
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -75,7 +76,7 @@ import cn.xfangfang.biliduo.ui.common.DuoPalette
 import cn.xfangfang.biliduo.ui.duo.GridFocusNavigator
 import cn.xfangfang.biliduo.ui.duo.duoClickable
 import cn.xfangfang.biliduo.ui.duo.duoFocusRing
-import cn.xfangfang.biliduo.ui.duo.duoGridDown
+import cn.xfangfang.biliduo.ui.duo.duoGridVertical
 import cn.xfangfang.biliduo.ui.duo.duoTabCycling
 import cn.xfangfang.biliduo.ui.duo.rememberGridFocusNavigator
 import cn.xfangfang.biliduo.ui.duo.requestPageFocus
@@ -113,8 +114,8 @@ fun PgcIndexScreen(
     val ui by viewModel.uiState.collectAsState()
     val scope = rememberCoroutineScope()
     val gridState = rememberLazyGridState()
-    val navigator = rememberGridFocusNavigator(4, gridState)
     val firstItemFocus = remember { FocusRequester() }
+    val navigator = rememberGridFocusNavigator(4, gridState, firstItemFocus)
     val retryFocus = remember { FocusRequester() }
     val backFocus = remember { FocusRequester() }
     val typeFocuses = remember {
@@ -455,7 +456,7 @@ fun PgcIndexScreen(
                             key = { _, item -> item.seasonId },
                         ) { index, item ->
                             val modifier = Modifier
-                                .duoGridDown(index, ui.items.size, navigator)
+                                .duoGridVertical(index, ui.items.size, navigator)
                                 .then(
                                     if (index < 4) {
                                         Modifier.focusProperties {
@@ -663,6 +664,7 @@ private fun IndexPicker(
     val focusers = remember(options) { List(options.size) { FocusRequester() } }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
+    val gamepadStyle by GamepadStyleStore.style.collectAsState()
 
     LaunchedEffect(picker.title) {
         if (options.isEmpty()) return@LaunchedEffect
@@ -732,7 +734,7 @@ private fun IndexPicker(
                     modifier = Modifier.weight(1f),
                 )
                 Text(
-                    text = "B 关闭",
+                    text = "${gamepadStyle.backLabel} 关闭",
                     color = DuoPalette.Tertiary,
                     fontSize = 10.sp,
                 )

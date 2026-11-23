@@ -1,5 +1,9 @@
+@file:OptIn(ExperimentalComposeUiApi::class)
+
 package cn.xfangfang.biliduo.ui.home
 
+import android.widget.Toast
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
@@ -8,6 +12,9 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,6 +28,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -41,10 +49,12 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -63,6 +73,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -70,19 +81,21 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import cn.xfangfang.biliduo.data.model.HomeTab
+import cn.xfangfang.biliduo.data.local.GamepadStyleStore
 import cn.xfangfang.biliduo.data.model.HomeVideoItem
 import cn.xfangfang.biliduo.data.model.LiveAreaGroup
 import cn.xfangfang.biliduo.data.model.LiveFollowedAnchor
 import cn.xfangfang.biliduo.data.model.LiveRoomItem
 import cn.xfangfang.biliduo.data.model.LiveSubArea
 import cn.xfangfang.biliduo.data.model.PgcSeasonItem
+import cn.xfangfang.biliduo.duo.DuoSessionViewModel
 import cn.xfangfang.biliduo.ui.theme.DuoTheme
 import cn.xfangfang.biliduo.ui.common.DuoPalette
 import cn.xfangfang.biliduo.ui.duo.requestPageFocus
 import cn.xfangfang.biliduo.ui.duo.GridFocusNavigator
 import cn.xfangfang.biliduo.ui.duo.duoClickable
 import cn.xfangfang.biliduo.ui.duo.duoFocusRing
-import cn.xfangfang.biliduo.ui.duo.duoGridDown
+import cn.xfangfang.biliduo.ui.duo.duoGridVertical
 import cn.xfangfang.biliduo.ui.duo.duoTabCycling
 import cn.xfangfang.biliduo.ui.duo.rememberGridFocusNavigator
 import cn.xfangfang.biliduo.ui.top.TopAmbientUi
@@ -106,6 +119,12 @@ private val CardFocusClearance = 7.dp
 /** Direct tab activation keeps the tab ring; L1/R1 moves into the content. */
 private enum class TabFocusTarget { TAB, CONTENT }
 
+/**
+ * Where focus goes after a refresh finishes. Y/refresh-key keeps the card the
+ * user was on; activating the header refresh button moves to the first card.
+ */
+private enum class RefreshFocusMode { NONE, FIRST_CARD }
+
 @Composable
 fun HomeScreen(
     onVideoClick: (String) -> Unit,
@@ -115,17 +134,26 @@ fun HomeScreen(
     onVideoFocused: (TopPreviewUi) -> Unit = {},
     onFocusCleared: () -> Unit = {},
     onTopAmbient: (TopAmbientUi) -> Unit = {},
+    session: DuoSessionViewModel? = null,
     viewModel: HomeViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsState()
+    val gamepadStyle by GamepadStyleStore.style.collectAsState()
+    val context = LocalContext.current
     val gridState = rememberLazyGridState()
     val pgcGridState = rememberLazyGridState()
-    val videoNavigator = rememberGridFocusNavigator(3, gridState)
-    val liveNavigator = rememberGridFocusNavigator(2, gridState)
-    val pgcNavigator = rememberGridFocusNavigator(4, pgcGridState)
+    val firstFocus = remember { FocusRequester() }
+    val videoNavigator = rememberGridFocusNavigator(3, gridState, firstFocus)
+    val liveNavigator = rememberGridFocusNavigator(2, gridState, firstFocus)
+    val pgcNavigator = rememberGridFocusNavigator(4, pgcGridState, firstFocus)
     var lastTabName by rememberSaveable { mutableStateOf<String?>(null) }
     var lastFocusedKey by rememberSaveable { mutableStateOf<String?>(null) }
-    val firstFocus = remember { FocusRequester() }
+    var refreshFocusMode by remember { mutableStateOf(RefreshFocusMode.NONE) }
+    var refreshHadLoading by remember { mutableStateOf(false) }
+    var focusedRecommendItem by remember { mutableStateOf<HomeVideoItem?>(null) }
+    var dislikeTarget by remember { mutableStateOf<HomeVideoItem?>(null) }
+    var dislikeOriginIndex by remember { mutableIntStateOf(-1) }
+    var pendingDislikeFocus by remember { mutableStateOf<Int?>(null) }
     val tabFocuses = remember { List(HomeTab.entries.size) { FocusRequester() } }
     val refreshFocus = remember { FocusRequester() }
     val indexFocus = remember { FocusRequester() }
@@ -188,6 +216,7 @@ fun HomeScreen(
             lastTabName = state.tab.name
             if (changed) {
                 lastFocusedKey = null
+                focusedRecommendItem = null
                 runCatching { gridState.scrollToItem(0) }
                 runCatching { pgcGridState.scrollToItem(0) }
             }
@@ -229,6 +258,76 @@ fun HomeScreen(
             delay(220L)
             if (tabFocusTarget == TabFocusTarget.TAB) tabFocusTarget = null
         }
+    }
+
+    // A refresh replaces the whole feed. Return to the top and put the ring on
+    // the first card once the new list is in place; keep neither the old
+    // scroll offset nor the refresh button.
+    LaunchedEffect(state.isLoading, refreshFocusMode) {
+        if (refreshFocusMode == RefreshFocusMode.NONE) return@LaunchedEffect
+        if (state.isLoading) {
+            refreshHadLoading = true
+            return@LaunchedEffect
+        }
+        if (!refreshHadLoading) return@LaunchedEffect
+        delay(120L)
+        // Requesting focus on an off-screen first card used to fail silently,
+        // leaving the old scroll offset and no ring. Reset the active grid to
+        // the top first, then focus the first row after it is composed.
+        runCatching {
+            if (isPgc) pgcGridState.scrollToItem(0) else gridState.scrollToItem(0)
+        }
+        delay(80L)
+        val hasItems = when {
+            isLive -> state.liveItems.isNotEmpty()
+            isPgc -> state.pgcItems.isNotEmpty()
+            else -> state.items.isNotEmpty()
+        }
+        if (hasItems) runCatching { firstFocus.requestPageFocus() }
+        refreshHadLoading = false
+        refreshFocusMode = RefreshFocusMode.NONE
+    }
+
+    // START on a focused recommend card opens "not interested". The hint only
+    // appears while a card actually owns focus.
+    DisposableEffect(session, state.tab, focusedRecommendItem?.bvid, dislikeTarget, gamepadStyle) {
+        when {
+            session == null -> Unit
+            dislikeTarget != null ->
+                session.setHintOverride(
+                    "${gamepadStyle.confirmLabel} 选择理由 · ${gamepadStyle.backLabel} 取消"
+                )
+            state.tab == HomeTab.RECOMMEND && focusedRecommendItem != null ->
+                session.setHintOverride(
+                    "START 不感兴趣 · ${gamepadStyle.actionLabel} 刷新 · LB/RB 切标签"
+                )
+            else -> session.setHintOverride(null)
+        }
+        onDispose { session?.setHintOverride(null) }
+    }
+
+    DisposableEffect(session, dislikeTarget) {
+        if (session != null && dislikeTarget != null) {
+            session.setBackInterceptor {
+                dislikeTarget = null
+                pendingDislikeFocus = dislikeOriginIndex
+                true
+            }
+        }
+        onDispose { session?.setBackInterceptor(null) }
+    }
+
+    LaunchedEffect(pendingDislikeFocus, state.items) {
+        val index = pendingDislikeFocus ?: return@LaunchedEffect
+        if (state.isLoading) return@LaunchedEffect
+        delay(120L)
+        val target = index.coerceAtMost(state.items.lastIndex)
+        if (target > 0) {
+            videoNavigator.focus(target, state.items.size)
+        } else {
+            runCatching { firstFocus.requestPageFocus() }
+        }
+        pendingDislikeFocus = null
     }
 
     val shouldLoadMore by remember {
@@ -283,6 +382,7 @@ fun HomeScreen(
         else -> null
     }
 
+    Box(Modifier.fillMaxSize()) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -300,13 +400,26 @@ fun HomeScreen(
                 onNextSection = cycleNextArea,
             )
             .onPreviewKeyEvent { event ->
-                if (event.type == KeyEventType.KeyDown &&
-                    (event.key == Key.X || event.key == Key.ButtonX)
+                if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                val keyCode = event.nativeKeyEvent.keyCode
+                if (event.nativeKeyEvent.repeatCount == 0 &&
+                    (keyCode == android.view.KeyEvent.KEYCODE_BUTTON_START ||
+                        keyCode == android.view.KeyEvent.KEYCODE_MENU) &&
+                    state.tab == HomeTab.RECOMMEND
                 ) {
-                    // Keep a stable focus target: the old card disappears when
-                    // the new feed replaces the grid. Down from the refresh
-                    // button goes to the first card.
-                    runCatching { refreshFocus.requestPageFocus() }
+                    val item = focusedRecommendItem
+                    if (item != null) {
+                        dislikeOriginIndex = state.items.indexOfFirst { it.bvid == item.bvid }
+                        dislikeTarget = item
+                        true
+                    } else {
+                        false
+                    }
+                } else if (event.key == Key.X || event.key == Key.ButtonX) {
+                    // Refresh returns to the first row / first card. Do not
+                    // keep the old scroll offset or park on the refresh button.
+                    refreshFocusMode = RefreshFocusMode.FIRST_CARD
+                    refreshHadLoading = false
                     viewModel.refresh()
                     true
                 } else {
@@ -324,7 +437,13 @@ fun HomeScreen(
                 viewModel.selectTab(tab)
             },
             tabFocusRequesters = tabFocuses,
-            onRefresh = viewModel::refresh,
+            onRefresh = {
+                // Activating the header button: after the new feed lands, the
+                // ring goes to the first card instead of staying on the button.
+                refreshFocusMode = RefreshFocusMode.FIRST_CARD
+                refreshHadLoading = false
+                viewModel.refresh()
+            },
             isRefreshing = state.isLoading,
             refreshFocus = refreshFocus,
             indexFocus = indexFocus,
@@ -447,13 +566,17 @@ fun HomeScreen(
                     itemsIndexed(state.items, key = { _, item -> item.bvid }) { index, item ->
                         HomeVideoCard(
                             item = item,
-                            modifier = Modifier.duoGridDown(index, state.items.size, videoNavigator),
+                            modifier = Modifier.duoGridVertical(index, state.items.size, videoNavigator),
                             focusRequester = if (index == 0) firstFocus else videoNavigator.requester(index),
                             onFocusChanged = { focused ->
                                 if (focused) {
                                     lastFocusedKey = "video:${item.bvid}"
+                                    focusedRecommendItem = item
                                     onVideoFocused(item.toTopPreview())
                                 } else {
+                                    if (focusedRecommendItem?.bvid == item.bvid) {
+                                        focusedRecommendItem = null
+                                    }
                                     onFocusCleared()
                                 }
                             },
@@ -479,6 +602,142 @@ fun HomeScreen(
                 }
             }
         }
+        }
+
+        dislikeTarget?.let { target ->
+            HomeDislikeOverlay(
+                item = target,
+                onCancel = {
+                    dislikeTarget = null
+                    pendingDislikeFocus = dislikeOriginIndex
+                },
+                onConfirm = { reasonId ->
+                    viewModel.dislikeRecommend(target, reasonId) { ok, message ->
+                        if (ok) {
+                            dislikeTarget = null
+                            if (focusedRecommendItem?.bvid == target.bvid) {
+                                focusedRecommendItem = null
+                            }
+                            pendingDislikeFocus = dislikeOriginIndex
+                            Toast.makeText(context, "已标记不感兴趣", Toast.LENGTH_SHORT).show()
+                        } else {
+                            Toast.makeText(context, message ?: "操作失败", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun HomeDislikeOverlay(
+    item: HomeVideoItem,
+    onCancel: () -> Unit,
+    onConfirm: (Int) -> Unit,
+) {
+    val firstFocus = remember { FocusRequester() }
+    val gamepadStyle by GamepadStyleStore.style.collectAsState()
+    LaunchedEffect(item.bvid) {
+        delay(80L)
+        runCatching { firstFocus.requestFocus() }
+    }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.68f))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+            ) {}
+            .focusable(),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth(0.9f)
+                .widthIn(max = 420.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(HomeCardBg)
+                .border(1.dp, HomePink.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
+                .padding(18.dp),
+        ) {
+            Text(
+                text = "不感兴趣",
+                color = HomeText,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = item.title,
+                color = HomeSecondary,
+                fontSize = 11.sp,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.height(14.dp))
+            DislikeReasonRow(
+                text = "内容不感兴趣",
+                focusRequester = firstFocus,
+                topEdge = true,
+                onClick = { onConfirm(1) },
+            )
+            Spacer(Modifier.height(8.dp))
+            DislikeReasonRow(
+                text = "不想看此 UP 主",
+                onClick = { onConfirm(4) },
+            )
+            Spacer(Modifier.height(8.dp))
+            DislikeReasonRow(
+                text = "取消",
+                bottomEdge = true,
+                onClick = onCancel,
+            )
+            Spacer(Modifier.height(12.dp))
+            Text(
+                text = "${gamepadStyle.confirmLabel} 选择 · ${gamepadStyle.backLabel} 取消",
+                color = HomeSecondary,
+                fontSize = 10.sp,
+            )
+        }
+    }
+}
+
+@Composable
+private fun DislikeReasonRow(
+    text: String,
+    onClick: () -> Unit,
+    focusRequester: FocusRequester? = null,
+    topEdge: Boolean = false,
+    bottomEdge: Boolean = false,
+) {
+    var focused by remember { mutableStateOf(false) }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(40.dp)
+            .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
+            .focusProperties {
+                left = FocusRequester.Cancel
+                right = FocusRequester.Cancel
+                if (topEdge) up = FocusRequester.Cancel
+                if (bottomEdge) down = FocusRequester.Cancel
+            }
+            .duoFocusRing(RoundedCornerShape(7.dp))
+            .clip(RoundedCornerShape(7.dp))
+            .background(if (focused) HomePink.copy(alpha = 0.14f) else Color.Transparent)
+            .border(
+                width = 1.dp,
+                color = if (focused) HomePink.copy(alpha = 0.5f) else Color.Transparent,
+                shape = RoundedCornerShape(7.dp),
+            )
+            .onFocusChanged { focused = it.isFocused }
+            .duoClickable(onClick = onClick)
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(text = text, color = HomeText, fontSize = 13.sp)
     }
 }
 
@@ -872,7 +1131,7 @@ private fun LiveSection(
             itemsIndexed(rooms, key = { _, room -> room.roomId }) { index, room ->
                 LiveRoomCard(
                     room = room,
-                    modifier = Modifier.duoGridDown(index, rooms.size, navigator),
+                    modifier = Modifier.duoGridVertical(index, rooms.size, navigator),
                     focusRequester = if (index == 0) firstFocus else navigator.requester(index),
                     // Let the grid's top row jump into the filter rows instead
                     // of skipping straight to the header tabs.
@@ -1207,7 +1466,7 @@ private fun PgcSeasonGrid(
         itemsIndexed(items, key = { _, item -> item.seasonId }) { index, season ->
             PgcSeasonCard(
                 season = season,
-                modifier = Modifier.duoGridDown(index, items.size, navigator),
+                modifier = Modifier.duoGridVertical(index, items.size, navigator),
                 focusRequester = if (index == 0) firstFocus else navigator.requester(index),
                 onFocusChanged = { focused ->
                     if (focused) onFocused(season) else onFocusCleared()

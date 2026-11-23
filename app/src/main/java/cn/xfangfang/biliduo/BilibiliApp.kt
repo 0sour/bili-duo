@@ -36,6 +36,18 @@ class BilibiliApp : Application(), ImageLoaderFactory {
             prefs.edit().putString("buvid3", UUID.randomUUID().toString()).apply()
         }
         BilibiliApi.buvid3 = prefs.getString("buvid3", "")!!
+        BilibiliApi.buvid4 = prefs.getString("buvid4", "").orEmpty()
+        // The old locally generated UUID is rejected by search/type risk
+        // control (HTTP 412). Upgrade once to the browser-issued b_3/b_4.
+        if (BilibiliApi.buvid4.isBlank()) {
+            appScope.launch {
+                BilibiliApi.fetchBuvidSpi()?.let { (b3, b4) ->
+                    BilibiliApi.buvid3 = b3
+                    BilibiliApi.buvid4 = b4
+                    prefs.edit().putString("buvid3", b3).putString("buvid4", b4).apply()
+                }
+            }
+        }
         BilibiliApi.activateBuvidIfNeeded(appScope)
         val sessdata = prefs.getString("sessdata", null)
         val biliJct = prefs.getString("bili_jct", null)

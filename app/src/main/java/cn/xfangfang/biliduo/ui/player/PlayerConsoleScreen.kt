@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -77,6 +78,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -293,11 +295,21 @@ fun PlayerConsoleScreen(
         if (previous != null && overlay == null) {
             val target = pendingOverlayFocus ?: playFocus
             pendingOverlayFocus = null
-            // The overlay's focused row is removed in the same frames that clear
-            // its focus; a short 60-120ms restore can be overwritten. 300ms is
-            // measured on the Duo/MuMu bottom display and still feels immediate.
-            delay(300)
-            runCatching { target.requestFocus() }
+            if (previous == DuoOverlay.IMAGE) {
+                // The image viewer is a full-screen sibling over already
+                // composed comment thumbnails, so the thumbnail can take the
+                // ring as soon as the viewer leaves. Try at once and retry
+                // once in case the removal frame clears it; the generic 300ms
+                // restore felt visibly slow here.
+                runCatching { target.requestFocus() }
+                delay(80L)
+                runCatching { target.requestFocus() }
+            } else {
+                // Other overlays' focused rows are removed in the same frames
+                // that clear their focus; a short restore can be overwritten.
+                delay(300L)
+                runCatching { target.requestFocus() }
+            }
         }
     }
     var nextCursor by remember(aid) { mutableIntStateOf(0) }
@@ -320,8 +332,33 @@ fun PlayerConsoleScreen(
     var relatedLoading by remember(ownerMid, videoBvid) { mutableStateOf(false) }
     var relatedLoaded by remember(ownerMid, videoBvid) { mutableStateOf(false) }
 
+    // Session-local sleep timer. 0 = off; remaining is updated once a second
+    // for the settings row while the deadline drives the pause.
+    var sleepDeadlineMs by remember { mutableLongStateOf(0L) }
+    var sleepRemainingMs by remember { mutableLongStateOf(0L) }
+    var sleepMinutes by remember { mutableIntStateOf(0) }
+
     fun toast(message: String) {
         Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+    }
+
+    LaunchedEffect(sleepDeadlineMs) {
+        if (sleepDeadlineMs <= 0L) {
+            sleepRemainingMs = 0L
+            return@LaunchedEffect
+        }
+        while (true) {
+            val remaining = (sleepDeadlineMs - System.currentTimeMillis()).coerceAtLeast(0L)
+            sleepRemainingMs = remaining
+            if (remaining <= 0L) {
+                controller.pause()
+                toast("睡眠定时结束，已暂停播放")
+                sleepDeadlineMs = 0L
+                sleepMinutes = 0
+                break
+            }
+            delay(1_000L)
+        }
     }
 
     LaunchedEffect(ui.qualityFallbackNotice) {
@@ -477,10 +514,17 @@ fun PlayerConsoleScreen(
         }
     }
 
-    fun openImages(pictures: List<CommentPicture>, index: Int) {
+    fun openImages(
+        pictures: List<CommentPicture>,
+        index: Int,
+        requester: FocusRequester,
+    ) {
         if (pictures.isEmpty()) return
         viewerPictures = pictures
         viewerStartIndex = index.coerceIn(0, pictures.lastIndex)
+        // Return the ring to the thumbnail that opened the viewer, not to the
+        // play button on the other pane.
+        pendingOverlayFocus = requester
         session.openOverlay(DuoOverlay.IMAGE)
     }
 
@@ -1098,10 +1142,23 @@ fun PlayerConsoleScreen(
         vm.selectPage(page)
     }
 
+    /**
+     * Switching from the related/season list to the intro tab removes the
+     * focused node. Without a focused row the root key handler stops seeing
+     * L1/R1, so put the ring on the intro tab once the new layout is in place.
+     */
+    fun restoreTabFocusSoon() {
+        scope.launch {
+            delay(150L)
+            runCatching { tabFocus[TAB_INTRO].requestFocus() }
+        }
+    }
+
     fun playRelated(item: UserVideoItem) {
         controller.reportNow()
         selectedTab = TAB_INTRO
         vm.load(item.bvid)
+        restoreTabFocusSoon()
     }
 
     fun cycleTab(step: Int) {
@@ -1817,6 +1874,7 @@ fun PlayerConsoleScreen(
                                 controller.reportNow()
                                 selectedTab = TAB_INTRO
                                 vm.load(episode.bvid, episode.cid.takeIf { it > 0L })
+                                restoreTabFocusSoon()
                             },
                         )
                     }
@@ -2393,9 +2451,10 @@ fun PlayerConsoleScreen(
         val danmakuFirstFocus = remember { FocusRequester() }
         val subtitleFirstFocus = remember { FocusRequester() }
         val audioFirstFocus = remember { FocusRequester() }
+        val playFirstFocus = remember { FocusRequester() }
         val filterFirstFocus = remember { FocusRequester() }
         val settingsChoice = rememberDuoChoiceController()
-        val sectionTabFocus = remember { List(3) { FocusRequester() } }
+        val sectionTabFocus = remember { List(4) { FocusRequester() } }
         val blockedFieldFocus = remember { FocusRequester() }
         val regexFieldFocus = remember { FocusRequester() }
         val authorFirstFocus = remember { FocusRequester() }
@@ -2432,6 +2491,7 @@ fun PlayerConsoleScreen(
                         section == 1 && hasSubtitles -> subtitleFirstFocus.requestFocus()
                         section == 2 && ui.availableAudioTracks.isNotEmpty() ->
                             audioFirstFocus.requestFocus()
+                        section == 3 -> playFirstFocus.requestFocus()
                         else -> sectionTabFocus[section].requestFocus()
                     }
                 }
@@ -2445,11 +2505,11 @@ fun PlayerConsoleScreen(
             if (event.nativeKeyEvent.repeatCount > 0) return true
             return when (event.key) {
                 Key.DirectionLeft -> {
-                    selectSection((current + 2) % 3, focusContent = false)
+                    selectSection((current + 3) % 4, focusContent = false)
                     true
                 }
                 Key.DirectionRight -> {
-                    selectSection((current + 1) % 3, focusContent = false)
+                    selectSection((current + 1) % 4, focusContent = false)
                     true
                 }
                 else -> false
@@ -2723,7 +2783,7 @@ fun PlayerConsoleScreen(
                                 Key.ButtonL1 -> {
                                     if (event.nativeKeyEvent.repeatCount == 0) {
                                         selectSection(
-                                            (settingsSection + 2) % 3,
+                                            (settingsSection + 3) % 4,
                                             focusContent = true,
                                         )
                                     }
@@ -2732,7 +2792,7 @@ fun PlayerConsoleScreen(
                                 Key.ButtonR1 -> {
                                     if (event.nativeKeyEvent.repeatCount == 0) {
                                         selectSection(
-                                            (settingsSection + 1) % 3,
+                                            (settingsSection + 1) % 4,
                                             focusContent = true,
                                         )
                                     }
@@ -2778,6 +2838,14 @@ fun PlayerConsoleScreen(
                             },
                             onClick = { selectSection(2, focusContent = true) },
                             onKeyEvent = { event -> handleSectionKey(event, 2) },
+                        )
+                        SettingsSectionTab(
+                            text = "播放",
+                            selected = settingsSection == 3,
+                            focusRequester = sectionTabFocus[3],
+                            downFocus = playFirstFocus,
+                            onClick = { selectSection(3, focusContent = true) },
+                            onKeyEvent = { event -> handleSectionKey(event, 3) },
                         )
                     }
                     Text(
@@ -2959,7 +3027,7 @@ fun PlayerConsoleScreen(
                                 modifier = Modifier.focusProperties { down = FocusRequester.Cancel },
                             )
                         }
-                    } else {
+                    } else if (settingsSection == 2) {
                         if (ui.availableAudioTracks.isEmpty()) {
                             Text(
                                 text = "当前内容不支持切换音轨",
@@ -2995,6 +3063,54 @@ fun PlayerConsoleScreen(
                                 )
                             }
                         }
+                    } else {
+                        DanmakuSettingRow(
+                            label = "自动连播",
+                            value = if (AppSettings.autoPlayNext) "开" else "关",
+                            focusRequester = playFirstFocus,
+                            modifier = Modifier.focusProperties { up = sectionTabFocus[3] },
+                            onClick = {
+                                AppSettings.autoPlayNext = !AppSettings.autoPlayNext
+                            },
+                        )
+                        DanmakuSettingRow(
+                            label = "跳过片头",
+                            value = if (AppSettings.skipOpening) "开" else "关",
+                            onClick = {
+                                AppSettings.skipOpening = !AppSettings.skipOpening
+                            },
+                        )
+                        DanmakuSettingRow(
+                            label = "跳过片尾",
+                            value = if (AppSettings.skipEnding) "开" else "关",
+                            onClick = {
+                                AppSettings.skipEnding = !AppSettings.skipEnding
+                            },
+                        )
+                        DanmakuSettingRow(
+                            label = "睡眠定时",
+                            value = sleepTimerLabel(sleepRemainingMs),
+                            choices = sleepTimerOptions.map { minutes ->
+                                DuoChoiceOption(
+                                    label = if (minutes == 0) "关闭" else "$minutes 分钟",
+                                    selected = minutes == sleepMinutes,
+                                )
+                            },
+                            onChoice = { index ->
+                                val minutes = sleepTimerOptions[index]
+                                sleepMinutes = minutes
+                                sleepDeadlineMs = if (minutes == 0) {
+                                    0L
+                                } else {
+                                    System.currentTimeMillis() + minutes * 60_000L
+                                }
+                                toast(
+                                    if (minutes == 0) "已关闭睡眠定时"
+                                    else "睡眠定时 $minutes 分钟"
+                                )
+                            },
+                            modifier = Modifier.focusProperties { down = FocusRequester.Cancel },
+                        )
                     }
                 }
             }
@@ -3413,7 +3529,7 @@ private fun CommentsTab(
     onLoadMoreReplies: (CommentItem) -> Unit,
     expandedComments: Set<Long>,
     onToggleCommentBody: (CommentItem) -> Unit,
-    onOpenImages: (List<CommentPicture>, Int) -> Unit,
+    onOpenImages: (List<CommentPicture>, Int, FocusRequester) -> Unit,
     selfMid: Long?,
     composeFocus: FocusRequester,
     onCompose: () -> Unit,
@@ -3424,6 +3540,60 @@ private fun CommentsTab(
     hotSortFocus: FocusRequester,
     latestSortFocus: FocusRequester,
 ) {
+    val listState = rememberLazyListState()
+    val loadMoreFocus = remember { FocusRequester() }
+    val loadMoreAnchorFocus = remember { FocusRequester() }
+    var loadMoreAnchorRpid by remember { mutableStateOf<Long?>(null) }
+    var loadMoreAnchorIndex by remember { mutableIntStateOf(-1) }
+    var loadMorePreviousCount by remember { mutableIntStateOf(0) }
+    var loadMorePending by remember { mutableStateOf(false) }
+
+    fun requestLoadMore() {
+        if (loadMorePending) return
+        // After the new page arrives, focus lands on the comment that was
+        // last before the footer, not on the moved footer (which briefly
+        // disappears behind the spinner and used to drop the ring entirely).
+        loadMoreAnchorRpid = comments.lastOrNull()?.rpid
+        loadMoreAnchorIndex = comments.lastIndex
+        loadMorePreviousCount = comments.size
+        loadMorePending = true
+        onLoadMore()
+    }
+
+    LaunchedEffect(loadMoreAnchorRpid) {
+        if (loadMoreAnchorRpid == null) return@LaunchedEffect
+        // Move the ring to the previous last comment before the footer
+        // becomes a spinner, so the load does not blank the focus entirely.
+        repeat(3) {
+            if (runCatching { loadMoreAnchorFocus.requestFocus() }.isSuccess) {
+                return@LaunchedEffect
+            }
+            delay(16L)
+        }
+    }
+
+    LaunchedEffect(loading, comments.size, loadMorePending) {
+        if (!loadMorePending) return@LaunchedEffect
+        if (loading) return@LaunchedEffect
+        delay(80L)
+        val added = comments.size > loadMorePreviousCount
+        val anchor = loadMoreAnchorRpid
+        if (added && anchor != null && comments.any { it.rpid == anchor }) {
+            var focused = runCatching { loadMoreAnchorFocus.requestFocus() }.isSuccess
+            if (!focused && loadMoreAnchorIndex in comments.indices) {
+                runCatching { listState.scrollToItem(loadMoreAnchorIndex) }
+                delay(60L)
+                focused = runCatching { loadMoreAnchorFocus.requestFocus() }.isSuccess
+            }
+            if (!focused) runCatching { loadMoreFocus.requestFocus() }
+        } else {
+            // No new rows (failure, duplicates, or the end of the list):
+            // keep the ring on the footer instead of losing it.
+            runCatching { loadMoreFocus.requestFocus() }
+        }
+        loadMorePending = false
+    }
+
     Column(Modifier.fillMaxSize()) {
         Box(
             modifier = Modifier
@@ -3460,7 +3630,9 @@ private fun CommentsTab(
                 onClick = { onSort(3) },
                 modifier = Modifier.focusRequester(hotSortFocus),
             )
-            Spacer(Modifier.width(4.dp))
+            // Rings are drawn 5.75dp outside each chip; 12dp keeps the two
+            // rings from covering each other.
+            Spacer(Modifier.width(12.dp))
             CommentSortChip(
                 text = "最新",
                 selected = sortMode == 2,
@@ -3502,6 +3674,7 @@ private fun CommentsTab(
                 }
                 else -> {
                     LazyColumn(
+                        state = listState,
                         modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
                         contentPadding = PaddingValues(top = 12.dp, bottom = 12.dp),
                     ) {
@@ -3535,6 +3708,11 @@ private fun CommentsTab(
                                 onReplyReply = { reply -> onReplyToReply(comment, reply) },
                                 onDeleteReply = { reply -> onDelete(reply) },
                                 onAuthorClick = onAuthorClick,
+                                rowFocusRequester = if (comment.rpid == loadMoreAnchorRpid) {
+                                    loadMoreAnchorFocus
+                                } else {
+                                    null
+                                },
                             )
                         }
                         item {
@@ -3553,12 +3731,13 @@ private fun CommentsTab(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .padding(vertical = 4.dp)
+                                        .focusRequester(loadMoreFocus)
                                         .duoFocusRing(RoundedCornerShape(6.dp))
                                         .clip(RoundedCornerShape(6.dp))
                                         .focusProperties {
                                             down = FocusRequester.Cancel
                                         }
-                                        .duoClickable(onClick = onLoadMore)
+                                        .duoClickable(onClick = { requestLoadMore() })
                                         .padding(vertical = 8.dp),
                                     contentAlignment = Alignment.Center,
                                 ) {
@@ -3569,6 +3748,7 @@ private fun CommentsTab(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .padding(vertical = 4.dp)
+                                        .focusRequester(loadMoreFocus)
                                         .duoFocusRing(RoundedCornerShape(6.dp))
                                         .clip(RoundedCornerShape(6.dp))
                                         .focusProperties {
@@ -3642,9 +3822,10 @@ private fun CommentRow(
     bodyExpanded: Boolean,
     onToggleBody: () -> Unit,
     upTarget: FocusRequester? = null,
+    rowFocusRequester: FocusRequester? = null,
     onLikeReply: (CommentItem) -> Unit,
     onDislikeReply: (CommentItem) -> Unit,
-    onOpenImages: (List<CommentPicture>, Int) -> Unit,
+    onOpenImages: (List<CommentPicture>, Int, FocusRequester) -> Unit,
     selfMid: Long?,
     onReply: () -> Unit,
     canDelete: Boolean,
@@ -3653,7 +3834,10 @@ private fun CommentRow(
     onDeleteReply: (CommentItem) -> Unit,
     onAuthorClick: (Long) -> Unit,
 ) {
-    val avatarFocus = remember { FocusRequester() }
+    val fallbackAvatarFocus = remember { FocusRequester() }
+    val avatarFocus = rowFocusRequester ?: fallbackAvatarFocus
+    val bodyToggleFocus = remember { FocusRequester() }
+    val bodyToggleScope = rememberCoroutineScope()
     var avatarFocused by remember { mutableStateOf(false) }
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.fillMaxWidth().padding(vertical = 9.dp)) {
@@ -3717,6 +3901,7 @@ private fun CommentRow(
                         fontSize = 9.5.sp,
                         modifier = Modifier
                             .padding(top = 2.dp)
+                            .focusRequester(bodyToggleFocus)
                             .duoFocusRing(RoundedCornerShape(3.dp))
                             .clip(RoundedCornerShape(3.dp))
                             .focusProperties {
@@ -3725,7 +3910,16 @@ private fun CommentRow(
                                 // sort chip, keeping the ring in the right pane.
                                 if (upTarget != null) up = avatarFocus
                             }
-                            .duoClickable(onClick = onToggleBody)
+                            .duoClickable {
+                                onToggleBody()
+                                // Expanding moves this link down with the
+                                // longer body. Put the ring back on it once the
+                                // new layout is in place.
+                                bodyToggleScope.launch {
+                                    delay(80L)
+                                    runCatching { bodyToggleFocus.requestFocus() }
+                                }
+                            }
                             .padding(horizontal = 2.dp, vertical = 2.dp),
                     )
                 }
@@ -3868,7 +4062,7 @@ private fun ReplyRow(
     disliked: Boolean,
     onLike: () -> Unit,
     onDislike: () -> Unit,
-    onOpenImages: (List<CommentPicture>, Int) -> Unit,
+    onOpenImages: (List<CommentPicture>, Int, FocusRequester) -> Unit,
     onReply: () -> Unit,
     canDelete: Boolean,
     onDelete: () -> Unit,
@@ -4208,8 +4402,11 @@ private fun SeasonTab(
 @Composable
 private fun CommentPicturesRow(
     pictures: List<CommentPicture>,
-    onOpenImages: (List<CommentPicture>, Int) -> Unit,
+    onOpenImages: (List<CommentPicture>, Int, FocusRequester) -> Unit,
 ) {
+    val focusRequesters = remember(pictures) {
+        List(pictures.size) { FocusRequester() }
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -4230,10 +4427,13 @@ private fun CommentPicturesRow(
                 modifier = Modifier
                     .height(64.dp)
                     .aspectRatio(ratio, matchHeightConstraintsFirst = true)
+                    .focusRequester(focusRequesters[index])
                     .duoFocusRing(RoundedCornerShape(4.dp))
                     .clip(RoundedCornerShape(4.dp))
                     .background(DuoSurfaceHigh)
-                    .duoClickable { onOpenImages(pictures, index) },
+                    .duoClickable {
+                        onOpenImages(pictures, index, focusRequesters[index])
+                    },
             )
         }
     }
@@ -5072,6 +5272,15 @@ private val danmakuMaxOnScreenOptions = listOf(0, 30, 60, 100)
 private val subtitleTextSizeOptions = listOf(18f, 22f, 26f, 30f)
 private val subtitleBackgroundOptions = listOf(0f, 0.35f, 0.55f, 0.8f)
 private val subtitleBottomPaddingOptions = listOf(32, 58, 90)
+private val sleepTimerOptions = listOf(0, 15, 30, 45, 60, 90)
+
+private fun sleepTimerLabel(remainingMs: Long): String = when {
+    remainingMs <= 0L -> "关闭"
+    else -> {
+        val remaining = ((remainingMs + 59_999L) / 60_000L).coerceAtLeast(1L)
+        "剩余 $remaining 分钟"
+    }
+}
 
 private fun danmakuShieldLevelLabel(level: Int): String =
     if (level <= 0) "不过滤" else "等级 $level"

@@ -64,6 +64,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import cn.xfangfang.biliduo.data.model.SearchArticleItem
+import cn.xfangfang.biliduo.data.model.SearchLiveItem
 import cn.xfangfang.biliduo.data.model.SearchPgcItem
 import cn.xfangfang.biliduo.data.model.SearchUserItem
 import cn.xfangfang.biliduo.data.model.SearchVideoItem
@@ -94,6 +96,8 @@ fun SearchScreen(
     onVideoClick: (String) -> Unit,
     onUserClick: (Long) -> Unit = {},
     onPgcClick: (Long) -> Unit = {},
+    onArticleClick: (Long) -> Unit = {},
+    onLiveClick: (Long) -> Unit = {},
     onBack: () -> Unit = {},
     onVideoFocused: (TopPreviewUi) -> Unit = {},
     onUserFocused: (TopPersonUi) -> Unit = {},
@@ -138,6 +142,8 @@ fun SearchScreen(
         state.results.size,
         state.users.size,
         state.pgc.size,
+        state.articles.size,
+        state.liveRooms.size,
         state.isLoading,
         state.error,
         searchFocused,
@@ -147,6 +153,8 @@ fun SearchScreen(
         val hasItems = when (state.searchType) {
             SearchType.USER -> state.users.isNotEmpty()
             SearchType.BANGUMI, SearchType.MOVIE -> state.pgc.isNotEmpty()
+            SearchType.ARTICLE -> state.articles.isNotEmpty()
+            SearchType.LIVE -> state.liveRooms.isNotEmpty()
             else -> state.results.isNotEmpty()
         }
         when {
@@ -163,7 +171,7 @@ fun SearchScreen(
         }
     }
 
-    var focusContentOnTypeShortcut by remember { mutableStateOf(false) }
+    var pendingTypeFocus by remember { mutableStateOf(false) }
     LaunchedEffect(
         state.hasSearched,
         state.searchType,
@@ -171,33 +179,40 @@ fun SearchScreen(
         state.results.firstOrNull()?.bvid,
         state.users.firstOrNull()?.mid,
         state.pgc.firstOrNull()?.seasonKey,
+        state.articles.firstOrNull()?.id,
+        state.liveRooms.firstOrNull()?.roomId,
     ) {
         if (state.isLoading) return@LaunchedEffect
         delay(120L)
         if (state.isLoading) return@LaunchedEffect
-        // L1/R1: after switching type, focus the result list (or the search
-        // field when empty) instead of leaving the ring on the type chip.
-        // L2/R2 sort and direct chip activation keep the chip.
-        if (!focusContentOnTypeShortcut) {
-            if (SystemClock.uptimeMillis() - lastShortcutAt < 600L) return@LaunchedEffect
-            if (chipFocusCount > 0) return@LaunchedEffect
-        }
+        // L1/R1 now leaves the ring on the selected type chip, and direct
+        // chip activation keeps it there. Only pull focus into the results
+        // when the user is not interacting with the chip rows.
+        if (SystemClock.uptimeMillis() - lastShortcutAt < 600L) return@LaunchedEffect
+        if (chipFocusCount > 0) return@LaunchedEffect
         val hasItems = when (state.searchType) {
             SearchType.USER -> state.users.isNotEmpty()
             SearchType.BANGUMI, SearchType.MOVIE -> state.pgc.isNotEmpty()
+            SearchType.ARTICLE -> state.articles.isNotEmpty()
+            SearchType.LIVE -> state.liveRooms.isNotEmpty()
             else -> state.results.isNotEmpty()
         }
         val target = when {
             state.hasSearched && hasItems -> firstResultFocus
-            focusContentOnTypeShortcut -> searchFocus
             // C: entering the page focuses the back button, not the input.
             else -> backFocus
         }
         runCatching { target.requestPageFocus() }
-        focusContentOnTypeShortcut = false
     }
 
     val typeFocusers = remember { List(SearchType.values().size) { FocusRequester() } }
+    LaunchedEffect(state.searchType, pendingTypeFocus) {
+        if (pendingTypeFocus) {
+            delay(60L)
+            runCatching { typeFocusers[state.searchType.ordinal].requestPageFocus() }
+            pendingTypeFocus = false
+        }
+    }
     val sortFocusers = remember { List(SearchSort.options.size) { FocusRequester() } }
     var pendingSortFocus by remember { mutableStateOf(false) }
 
@@ -226,12 +241,12 @@ fun SearchScreen(
             onPreviousTab = {
                 viewModel.setSearchType(types[(typeIndex - 1 + types.size) % types.size])
                 lastShortcutAt = SystemClock.uptimeMillis()
-                focusContentOnTypeShortcut = true
+                pendingTypeFocus = true
             },
             onNextTab = {
                 viewModel.setSearchType(types[(typeIndex + 1) % types.size])
                 lastShortcutAt = SystemClock.uptimeMillis()
-                focusContentOnTypeShortcut = true
+                pendingTypeFocus = true
             },
             onPreviousSection = if (state.searchType == SearchType.VIDEO) {
                 {
@@ -324,6 +339,8 @@ fun SearchScreen(
             val hasItems = when (state.searchType) {
                 SearchType.USER -> state.users.isNotEmpty()
                 SearchType.BANGUMI, SearchType.MOVIE -> state.pgc.isNotEmpty()
+                SearchType.ARTICLE -> state.articles.isNotEmpty()
+                SearchType.LIVE -> state.liveRooms.isNotEmpty()
                 else -> state.results.isNotEmpty()
             }
             when {
@@ -347,6 +364,8 @@ fun SearchScreen(
                             SearchType.USER -> "没有找到相关用户"
                             SearchType.BANGUMI -> "没有找到相关番剧"
                             SearchType.MOVIE -> "没有找到相关影视"
+                            SearchType.ARTICLE -> "没有找到相关专栏"
+                            SearchType.LIVE -> "没有找到相关直播"
                             else -> "没有找到相关视频"
                         }
                     )
@@ -357,7 +376,7 @@ fun SearchScreen(
                         state = listState,
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(0.dp),
                     ) {
                         itemsIndexed(
                             items = state.users,
@@ -392,7 +411,7 @@ fun SearchScreen(
                         state = listState,
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(0.dp),
                     ) {
                         itemsIndexed(
                             items = state.pgc,
@@ -424,12 +443,82 @@ fun SearchScreen(
                     }
                 }
 
+                state.searchType == SearchType.ARTICLE -> {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(0.dp),
+                    ) {
+                        itemsIndexed(
+                            items = state.articles,
+                            key = { _, item -> item.id },
+                        ) { index, item ->
+                            SearchArticleRow(
+                                item = item,
+                                onClick = { onArticleClick(item.id) },
+                                focusRequester = if (index == 0) firstResultFocus else null,
+                                onFocusChanged = { focused ->
+                                    if (focused) {
+                                        onVideoFocused(item.toTopPreview())
+                                    } else {
+                                        onFocusCleared()
+                                    }
+                                },
+                            )
+                        }
+                        item {
+                            SearchListFooter(
+                                isLoadingMore = state.isLoadingMore,
+                                hasMore = state.hasMore,
+                                moreError = state.moreError,
+                                onRetry = viewModel::retryLoadMore,
+                            )
+                        }
+                    }
+                }
+
+                state.searchType == SearchType.LIVE -> {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(0.dp),
+                    ) {
+                        itemsIndexed(
+                            items = state.liveRooms,
+                            key = { _, item -> item.roomId },
+                        ) { index, item ->
+                            SearchLiveRow(
+                                item = item,
+                                onClick = { onLiveClick(item.roomId) },
+                                focusRequester = if (index == 0) firstResultFocus else null,
+                                onFocusChanged = { focused ->
+                                    if (focused) {
+                                        onVideoFocused(item.toTopPreview())
+                                    } else {
+                                        onFocusCleared()
+                                    }
+                                },
+                            )
+                        }
+                        item {
+                            SearchListFooter(
+                                isLoadingMore = state.isLoadingMore,
+                                hasMore = state.hasMore,
+                                moreError = state.moreError,
+                                onRetry = viewModel::retryLoadMore,
+                            )
+                        }
+                    }
+                }
+
                 else -> {
                     LazyColumn(
                         state = listState,
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(0.dp),
                     ) {
                         itemsIndexed(
                             items = state.results,
@@ -907,13 +996,10 @@ private fun SearchResultRow(
     focusRequester: FocusRequester?,
     onFocusChanged: (Boolean) -> Unit = {},
 ) {
+    var focused by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(84.dp)
-            .duoFocusRing(RoundedCornerShape(8.dp))
-            .clip(RoundedCornerShape(8.dp))
-            .background(SearchCardBg)
             .then(
                 if (focusRequester != null) {
                     Modifier.focusRequester(focusRequester)
@@ -921,8 +1007,19 @@ private fun SearchResultRow(
                     Modifier
                 }
             )
-            .onFocusChanged { onFocusChanged(it.hasFocus) }
+            .onFocusChanged {
+                focused = it.hasFocus
+                onFocusChanged(it.hasFocus)
+            }
             .duoClickable(onClick = onClick)
+            // Inside the focus target on purpose: Compose's bring-into-view
+            // otherwise scrolls the card flush to the viewport edge and the
+            // outer ring is clipped when the list returns to the top.
+            .padding(vertical = 7.dp)
+            .height(84.dp)
+            .duoFocusRing(RoundedCornerShape(8.dp), focused = focused)
+            .clip(RoundedCornerShape(8.dp))
+            .background(SearchCardBg)
             .padding(6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -996,13 +1093,10 @@ private fun SearchPgcRow(
     focusRequester: FocusRequester?,
     onFocusChanged: (Boolean) -> Unit = {},
 ) {
+    var focused by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(96.dp)
-            .duoFocusRing(RoundedCornerShape(8.dp))
-            .clip(RoundedCornerShape(8.dp))
-            .background(SearchCardBg)
             .then(
                 if (focusRequester != null) {
                     Modifier.focusRequester(focusRequester)
@@ -1010,8 +1104,16 @@ private fun SearchPgcRow(
                     Modifier
                 }
             )
-            .onFocusChanged { onFocusChanged(it.hasFocus) }
+            .onFocusChanged {
+                focused = it.hasFocus
+                onFocusChanged(it.hasFocus)
+            }
             .duoClickable(onClick = onClick)
+            .padding(vertical = 7.dp)
+            .height(96.dp)
+            .duoFocusRing(RoundedCornerShape(8.dp), focused = focused)
+            .clip(RoundedCornerShape(8.dp))
+            .background(SearchCardBg)
             .padding(6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -1112,19 +1214,16 @@ private fun SearchPgcItem.toTopPreview(): TopPreviewUi = TopPreviewUi(
 )
 
 @Composable
-private fun SearchUserRow(
-    item: SearchUserItem,
+private fun SearchArticleRow(
+    item: SearchArticleItem,
     onClick: () -> Unit,
     focusRequester: FocusRequester?,
     onFocusChanged: (Boolean) -> Unit = {},
 ) {
+    var focused by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(88.dp)
-            .duoFocusRing(RoundedCornerShape(8.dp))
-            .clip(RoundedCornerShape(8.dp))
-            .background(SearchCardBg)
             .then(
                 if (focusRequester != null) {
                     Modifier.focusRequester(focusRequester)
@@ -1132,8 +1231,242 @@ private fun SearchUserRow(
                     Modifier
                 }
             )
-            .onFocusChanged { onFocusChanged(it.hasFocus) }
+            .onFocusChanged {
+                focused = it.hasFocus
+                onFocusChanged(it.hasFocus)
+            }
             .duoClickable(onClick = onClick)
+            .padding(vertical = 7.dp)
+            .height(84.dp)
+            .duoFocusRing(RoundedCornerShape(8.dp), focused = focused)
+            .clip(RoundedCornerShape(8.dp))
+            .background(SearchCardBg)
+            .padding(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .width(128.dp)
+                .height(72.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(SearchFieldBg),
+        ) {
+            AsyncImage(
+                model = fixPic(item.imageUrls?.firstOrNull().orEmpty()),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+            Text(
+                text = "专栏",
+                color = Color.White,
+                fontSize = 8.sp,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(3.dp)
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(SearchPink.copy(alpha = 0.9f))
+                    .padding(horizontal = 3.dp, vertical = 1.dp),
+            )
+        }
+        Spacer(Modifier.width(10.dp))
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Text(
+                text = item.title.orEmpty(),
+                color = SearchText,
+                fontSize = 13.sp,
+                lineHeight = 17.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.height(5.dp))
+            Text(
+                text = buildString {
+                    item.author?.takeIf { it.isNotBlank() }?.let { append(it) }
+                    item.categoryName?.takeIf { it.isNotBlank() }?.let {
+                        if (isNotEmpty()) append(" · ")
+                        append(it)
+                    }
+                    if (item.view > 0) {
+                        if (isNotEmpty()) append(" · ")
+                        append("${formatCount(item.view)}阅读")
+                    }
+                },
+                color = SearchSecondary,
+                fontSize = 10.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+private fun SearchArticleItem.toTopPreview(): TopPreviewUi = TopPreviewUi(
+    bvid = "",
+    title = title.orEmpty(),
+    coverUrl = fixPic(imageUrls?.firstOrNull().orEmpty()),
+    ownerName = author.orEmpty(),
+    description = desc.orEmpty(),
+    category = categoryName.orEmpty(),
+    playCount = view,
+    ownerLabel = "作者",
+    eyebrow = "● 搜索 · 专栏",
+    actionHint = "阅读全文 · A",
+)
+
+@Composable
+private fun SearchLiveRow(
+    item: SearchLiveItem,
+    onClick: () -> Unit,
+    focusRequester: FocusRequester?,
+    onFocusChanged: (Boolean) -> Unit = {},
+) {
+    val isLive = item.liveStatus == 1
+    var focused by remember { mutableStateOf(false) }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(
+                if (focusRequester != null) {
+                    Modifier.focusRequester(focusRequester)
+                } else {
+                    Modifier
+                }
+            )
+            .onFocusChanged {
+                focused = it.hasFocus
+                onFocusChanged(it.hasFocus)
+            }
+            .duoClickable(onClick = onClick)
+            .padding(vertical = 7.dp)
+            .height(84.dp)
+            .duoFocusRing(RoundedCornerShape(8.dp), focused = focused)
+            .clip(RoundedCornerShape(8.dp))
+            .background(SearchCardBg)
+            .padding(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .width(128.dp)
+                .height(72.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(SearchFieldBg),
+        ) {
+            AsyncImage(
+                model = fixPic(item.cover?.takeIf { it.isNotBlank() } ?: item.pic.orEmpty()),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+            Text(
+                text = if (isLive) "直播中" else "未开播",
+                color = Color.White,
+                fontSize = 8.sp,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(3.dp)
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(
+                        if (isLive) SearchPink.copy(alpha = 0.9f) else Color.Black.copy(alpha = 0.72f)
+                    )
+                    .padding(horizontal = 3.dp, vertical = 1.dp),
+            )
+            if (isLive && item.online > 0) {
+                Text(
+                    text = "${formatCount(item.online)}人气",
+                    color = Color.White,
+                    fontSize = 8.sp,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(3.dp)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(Color.Black.copy(alpha = 0.72f))
+                        .padding(horizontal = 3.dp, vertical = 1.dp),
+                )
+            }
+        }
+        Spacer(Modifier.width(10.dp))
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Text(
+                text = item.title.orEmpty(),
+                color = SearchText,
+                fontSize = 13.sp,
+                lineHeight = 17.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.height(5.dp))
+            Text(
+                text = buildString {
+                    item.uname?.takeIf { it.isNotBlank() }?.let { append(it) }
+                    (item.area?.takeIf { it.isNotBlank() } ?: item.cateName?.takeIf { it.isNotBlank() })?.let {
+                        if (isNotEmpty()) append(" · ")
+                        append(it)
+                    }
+                },
+                color = SearchSecondary,
+                fontSize = 10.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+private fun SearchLiveItem.toTopPreview(): TopPreviewUi = TopPreviewUi(
+    bvid = "",
+    title = title.orEmpty(),
+    coverUrl = fixPic(cover?.takeIf { it.isNotBlank() } ?: pic.orEmpty()),
+    ownerName = uname.orEmpty(),
+    ownerFace = fixPic(uface.orEmpty()),
+    playCount = online,
+    description = listOfNotNull(
+        area?.takeIf { it.isNotBlank() },
+        cateName?.takeIf { it.isNotBlank() },
+    ).joinToString(" · "),
+    category = "直播",
+    ownerLabel = "主播",
+    eyebrow = if (liveStatus == 1) "● 搜索 · 直播中" else "● 搜索 · 未开播",
+    actionHint = "进入直播间 · A",
+)
+
+@Composable
+private fun SearchUserRow(
+    item: SearchUserItem,
+    onClick: () -> Unit,
+    focusRequester: FocusRequester?,
+    onFocusChanged: (Boolean) -> Unit = {},
+) {
+    var focused by remember { mutableStateOf(false) }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(
+                if (focusRequester != null) {
+                    Modifier.focusRequester(focusRequester)
+                } else {
+                    Modifier
+                }
+            )
+            .onFocusChanged {
+                focused = it.hasFocus
+                onFocusChanged(it.hasFocus)
+            }
+            .duoClickable(onClick = onClick)
+            .padding(vertical = 7.dp)
+            .height(88.dp)
+            .duoFocusRing(RoundedCornerShape(8.dp), focused = focused)
+            .clip(RoundedCornerShape(8.dp))
+            .background(SearchCardBg)
             .padding(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

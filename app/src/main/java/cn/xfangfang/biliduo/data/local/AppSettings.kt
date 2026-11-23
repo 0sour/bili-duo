@@ -17,6 +17,9 @@ object AppSettings {
     private const val KEY_DISPLAY_SWAPPED = "display_swapped"
     private const val KEY_UPDATE_PROMPTED_TAG = "update_prompted_tag"
     private const val KEY_AUTO_CHECK_UPDATE = "auto_check_update"
+    private const val KEY_AUTO_PLAY_NEXT = "auto_play_next"
+    private const val KEY_SKIP_OPENING = "skip_opening"
+    private const val KEY_SKIP_ENDING = "skip_ending"
 
     private lateinit var prefs: SharedPreferences
 
@@ -32,12 +35,18 @@ object AppSettings {
         manualDarkState = prefs.getBoolean(KEY_MANUAL_DARK, true)
         displaySwappedState = prefs.getBoolean(KEY_DISPLAY_SWAPPED, false)
         autoCheckUpdateState = prefs.getBoolean(KEY_AUTO_CHECK_UPDATE, true)
+        autoPlayNextState = prefs.getBoolean(KEY_AUTO_PLAY_NEXT, true)
+        skipOpeningState = prefs.getBoolean(KEY_SKIP_OPENING, false)
+        skipEndingState = prefs.getBoolean(KEY_SKIP_ENDING, false)
     }
 
     private var themeModeState by mutableIntStateOf(0)
     private var manualDarkState by androidx.compose.runtime.mutableStateOf(true)
     private var displaySwappedState by androidx.compose.runtime.mutableStateOf(false)
     private var autoCheckUpdateState by androidx.compose.runtime.mutableStateOf(true)
+    private var autoPlayNextState by androidx.compose.runtime.mutableStateOf(true)
+    private var skipOpeningState by androidx.compose.runtime.mutableStateOf(false)
+    private var skipEndingState by androidx.compose.runtime.mutableStateOf(false)
 
     var themeMode: Int
         get() = themeModeState
@@ -80,6 +89,30 @@ object AppSettings {
         set(value) {
             autoCheckUpdateState = value
             prefs.edit().putBoolean(KEY_AUTO_CHECK_UPDATE, value).apply()
+        }
+
+    /** Play the next part/episode automatically when the current one ends. */
+    var autoPlayNext: Boolean
+        get() = autoPlayNextState
+        set(value) {
+            autoPlayNextState = value
+            prefs.edit().putBoolean(KEY_AUTO_PLAY_NEXT, value).apply()
+        }
+
+    /** Seek past the uploader/PGC opening marker on start. */
+    var skipOpening: Boolean
+        get() = skipOpeningState
+        set(value) {
+            skipOpeningState = value
+            prefs.edit().putBoolean(KEY_SKIP_OPENING, value).apply()
+        }
+
+    /** Seek to the end when the ending marker starts. */
+    var skipEnding: Boolean
+        get() = skipEndingState
+        set(value) {
+            skipEndingState = value
+            prefs.edit().putBoolean(KEY_SKIP_ENDING, value).apply()
         }
 
     /** Release tag of the update prompt the user last dismissed with "稍后". */

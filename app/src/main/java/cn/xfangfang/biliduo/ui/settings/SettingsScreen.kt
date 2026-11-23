@@ -914,6 +914,24 @@ private fun PlaySettings(
     Spacer(Modifier.height(6.dp))
     SettingsSection("播放行为")
     SettingsSwitchRow(
+        title = "自动连播",
+        subtitle = "播放结束后自动进入下一P / 下一集",
+        checked = AppSettings.autoPlayNext,
+        onToggle = { AppSettings.autoPlayNext = !AppSettings.autoPlayNext },
+    )
+    SettingsSwitchRow(
+        title = "自动跳过片头",
+        subtitle = "使用 UP 主 / 番剧的片头标记",
+        checked = AppSettings.skipOpening,
+        onToggle = { AppSettings.skipOpening = !AppSettings.skipOpening },
+    )
+    SettingsSwitchRow(
+        title = "自动跳过片尾",
+        subtitle = "片尾标记开始时直接结束或进入下一集",
+        checked = AppSettings.skipEnding,
+        onToggle = { AppSettings.skipEnding = !AppSettings.skipEnding },
+    )
+    SettingsSwitchRow(
         title = "仅 WiFi 播放视频",
         subtitle = "移动网络下不开始播放，避免消耗流量",
         checked = wifiOnlyPlayback,

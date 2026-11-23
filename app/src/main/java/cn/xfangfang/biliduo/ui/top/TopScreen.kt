@@ -5,10 +5,12 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -40,11 +42,17 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import cn.xfangfang.biliduo.util.galleryImageUrl
+import coil.compose.rememberAsyncImagePainter
+import coil.request.ImageRequest
+import coil.size.Size
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -1723,6 +1731,16 @@ private fun TopDynamicDetailScreen(reader: TopDynamicReaderUi) {
 @Composable
 private fun TopDynamicGalleryScreen(reader: TopDynamicReaderUi) {
     val image = reader.activeImage
+    val context = LocalContext.current
+    // Load the same full-aspect bitmap as the bottom viewer (Size.ORIGINAL)
+    // so fit-width long images are not decoded at the tiny viewport size.
+    val imageRequest = remember(image, context) {
+        ImageRequest.Builder(context)
+            .data(image?.let { galleryImageUrl(it) } ?: "")
+            .size(Size.ORIGINAL)
+            .build()
+    }
+    val imagePainter = rememberAsyncImagePainter(imageRequest)
     Box(Modifier.fillMaxSize().background(TopBg)) {
         if (!image.isNullOrBlank()) {
             AsyncImage(
@@ -1762,12 +1780,53 @@ private fun TopDynamicGalleryScreen(reader: TopDynamicReaderUi) {
                     contentAlignment = Alignment.Center,
                 ) {
                     if (!image.isNullOrBlank()) {
-                        AsyncImage(
-                            model = fixPic(image),
-                            contentDescription = null,
-                            contentScale = ContentScale.Fit,
-                            modifier = Modifier.fillMaxSize(),
-                        )
+                        val aspect = reader.galleryAspect
+                        val zoomX = reader.galleryZoomX
+                        if (aspect > 0f && zoomX > 0f) {
+                            // Mirror the bottom gallery's normalized width
+                            // fraction and image-space center. The top box is
+                            // larger, so the same crop is easier to read.
+                            BoxWithConstraints(Modifier.fillMaxSize()) {
+                                val wt = constraints.maxWidth.toFloat()
+                                val ht = constraints.maxHeight.toFloat()
+                                if (wt > 0f && ht > 0f) {
+                                    val fit = minOf(wt / aspect, ht)
+                                    val fittedW = aspect * fit
+                                    // Never draw the top image smaller than its
+                                    // own fit; a zoomed-out bottom should still
+                                    // look large on the top display.
+                                    val scale = if (fittedW > 0f) {
+                                        (zoomX * wt / fittedW).coerceAtLeast(1f)
+                                    } else {
+                                        1f
+                                    }
+                                    val displayedW = fittedW * scale
+                                    val displayedH = fit * scale
+                                    Image(
+                                        painter = imagePainter,
+                                        contentDescription = null,
+                                        contentScale = ContentScale.Fit,
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .graphicsLayer {
+                                                scaleX = scale
+                                                scaleY = scale
+                                                translationX =
+                                                    (0.5f - reader.galleryCenterX) * displayedW
+                                                translationY =
+                                                    (0.5f - reader.galleryCenterY) * displayedH
+                                            },
+                                    )
+                                }
+                            }
+                        } else {
+                            Image(
+                                painter = imagePainter,
+                                contentDescription = null,
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
                     }
                     Text(
                         text = "${reader.imageIndex + 1} / ${reader.images.size.coerceAtLeast(1)}",
@@ -1818,7 +1877,7 @@ private fun TopDynamicGalleryScreen(reader: TopDynamicReaderUi) {
                 }
             }
             Spacer(Modifier.height(7.dp))
-            TopSceneFooter("上屏只读 · 下屏切换图片", "GALLERY")
+            TopSceneFooter("上屏同步缩放 · 下屏切换图片/缩放", "GALLERY")
         }
     }
 }

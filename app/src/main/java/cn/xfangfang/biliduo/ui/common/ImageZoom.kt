@@ -1,5 +1,6 @@
 package cn.xfangfang.biliduo.ui.common
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -17,12 +18,17 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.isSpecified
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntSize
-import coil.compose.AsyncImage
+import cn.xfangfang.biliduo.util.galleryImageUrl
+import coil.compose.rememberAsyncImagePainter
+import coil.request.ImageRequest
+import coil.size.Size
 import kotlinx.coroutines.isActive
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -41,14 +47,108 @@ class ImageZoomState {
     var viewport by mutableStateOf(IntSize.Zero)
         private set
 
+    /** Intrinsic source size; zero until the painter has decoded the image. */
+    var contentSize by mutableStateOf(IntSize.Zero)
+        private set
+
+    /** Displayed image width / viewport width (1 = fills the viewer width). */
+    val zoomX: Float
+        get() {
+            val displayed = baseWidth * scale
+            return if (displayed > 0f && viewport.width > 0) {
+                displayed / viewport.width
+            } else {
+                1f
+            }
+        }
+
+    /** Normalized center of the visible image area (0..1). */
+    val centerX: Float
+        get() {
+            val displayed = baseWidth * scale
+            return if (displayed > 0f) {
+                (0.5f - offset.x / displayed).coerceIn(0f, 1f)
+            } else {
+                0.5f
+            }
+        }
+
+    val centerY: Float
+        get() {
+            val displayed = baseHeight * scale
+            return if (displayed > 0f) {
+                (0.5f - offset.y / displayed).coerceIn(0f, 1f)
+            } else {
+                0.5f
+            }
+        }
+
+    /** Source width / height; 0 until the image size is known. */
+    val aspect: Float
+        get() = if (contentSize.width > 0 && contentSize.height > 0) {
+            contentSize.width.toFloat() / contentSize.height
+        } else {
+            0f
+        }
+
+    /** Fit-entire scale of the source image. */
+    private val fitScale: Float
+        get() {
+            val cw = contentSize.width
+            val ch = contentSize.height
+            if (cw <= 0 || ch <= 0 || viewport.width <= 0 || viewport.height <= 0) {
+                return 1f
+            }
+            return minOf(
+                viewport.width.toFloat() / cw,
+                viewport.height.toFloat() / ch,
+            )
+        }
+
+    private val baseWidth: Float
+        get() = if (contentSize.width > 0) {
+            contentSize.width * fitScale
+        } else {
+            viewport.width.toFloat()
+        }
+
+    private val baseHeight: Float
+        get() = if (contentSize.height > 0) {
+            contentSize.height * fitScale
+        } else {
+            viewport.height.toFloat()
+        }
+
+    /**
+     * Normal images keep the 8x ceiling. A long infographic whose fit-entire
+     * width is narrow may need more than 8x to fill the viewer width; allow
+     * at least that scale.
+     */
+    private val maxScale: Float
+        get() {
+            val fitWidth = if (baseWidth > 0f) viewport.width / baseWidth else 1f
+            return maxOf(MAX_SCALE, fitWidth)
+        }
+
     fun updateViewport(size: IntSize) {
         viewport = size
+        fitLongImageToWidth()
+        clamp()
+    }
+
+    fun updateContentSize(size: IntSize) {
+        if (size.width <= 0 || size.height <= 0) return
+        contentSize = size
+        fitLongImageToWidth()
         clamp()
     }
 
     fun reset() {
         scale = 1f
         offset = Offset.Zero
+        // Let the next image report its own size; otherwise a tall image
+        // would briefly use the previous image's fit-width scale.
+        contentSize = IntSize.Zero
     }
 
     /** R2/L2: zoom around the viewport center. */
@@ -60,14 +160,14 @@ class ImageZoomState {
     /** Touch: pinch and drag; [centroid] is in the image area's local pixels. */
     fun applyGesture(centroid: Offset, pan: Offset, zoom: Float) {
         val old = scale
-        val next = (old * zoom).coerceIn(MIN_SCALE, MAX_SCALE)
+        val next = (old * zoom).coerceIn(MIN_SCALE, maxScale)
         if (next <= 1.001f) {
             reset()
             return
         }
         val change = next / old
-        val center = Offset(viewport.width / 2f, viewport.height / 2f)
-        val focus = centroid - center
+        val viewportCenter = Offset(viewport.width / 2f, viewport.height / 2f)
+        val focus = centroid - viewportCenter
         offset = offset * change + focus * (1f - change) + pan
         scale = next
         clamp()
@@ -82,18 +182,38 @@ class ImageZoomState {
 
     private fun zoomAround(centroid: Offset, factor: Float) {
         val old = scale
-        val next = (old * factor).coerceIn(MIN_SCALE, MAX_SCALE)
+        val next = (old * factor).coerceIn(MIN_SCALE, maxScale)
         if (next <= 1.001f) {
             reset()
             return
         }
         val change = next / old
-        val center = Offset(viewport.width / 2f, viewport.height / 2f)
-        val focus = centroid - center
+        val viewportCenter = Offset(viewport.width / 2f, viewport.height / 2f)
+        val focus = centroid - viewportCenter
         offset = offset * change + focus * (1f - change)
         scale = next
         clamp()
     }
+
+    /**
+     * Long infographics (height > 2x width) open at fit-width and top-aligned,
+     * so their text is readable immediately. The user can still L2 back to
+     * fit-entire; normal images keep the previous fit-entire behavior.
+     */
+    private fun fitLongImageToWidth() {
+        if (scale > 1.001f) return
+        if (contentSize.width <= 0 || contentSize.height <= 0) return
+        if (contentSize.height <= contentSize.width * 2) return
+        val bw = baseWidth
+        if (bw <= 0f || viewport.width <= 0) return
+        val target = (viewport.width / bw).coerceAtMost(maxScale)
+        if (target <= 1.001f) return
+        scale = target
+        offset = Offset(0f, maxOffsetY())
+    }
+
+    private fun maxOffsetY(): Float =
+        ((baseHeight * scale - viewport.height) / 2f).coerceAtLeast(0f)
 
     private fun clamp() {
         if (scale <= 1.001f) {
@@ -101,8 +221,8 @@ class ImageZoomState {
             offset = Offset.Zero
             return
         }
-        val maxX = (scale - 1f) * viewport.width / 2f
-        val maxY = (scale - 1f) * viewport.height / 2f
+        val maxX = ((baseWidth * scale - viewport.width) / 2f).coerceAtLeast(0f)
+        val maxY = ((baseHeight * scale - viewport.height) / 2f).coerceAtLeast(0f)
         offset = Offset(
             offset.x.coerceIn(-maxX, maxX),
             offset.y.coerceIn(-maxY, maxY),
@@ -111,7 +231,9 @@ class ImageZoomState {
 
     private companion object {
         const val MIN_SCALE = 1f
-        const val MAX_SCALE = 4f
+
+        /** Normal images need at least this much close-up inspection. */
+        const val MAX_SCALE = 8f
     }
 }
 
@@ -206,8 +328,27 @@ fun DuoZoomableImage(
                 }
             }
         }
-        AsyncImage(
-            model = model,
+        val context = LocalContext.current
+        val painter = rememberAsyncImagePainter(
+            remember(model, context) {
+                ImageRequest.Builder(context)
+                    .data((model as? String)?.let { galleryImageUrl(it) } ?: model)
+                    // Do not let the viewport size downsample a long image:
+                    // fit-width zoom needs the full pixel width.
+                    .size(Size.ORIGINAL)
+                    .build()
+            }
+        )
+        val intrinsic = painter.intrinsicSize
+        LaunchedEffect(model, intrinsic) {
+            if (intrinsic.isSpecified && intrinsic.width > 0f && intrinsic.height > 0f) {
+                state.updateContentSize(
+                    IntSize(intrinsic.width.roundToInt(), intrinsic.height.roundToInt()),
+                )
+            }
+        }
+        Image(
+            painter = painter,
             contentDescription = contentDescription,
             contentScale = contentScale,
             modifier = Modifier

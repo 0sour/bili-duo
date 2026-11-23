@@ -133,6 +133,12 @@ data class TopDynamicReaderUi(
     val commentCount: Int = 0,
     val forwardCount: Int = 0,
     val likeCount: Int = 0,
+    /** Gallery mirror: displayed image width / viewport width (0 = no sync). */
+    val galleryZoomX: Float = 0f,
+    val galleryCenterX: Float = 0.5f,
+    val galleryCenterY: Float = 0.5f,
+    /** Source image width / height; 0 until the bottom viewer knows it. */
+    val galleryAspect: Float = 0f,
 ) {
     val activeImage: String? get() = images.getOrNull(imageIndex) ?: images.firstOrNull()
 }

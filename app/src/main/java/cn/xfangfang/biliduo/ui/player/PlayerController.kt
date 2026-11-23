@@ -169,6 +169,8 @@ class PlayerController(
     private var activeCid: Long? = null
     private var pausedByWifi = false
     private var handlingEnded = false
+    private var lastSkipKey: String? = null
+    private var lastSkipAt = 0L
     private var lastLiveRecoveryAt = 0L
     private var qualityFallbackAttempted = false
     private var sourceRetryCount = 0
@@ -550,7 +552,7 @@ class PlayerController(
         }
         val index = ui.pages.indexOfFirst { it.cid == ui.currentPage?.cid }
         val next = if (index in 0 until ui.pages.size - 1) ui.pages[index + 1] else null
-        if (next != null) {
+        if (next != null && AppSettings.autoPlayNext) {
             if (BuildConfig.DEBUG) {
                 Log.d(BilibiliApp.TAG, "PlayerController: ended, next page=${next.page}")
             }
@@ -586,6 +588,7 @@ class PlayerController(
             player.seekTo(pending)
             pendingSeekMs = null
         }
+        maybeAutoSkip(player.currentPosition.coerceAtLeast(0L))
         _state.update {
             it.copy(
                 isPlaying = player.isPlaying,
@@ -601,11 +604,51 @@ class PlayerController(
         }
     }
 
+    /**
+     * Uploader/PGC opening and ending markers. Skip only while actually
+     * playing, and remember the last target so a seek cannot loop inside the
+     * same window.
+     */
+    private fun maybeAutoSkip(positionMs: Long) {
+        val ui = viewModel.uiState.value
+        if (ui.isLive || ui.isPreview || ui.currentPage == null || ui.skipRanges.isEmpty()) return
+        if (!player.isPlaying) return
+        val range = ui.skipRanges.firstOrNull { skip ->
+            val enabled = when (skip.kind) {
+                1 -> AppSettings.skipOpening
+                2 -> AppSettings.skipEnding
+                else -> false
+            }
+            enabled && positionMs >= skip.startMs && positionMs < skip.endMs - SKIP_EDGE_MS
+        }
+        if (range == null) {
+            lastSkipKey = null
+            return
+        }
+        val key = "${ui.currentPage?.cid}:${range.kind}:${range.startMs}:${range.endMs}"
+        val now = SystemClock.elapsedRealtime()
+        if (key == lastSkipKey && now - lastSkipAt < 3_000L) return
+        lastSkipKey = key
+        lastSkipAt = now
+        if (BuildConfig.DEBUG) {
+            Log.d(
+                BilibiliApp.TAG,
+                "PlayerController: skip kind=${range.kind} ${positionMs}ms -> ${range.endMs}ms",
+            )
+        }
+        player.seekTo(range.endMs)
+        _state.update { it.copy(ended = false) }
+    }
+
     private fun stateName(state: Int): String = when (state) {
         Player.STATE_IDLE -> "IDLE"
         Player.STATE_BUFFERING -> "BUFFERING"
         Player.STATE_READY -> "READY"
         Player.STATE_ENDED -> "ENDED"
         else -> "UNKNOWN"
+    }
+
+    private companion object {
+        const val SKIP_EDGE_MS = 500L
     }
 }
