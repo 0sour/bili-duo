@@ -577,6 +577,11 @@ fun PlayerConsoleScreen(
             }
         }
     }
+    // Same safety net as the top screen: if the XML fetch was never scheduled
+    // for this page, request it once the media is active.
+    LaunchedEffect(playback.isActive, ui.currentPage?.cid) {
+        if (playback.isActive) vm.ensureDanmakuLoaded()
+    }
     DisposableEffect(Unit) {
         session.setFocusBackInterceptor {
             if (rightPaneFocusedState) {

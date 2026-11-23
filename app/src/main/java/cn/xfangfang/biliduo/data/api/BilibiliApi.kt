@@ -24,6 +24,7 @@ import retrofit2.http.Headers
 import retrofit2.http.POST
 import retrofit2.http.Query
 import retrofit2.http.QueryMap
+import retrofit2.http.Url
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
@@ -88,6 +89,13 @@ interface BilibiliApi {
 
     @GET("x/v1/dm/list.so")
     suspend fun getDanmakuXml(@Query("oid") oid: Long): retrofit2.Response<okhttp3.ResponseBody>
+
+    /**
+     * Classic public danmaku host. It serves the same deflate XML as
+     * x/v1/dm/list.so but is much less prone to the 412 anti-crawl response.
+     */
+    @GET
+    suspend fun getDanmakuXmlCdn(@Url url: String): retrofit2.Response<okhttp3.ResponseBody>
 
     @GET("x/web-interface/index/top/feed/rcmd")
     suspend fun getRecommendFeed(

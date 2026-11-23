@@ -232,6 +232,8 @@ class PlayerViewModel(
         metaJob?.cancel()
         metaJob = null
         danmakuJob?.cancel()
+        danmakuScheduleJob?.cancel()
+        danmakuCid = null
         liveJob?.cancel()
         cachedDashData = null
         loadJob = viewModelScope.launch {
@@ -488,6 +490,7 @@ class PlayerViewModel(
         metaJob = null
         danmakuJob?.cancel()
         danmakuScheduleJob?.cancel()
+        danmakuCid = null
         liveJob?.cancel()
         cachedDashData = null
         pgcEpisodeByCid.clear()
@@ -815,6 +818,12 @@ class PlayerViewModel(
 
     fun setDanmakuEnabled(enabled: Boolean) {
         updateDanmakuState { it.copy(danmakuEnabled = enabled) }
+        // Re-enabling the switch is the most discoverable manual recovery when
+        // a previous XML fetch failed; schedule a fresh load for the current
+        // page instead of leaving an empty layer until the quality changes.
+        if (enabled && _uiState.value.danmaku.isEmpty()) {
+            scheduleDanmaku(_uiState.value.currentPage?.cid)
+        }
     }
 
     fun setDanmakuOpacity(value: Float) {
@@ -938,20 +947,56 @@ class PlayerViewModel(
             _uiState.value = _uiState.value.copy(danmaku = emptyList())
         }
         danmakuJob = viewModelScope.launch {
-            var items = repository.getDanmaku(cid).getOrNull()
+            val firstResult = repository.getDanmaku(cid)
+            var items = firstResult.getOrNull()
+            // A successful empty body means the video really has no danmaku;
+            // don't burn retries or refetch it on every first frame.
+            val genuinelyEmpty = firstResult.isSuccess && items != null && items.isEmpty()
             // The XML endpoint occasionally answers with a transient error or
-            // an empty body from one CDN node. One retry turns those into a
-            // visible danmaku layer instead of a permanently empty one.
-            if (items.isNullOrEmpty() && _uiState.value.currentPage?.cid == cid) {
+            // an empty body from one CDN node. Retry twice with a longer gap:
+            // rapid video switching can leave the dm CDN briefly rate-limited,
+            // and a single 1.2s retry usually lands inside the same window.
+            if (!genuinelyEmpty && items.isNullOrEmpty() &&
+                _uiState.value.currentPage?.cid == cid
+            ) {
                 delay(1_200L)
                 if (_uiState.value.currentPage?.cid == cid) {
                     items = repository.getDanmaku(cid).getOrNull()
                 }
             }
+            if (!genuinelyEmpty && items.isNullOrEmpty() &&
+                _uiState.value.currentPage?.cid == cid
+            ) {
+                delay(3_500L)
+                if (_uiState.value.currentPage?.cid == cid) {
+                    items = repository.getDanmaku(cid).getOrNull()
+                }
+            }
             if (!items.isNullOrEmpty() && _uiState.value.currentPage?.cid == cid) {
+                Log.i(BilibiliApp.TAG, "danmaku loaded cid=$cid size=${items.size}")
                 _uiState.value = _uiState.value.copy(danmaku = items)
+            } else if (!genuinelyEmpty && danmakuCid == cid) {
+                // Allow a later schedule (quality change, re-enabling danmaku)
+                // to retry instead of treating this cid as already loaded.
+                danmakuCid = null
             }
         }
+    }
+
+    /**
+     * Last-resort recovery for an empty danmaku layer. Some entry paths can
+     * finish loading the media without scheduling the XML fetch (or the
+     * schedule is lost while switching videos); call this when playback is
+     * actually active so the current cid is always attempted once.
+     */
+    fun ensureDanmakuLoaded() {
+        val state = _uiState.value
+        val cid = state.currentPage?.cid ?: return
+        if (cid <= 0L) return
+        if (state.danmaku.isNotEmpty()) return
+        if (danmakuCid == cid) return
+        if (danmakuJob?.isActive == true || danmakuScheduleJob?.isActive == true) return
+        scheduleDanmaku(cid)
     }
 
     /** Re-fetch danmaku after sending, keeping the current list until the new one arrives. */

@@ -126,12 +126,21 @@ fun TopScreenHost(
         0L
     }
 
+    // A new video must never end up with an empty layer just because its XML
+    // fetch was not scheduled on some entry path. Once the first frame is up,
+    // try the current cid once if nothing is loaded yet.
+    LaunchedEffect(playback.hasRenderedFrame, playerUi.currentPage?.cid) {
+        if (playback.hasRenderedFrame) playerViewModel.ensureDanmakuLoaded()
+    }
+
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         TopPlayerSurface(controller, Modifier.fillMaxSize())
-        if (playback.hasRenderedFrame &&
-            playerUi.danmakuEnabled &&
-            playerUi.danmaku.isNotEmpty()
-        ) {
+        // Compose after the first frame, not on the idle/preview screen: the
+        // PlayerView's surface must already exist on the Duo before the
+        // danmaku view is added, otherwise the late surface can cover it.
+        // Keep the layer while the list is empty so a slow XML fetch does not
+        // tear down and recreate the AndroidView mid-video.
+        if (playback.hasRenderedFrame && playerUi.danmakuEnabled && !playerUi.isLive) {
             DanmakuOverlay(
                 player = controller.player,
                 items = playerUi.danmaku,

@@ -214,15 +214,36 @@ class BilibiliRepository(
     }
 
     /** Decompressed XML for offline downloads; parsed later by [parseDanmakuXmlText]. */
-    suspend fun getDanmakuXmlText(cid: Long): Result<String> = runCatching {
-        val response = api.getDanmakuXml(cid)
-        if (!response.isSuccessful) throw Exception("弹幕 HTTP ${response.code()}")
+    suspend fun getDanmakuXmlText(cid: Long): Result<String> {
+        // x/v1/dm/list.so now frequently answers HTTP 412 to otherwise valid
+        // clients (anti-crawl / IP reputation). comment.bilibili.com serves the
+        // same XML without cookies and is the primary source; keep the API
+        // endpoint as a fallback for networks where the CDN host is blocked.
+        val cdn = runCatching {
+            readDanmakuResponse(
+                api.getDanmakuXmlCdn("https://comment.bilibili.com/$cid.xml"),
+                "CDN",
+            )
+        }
+        if (cdn.isSuccess) return cdn
+        return runCatching {
+            readDanmakuResponse(api.getDanmakuXml(cid), "API")
+        }.onFailure { apiError ->
+            cdn.exceptionOrNull()?.let { apiError.addSuppressed(it) }
+        }
+    }
+
+    private fun readDanmakuResponse(
+        response: retrofit2.Response<okhttp3.ResponseBody>,
+        source: String,
+    ): String {
+        if (!response.isSuccessful) throw Exception("弹幕 $source HTTP ${response.code()}")
         val body = response.body() ?: throw Exception("弹幕为空")
         val raw = body.bytes()
         val encoding = response.headers()["Content-Encoding"].orEmpty().lowercase()
         val bytes = decodeDanmakuBody(raw, encoding)
         if (!looksLikeDanmakuXml(bytes)) throw Exception("弹幕格式无效")
-        String(bytes, Charsets.UTF_8)
+        return String(bytes, Charsets.UTF_8)
     }
 
     /** Parses a saved danmaku XML file (offline playback). */

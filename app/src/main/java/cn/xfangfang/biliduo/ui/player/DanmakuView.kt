@@ -146,6 +146,8 @@ class DanmakuView @JvmOverloads constructor(
         }
         this.player = player
         this.sourceItems = items
+        // Rebuilt when the list changes; the view may be reused by Compose.
+        layoutItems = null
         this.blockedWords = nextWords
         this.blockedRegex = nextRegex
         this.shieldLevel = nextLevel
