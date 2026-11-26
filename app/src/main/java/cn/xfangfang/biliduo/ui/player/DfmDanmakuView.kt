@@ -77,6 +77,7 @@ class DfmDanmakuView(context: Context) : FrameLayout(context) {
         speed: Float = 1f,
         textSizeSp: Float = 16f,
         area: Float = 1f,
+        stroke: Boolean = true,
         blockedWords: Set<String> = emptySet(),
         blockedRegex: String = "",
         shieldLevel: Int = 0,
@@ -95,6 +96,7 @@ class DfmDanmakuView(context: Context) : FrameLayout(context) {
         val renderKey = RenderKey(
             textSizeSp = nextSize,
             area = nextArea,
+            stroke = stroke,
             blockedWords = blockedWords.map { it.trim() }.filter { it.isNotEmpty() }.toSet(),
             blockedRegex = blockedRegex.trim(),
             shieldLevel = shieldLevel.coerceIn(0, 10),
@@ -118,6 +120,7 @@ class DfmDanmakuView(context: Context) : FrameLayout(context) {
             speed = nextSpeed,
             textSizeSp = nextSize,
             area = nextArea,
+            stroke = stroke,
             maxOnScreen = nextMax,
             allowOverlap = allowOverlap,
             renderKey = renderKey,
@@ -222,7 +225,7 @@ class DfmDanmakuView(context: Context) : FrameLayout(context) {
         // the viewport when the parser creates the first item.
         context.setScrollSpeedFactor(0.88f / binding.speed)
         applyOverlapPolicy(context, binding.allowOverlap)
-        applyTextStyle(context, binding.textSizeSp)
+        applyTextStyle(context, binding.textSizeSp, binding.stroke)
         areaDisplayer = areaView
         config = context
 
@@ -256,7 +259,7 @@ class DfmDanmakuView(context: Context) : FrameLayout(context) {
 
         // The viewport is now known; calibrate the scroll duration.
         applySpeed(binding.speed)
-        applyTextStyle(config, binding.textSizeSp)
+        applyTextStyle(config, binding.textSizeSp, binding.stroke)
         view.show()
         val position = player.currentPosition.coerceAtLeast(0L)
         view.start(position)
@@ -271,6 +274,7 @@ class DfmDanmakuView(context: Context) : FrameLayout(context) {
         context.setDanmakuTransparency(binding.opacity)
         context.setMaximumVisibleSizeInScreen(binding.maxOnScreen)
         applyOverlapPolicy(context, binding.allowOverlap)
+        applyTextStyle(context, binding.textSizeSp, binding.stroke)
         applySpeed(binding.speed)
         view.forceRender()
     }
@@ -294,16 +298,27 @@ class DfmDanmakuView(context: Context) : FrameLayout(context) {
         )
     }
 
-    private fun applyTextStyle(context: DanmakuContext?, textSizeSp: Float) {
+    private fun applyTextStyle(
+        context: DanmakuContext?,
+        textSizeSp: Float,
+        stroke: Boolean,
+    ) {
         context ?: return
-        val base = danmakuBaseTextPx(currentViewHeight(), textSizeSp)
+        // currentViewHeight() can be 1 during the first prepare() layout; use a
+        // floor so the stroke never becomes sub-pixel/invisible. onPrepared()
+        // recalculates it once the real viewport is known.
+        val base = danmakuBaseTextPx(currentViewHeight(), textSizeSp).coerceAtLeast(18f)
         context.setDanmakuBold(true)
         // Do not call setMarginTop(): it collapses the custom area displayer
         // to a single row. The displayer already uses the full view height.
-        context.setDanmakuStyle(
-            IDisplayer.DANMAKU_STYLE_STROKEN,
-            base * 0.08f,
-        )
+        if (stroke) {
+            context.setDanmakuStyle(
+                IDisplayer.DANMAKU_STYLE_STROKEN,
+                (base * 0.08f).coerceAtLeast(1.5f),
+            )
+        } else {
+            context.setDanmakuStyle(IDisplayer.DANMAKU_STYLE_NONE)
+        }
     }
 
     private fun preparePlayer(player: Player) {
@@ -374,6 +389,7 @@ class DfmDanmakuView(context: Context) : FrameLayout(context) {
     private data class RenderKey(
         val textSizeSp: Float,
         val area: Float,
+        val stroke: Boolean,
         val blockedWords: Set<String>,
         val blockedRegex: String,
         val shieldLevel: Int,
@@ -390,6 +406,7 @@ class DfmDanmakuView(context: Context) : FrameLayout(context) {
         val speed: Float,
         val textSizeSp: Float,
         val area: Float,
+        val stroke: Boolean,
         val maxOnScreen: Int,
         val allowOverlap: Boolean,
         val renderKey: RenderKey,

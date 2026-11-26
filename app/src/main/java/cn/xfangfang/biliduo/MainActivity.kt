@@ -40,13 +40,16 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
@@ -93,8 +96,11 @@ import cn.xfangfang.biliduo.ui.watchlater.WatchLaterScreen
 import cn.xfangfang.biliduo.ui.home.HomeScreen
 import cn.xfangfang.biliduo.ui.live.LiveConsoleScreen
 import cn.xfangfang.biliduo.ui.login.LoginScreen
+import cn.xfangfang.biliduo.ui.messages.MessageScreen
+import cn.xfangfang.biliduo.ui.messages.MessageViewModel
 import cn.xfangfang.biliduo.ui.navigation.Routes
 import cn.xfangfang.biliduo.ui.navigation.Screen
+import cn.xfangfang.biliduo.ui.pgc.PgcTimelineScreen
 import cn.xfangfang.biliduo.ui.player.PlayerConsoleScreen
 import cn.xfangfang.biliduo.ui.player.PlayerController
 import cn.xfangfang.biliduo.BuildConfig
@@ -475,6 +481,8 @@ private fun duoPageHint(route: String?, style: GamepadStyle): String? = when (ro
         "LB/RB 切类型 · L2/R2 排序 · ${style.confirmLabel} 输入/播放"
     Screen.Dynamic.route ->
         "LB/RB 全部/视频/图文 · L2/R2 UP 筛选 · ${style.actionLabel} 点赞/复制"
+    Screen.Message.route ->
+        "LB/RB 切分类 · ${style.confirmLabel} 打开视频"
     Screen.Profile.route -> "${style.confirmLabel} 进入"
     Routes.HISTORY -> "${style.confirmLabel} 播放"
     Routes.WATCH_LATER -> "${style.confirmLabel} 播放 · 移除按钮"
@@ -490,6 +498,8 @@ private fun duoPageHint(route: String?, style: GamepadStyle): String? = when (ro
         "LB/RB 切 tab · L2/R2 评论排序 · ${style.actionLabel} 弹幕 · START 弹幕/字幕"
     Routes.PGC_INDEX ->
         "LB/RB 索引类型 · ${style.confirmLabel} 筛选/进入 · ${style.backLabel} 返回"
+    Routes.PGC_TIMELINE ->
+        "方向键浏览 · ${style.confirmLabel} 进入番剧 · ${style.backLabel} 返回"
     Routes.LIVE_PLAYER -> "方向键/${style.confirmLabel} 切换评论与信息 · ${style.actionLabel} 弹幕 · START 弹幕设置"
     Routes.DETAIL, Routes.NOTE -> "方向键移动 · ${style.confirmLabel} 播放/进入"
     else -> null
@@ -538,6 +548,19 @@ fun MainScreen(
     val gamepadStyle by GamepadStyleStore.style.collectAsState()
     val updateInfo = updateViewModel?.available?.collectAsState()?.value
     val overlay by duoSession.overlay.collectAsState()
+    val messageViewModel: MessageViewModel = viewModel()
+    val messageState by messageViewModel.uiState.collectAsState()
+    val lifecycleOwner = LocalLifecycleOwner.current
+    LaunchedEffect(lifecycleOwner) {
+        // The rail badge should appear without opening the message center.
+        // Poll only while the UI is resumed; the app pauses in the background.
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            while (true) {
+                messageViewModel.refreshUnread()
+                delay(60_000L)
+            }
+        }
+    }
 
     val keyboard = LocalSoftwareKeyboardController.current
     val imeVisible = WindowInsets.isImeVisible
@@ -719,6 +742,9 @@ fun MainScreen(
                         onPgcIndexClick = { typeOrdinal ->
                             navController.navigate(Routes.pgcIndex(typeOrdinal))
                         },
+                        onPgcTimelineClick = {
+                            navController.navigate(Routes.PGC_TIMELINE)
+                        },
                         onLiveClick = { roomId ->
                             navController.navigate(Routes.live(roomId))
                         },
@@ -747,9 +773,20 @@ fun MainScreen(
                     )
                 }
 
+                composable(Routes.PGC_TIMELINE) {
+                    PgcTimelineScreen(
+                        onBack = { navController.popBackStack() },
+                        onPgcClick = { seasonId ->
+                            navController.navigate(Routes.pgc(seasonId))
+                        },
+                        onTopAmbient = onTopAmbient,
+                        onFocusCleared = onTopFocusCleared,
+                        session = duoSession,
+                    )
+                }
+
                 composable(Screen.Dynamic.route) {
-                    DynamicScreen(
-                        onVideoClick = { bvid ->
+                    DynamicScreen(                        onVideoClick = { bvid ->
                             navController.navigate(Routes.player(bvid))
                         },
                         onLogin = { navController.navigate(Routes.LOGIN) },
@@ -758,6 +795,20 @@ fun MainScreen(
                         onFocusCleared = onTopFocusCleared,
                         onDynamicReader = onTopDynamicReader,
                         onTopAmbient = onTopAmbient,
+                    )
+                }
+
+                composable(Screen.Message.route) {
+                    MessageScreen(
+                        onBack = { navController.popBackStack() },
+                        onLogin = { navController.navigate(Routes.LOGIN) },
+                        onOpenVideo = { bvid ->
+                            navController.navigate(Routes.player(bvid))
+                        },
+                        onTopAmbient = onTopAmbient,
+                        onFocusCleared = onTopFocusCleared,
+                        session = duoSession,
+                        viewModel = messageViewModel,
                     )
                 }
 
@@ -791,11 +842,13 @@ fun MainScreen(
                     onLoginClick = { navController.navigate(Routes.LOGIN) },
                     onHistoryClick = { navController.navigate(Routes.HISTORY) },
                     onWatchLaterClick = { navController.navigate(Routes.WATCH_LATER) },
+                    onMessagesClick = { navController.navigate(Screen.Message.route) },
                     onMyFollowsClick = { navController.navigate(Routes.MY_FOLLOWS) },
                     onFavoritesClick = { navController.navigate(Routes.FAVORITES) },
                     onFollowingClick = { navController.navigate(Routes.FOLLOWING) },
                     onDownloadsClick = { navController.navigate(Routes.DOWNLOADS) },
                     onSettingsClick = { navController.navigate(Routes.SETTINGS) },
+                    messageUnread = messageState.unread,
                     onTopPerson = onTopPerson,
                     onTopAmbient = onTopAmbient,
                     session = duoSession,

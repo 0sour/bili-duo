@@ -25,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.outlined.Bookmarks
+import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.History
@@ -72,6 +73,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import cn.xfangfang.biliduo.duo.DuoSessionViewModel
 import cn.xfangfang.biliduo.ui.theme.DuoTheme
+import kotlinx.coroutines.flow.first
 import cn.xfangfang.biliduo.ui.common.DuoPalette
 import cn.xfangfang.biliduo.ui.duo.requestPageFocus
 import cn.xfangfang.biliduo.ui.duo.restoreDuoPageFocusLater
@@ -99,11 +101,13 @@ fun ProfileScreen(
     onLoginClick: () -> Unit = {},
     onHistoryClick: () -> Unit = {},
     onWatchLaterClick: () -> Unit = {},
+    onMessagesClick: () -> Unit = {},
     onMyFollowsClick: () -> Unit = {},
     onFavoritesClick: () -> Unit = {},
     onFollowingClick: () -> Unit = {},
     onDownloadsClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
+    messageUnread: Int = 0,
     onTopPerson: (TopPersonUi) -> Unit = {},
     onTopAmbient: (TopAmbientUi) -> Unit = {},
     session: DuoSessionViewModel? = null,
@@ -114,7 +118,15 @@ fun ProfileScreen(
 ) {
     val state by profileStateWithLifecycleEvents(viewModel)
     var showLogoutConfirm by rememberSaveable { mutableStateOf(false) }
-    val menuFocuses = remember { List(7) { FocusRequester() } }
+    val menuFocuses = remember { List(8) { FocusRequester() } }
+    // Returning from a secondary page (history/messages/...) should put the
+    // ring back on the entry that opened it, not on 观看历史.
+    var lastMenuIndex by rememberSaveable { mutableStateOf(-1) }
+    // While the return-to-Profile focus restore is in flight, the default
+    // first-row focus must not paint a ring on 观看历史; otherwise the user
+    // sees the ring jump 观看历史 → the entry they actually opened.
+    var focusRestorePending by remember { mutableStateOf(lastMenuIndex >= 0) }
+    val lifecycleOwner = LocalLifecycleOwner.current
     val swapFocus = remember { FocusRequester() }
     val logoutFocus = remember { FocusRequester() }
     val menuScroll = rememberScrollState()
@@ -124,6 +136,37 @@ fun ProfileScreen(
     // on the control screen. Both swap together with the layout.
     val videoScreen = if (displaySwapped) "下屏" else "上屏"
     val controlScreen = if (displaySwapped) "上屏" else "下屏"
+
+    LaunchedEffect(Unit) {
+        val index = lastMenuIndex
+        if (index in menuFocuses.indices) {
+            // Saveable state survives the trip to a secondary page; the rail
+            // lock still wins when the user returns through the rail.
+            // NavHost focuses the first focusable of the entering destination
+            // while the pop transition runs; non-target rows are `canFocus =
+            // false` until this restore lands so 观看历史 never takes focus or
+            // scrolls the menu back to the top.
+            lifecycleOwner.lifecycle.currentStateFlow.first {
+                it == Lifecycle.State.STARTED || it == Lifecycle.State.RESUMED
+            }
+            menuFocuses[index].requestPageFocus()
+            lifecycleOwner.lifecycle.currentStateFlow.first {
+                it == Lifecycle.State.RESUMED
+            }
+            menuFocuses[index].requestPageFocus()
+            delay(60)
+            menuFocuses[index].requestPageFocus()
+        }
+    }
+    LaunchedEffect(Unit) {
+        // If the restore never lands (rail lock, display swap), re-enable the
+        // normal ring/focus traversal shortly after the pop transition instead
+        // of leaving the menu without any focus indicator.
+        if (focusRestorePending) {
+            delay(400)
+            focusRestorePending = false
+        }
+    }
 
     LaunchedEffect(
         state.isLoggedIn,
@@ -167,8 +210,13 @@ fun ProfileScreen(
     }
 
     LaunchedEffect(Unit) {
-        delay(80)
-        runCatching { menuFocuses[0].requestPageFocus() }
+        // Only the first visit defaults to 观看历史. When returning from a
+        // secondary page the restore effect owns focus; an unconditional
+        // request here used to bounce the ring back to the first row.
+        if (lastMenuIndex < 0) {
+            delay(80)
+            menuFocuses[0].requestPageFocus()
+        }
     }
 
     LaunchedEffect(showLogoutConfirm) {
@@ -224,6 +272,7 @@ fun ProfileScreen(
             ProfileHeader(
                 state = state,
                 logoutFocus = logoutFocus,
+                focusEnabled = !focusRestorePending,
                 onLoginClick = onLoginClick,
                 onLogoutClick = {
                     restoreLogoutFocus = true
@@ -243,6 +292,7 @@ fun ProfileScreen(
                     DisplaySwapButton(
                         swapped = displaySwapped,
                         focusRequester = swapFocus,
+                        focusEnabled = !focusRestorePending,
                         modifier = Modifier
                             .fillMaxWidth()
                             .focusProperties { down = menuFocuses[0] },
@@ -253,6 +303,16 @@ fun ProfileScreen(
                 val entries = listOf(
                     ProfileMenuEntry("观看历史", Icons.Outlined.History, onHistoryClick),
                     ProfileMenuEntry("稍后再看", Icons.Outlined.WatchLater, onWatchLaterClick),
+                    ProfileMenuEntry(
+                        label = "消息",
+                        icon = Icons.Outlined.Email,
+                        onClick = onMessagesClick,
+                        badge = if (messageUnread > 0) {
+                            if (messageUnread > 99) "99+" else "$messageUnread"
+                        } else {
+                            null
+                        },
+                    ),
                     ProfileMenuEntry("追番追剧", Icons.Outlined.Bookmarks, onMyFollowsClick),
                     ProfileMenuEntry("我的收藏", Icons.Outlined.FavoriteBorder, onFavoritesClick),
                     ProfileMenuEntry("我的关注", Icons.Outlined.PersonAdd, onFollowingClick),
@@ -260,8 +320,27 @@ fun ProfileScreen(
                     ProfileMenuEntry("设置", Icons.Outlined.Settings, onSettingsClick),
                 )
                 entries.forEachIndexed { index, entry ->
+                    val isRestoreTarget = index == lastMenuIndex
                     ProfileMenuRow(
-                        entry = entry,
+                        entry = entry.copy(
+                            onClick = {
+                                lastMenuIndex = index
+                                entry.onClick()
+                            },
+                        ),
+                        // Hide the wrong default focus (first row) while the
+                        // restore is in flight; only the target may paint.
+                        showFocus = !focusRestorePending || isRestoreTarget,
+                        // Block non-target rows from taking focus at all during
+                        // the pop transition: NavHost requests the first
+                        // focusable on entry, which would also scroll the menu
+                        // back to the top before the restore lands.
+                        canTakeFocus = !focusRestorePending || isRestoreTarget,
+                        onFocusedChange = { focused ->
+                            if (focused && isRestoreTarget) {
+                                focusRestorePending = false
+                            }
+                        },
                         modifier = Modifier
                             .focusRequester(menuFocuses[index])
                             .then(
@@ -350,12 +429,14 @@ private data class ProfileMenuEntry(
     val label: String,
     val icon: ImageVector,
     val onClick: () -> Unit,
+    val badge: String? = null,
 )
 
 @Composable
 private fun ProfileHeader(
     state: ProfileUiState,
     logoutFocus: FocusRequester,
+    focusEnabled: Boolean = true,
     onLoginClick: () -> Unit,
     onLogoutClick: () -> Unit,
 ) {
@@ -471,6 +552,7 @@ private fun ProfileHeader(
                 modifier = Modifier
                     .height(32.dp)
                     .focusRequester(logoutFocus)
+                    .focusProperties { if (!focusEnabled) canFocus = false }
                     .duoFocusRing(RoundedCornerShape(8.dp))
                     .clip(RoundedCornerShape(8.dp))
                     .border(1.dp, ProfileOutline, RoundedCornerShape(8.dp))
@@ -484,6 +566,7 @@ private fun ProfileHeader(
             Box(
                 modifier = Modifier
                     .height(32.dp)
+                    .focusProperties { if (!focusEnabled) canFocus = false }
                     .duoFocusRing(RoundedCornerShape(8.dp))
                     .clip(RoundedCornerShape(8.dp))
                     .background(ProfilePink)
@@ -506,6 +589,7 @@ private fun ProfileHeader(
 private fun DisplaySwapButton(
     swapped: Boolean,
     focusRequester: FocusRequester,
+    focusEnabled: Boolean = true,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
@@ -516,6 +600,7 @@ private fun DisplaySwapButton(
     Box(
         modifier = modifier
             .focusRequester(focusRequester)
+            .focusProperties { if (!focusEnabled) canFocus = false }
             .onFocusChanged { focused = it.isFocused }
             .duoClickable(onClick = onClick)
             .padding(vertical = 7.dp),
@@ -579,16 +664,24 @@ private fun DisplaySwapButton(
 private fun ProfileMenuRow(
     entry: ProfileMenuEntry,
     modifier: Modifier = Modifier,
+    showFocus: Boolean = true,
+    canTakeFocus: Boolean = true,
+    onFocusedChange: (Boolean) -> Unit = {},
 ) {
     var focused by remember { mutableStateOf(false) }
+    val active = focused && showFocus
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .focusProperties { if (!canTakeFocus) canFocus = false }
             .height(48.dp)
-            .duoFocusRing(RoundedCornerShape(8.dp))
+            .duoFocusRing(RoundedCornerShape(8.dp), focused = active)
             .clip(RoundedCornerShape(8.dp))
-            .background(if (focused) ProfileSurface else Color.Transparent)
-            .onFocusChanged { focused = it.isFocused }
+            .background(if (active) ProfileSurface else Color.Transparent)
+            .onFocusChanged {
+                focused = it.isFocused
+                onFocusedChange(it.isFocused)
+            }
             .duoClickable(onClick = entry.onClick)
             .padding(horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -596,7 +689,7 @@ private fun ProfileMenuRow(
         Icon(
             imageVector = entry.icon,
             contentDescription = null,
-            tint = if (focused) ProfilePink else ProfileSecondary,
+            tint = if (active) ProfilePink else ProfileSecondary,
             modifier = Modifier.size(20.dp),
         )
         Spacer(Modifier.width(14.dp))
@@ -606,6 +699,24 @@ private fun ProfileMenuRow(
             fontSize = 13.sp,
             modifier = Modifier.weight(1f),
         )
+        entry.badge?.let { badge ->
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(ProfilePink)
+                    .padding(horizontal = 7.dp, vertical = 2.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = badge,
+                    color = ProfileOnPink,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                )
+            }
+            Spacer(Modifier.width(6.dp))
+        }
         Icon(
             imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
             contentDescription = null,

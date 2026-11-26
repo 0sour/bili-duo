@@ -175,3 +175,34 @@ data class PgcIndexItem(
 data class PgcIndexRating(
     val score: Float = 0f,
 )
+
+/** One day of `pgc/web/timeline` (before=6 + today + after=6). */
+data class PgcTimelineDay(
+    /** e.g. "11-19" (no year). */
+    val date: String? = null,
+    @SerializedName("date_ts") val dateTs: Long? = null,
+    @SerializedName("day_of_week") val dayOfWeek: Int? = null,
+    @SerializedName("is_today") val isToday: Int? = null,
+    val episodes: List<PgcTimelineEpisode>? = null,
+)
+
+data class PgcTimelineEpisode(
+    @SerializedName("season_id") val seasonId: Long? = null,
+    @SerializedName("episode_id") val episodeId: Long? = null,
+    val title: String? = null,
+    val cover: String? = null,
+    @SerializedName("square_cover") val squareCover: String? = null,
+    @SerializedName("ep_cover") val epCover: String? = null,
+    /** e.g. "第19话~第20话" or "全12话". */
+    @SerializedName("pub_index") val pubIndex: String? = null,
+    /** e.g. "10:00". */
+    @SerializedName("pub_time") val pubTime: String? = null,
+    @SerializedName("pub_ts") val pubTs: Long? = null,
+    val published: Int? = null,
+    val delay: Int? = null,
+    @SerializedName("delay_reason") val delayReason: String? = null,
+    /** "-" when unknown. */
+    val follows: String? = null,
+    /** "-" when unknown. */
+    val plays: String? = null,
+)

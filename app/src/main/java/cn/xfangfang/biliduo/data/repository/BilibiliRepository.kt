@@ -547,6 +547,90 @@ class BilibiliRepository(
         }.onFailure { Log.e(BilibiliApp.TAG, "likeDynamic failed: dynId=$dynId", it) }
     }
 
+    /** Unread message counts; all zero when logged out. */
+    suspend fun getMessageUnread(): Result<MessageUnread> {
+        if (BilibiliApi.parseSelfMid() == null) {
+            return Result.success(MessageUnread(total = 0, reply = 0, at = 0, like = 0))
+        }
+        return runCatching {
+            val response = api.getMessageUnread()
+            if (response.code != 0) throw Exception(response.message)
+            val data = response.data
+            val reply = data?.unreadReply ?: 0
+            val at = data?.unreadAt ?: 0
+            val like = data?.unreadLike ?: 0
+            MessageUnread(
+                total = data?.unreadCount ?: (reply + at + like),
+                reply = reply,
+                at = at,
+                like = like,
+            )
+        }.onFailure { Log.e(BilibiliApp.TAG, "getMessageUnread failed", it) }
+    }
+
+    /**
+     * One cursor page of the message center. `id`/[time] are the previous
+     * page's cursor; both stay 0 for the first page.
+     */
+    suspend fun getMessagePage(
+        kind: MessageFeedKind,
+        id: Long = 0,
+        time: Long = 0,
+    ): Result<MsgFeedPage> {
+        if (BilibiliApi.parseSelfMid() == null) return Result.failure(Exception("请先登录"))
+        return runCatching {
+            val items: List<MsgFeedItem>
+            val cursor: MsgFeedCursor?
+            when (kind) {
+                MessageFeedKind.REPLY -> {
+                    val response = api.getMessageReplies(id = id, replyTime = time)
+                    if (response.code != 0) throw Exception(response.message)
+                    items = response.data?.items.orEmpty()
+                    cursor = response.data?.cursor
+                }
+                MessageFeedKind.AT -> {
+                    val response = api.getMessageAts(id = id, atTime = time)
+                    if (response.code != 0) throw Exception(response.message)
+                    items = response.data?.items.orEmpty()
+                    cursor = response.data?.cursor
+                }
+                MessageFeedKind.LIKE -> {
+                    val response = api.getMessageLikes(id = id, likeTime = time)
+                    if (response.code != 0) throw Exception(response.message)
+                    items = response.data?.total?.items.orEmpty()
+                    cursor = response.data?.total?.cursor
+                }
+            }
+            MsgFeedPage(
+                items = items,
+                nextId = cursor?.id ?: 0L,
+                nextTime = cursor?.time ?: 0L,
+                isEnd = cursor?.isEnd ?: items.isEmpty(),
+            )
+        }.onFailure { Log.e(BilibiliApp.TAG, "getMessagePage failed: kind=$kind", it) }
+    }
+
+    suspend fun getVideoBvidByAid(aid: Long): Result<String> {
+        return runCatching {
+            val response = api.getVideoInfoByAid(aid)
+            if (response.code != 0) throw Exception(response.message)
+            response.data?.bvid?.takeIf { it.isNotBlank() }
+                ?: throw Exception("视频不存在")
+        }.onFailure { Log.e(BilibiliApp.TAG, "getVideoBvidByAid failed: aid=$aid", it) }
+    }
+
+    suspend fun getPgcTimeline(
+        types: String = "1,2",
+        before: Int = 6,
+        after: Int = 6,
+    ): Result<List<PgcTimelineDay>> {
+        return runCatching {
+            val response = api.getPgcTimeline(types = types, before = before, after = after)
+            if (response.code != 0) throw Exception(response.message)
+            response.result.orEmpty()
+        }.onFailure { Log.e(BilibiliApp.TAG, "getPgcTimeline failed", it) }
+    }
+
     suspend fun getFollowedLiveAnchors(): Result<List<LiveFollowedAnchor>> {
         val selfMid = BilibiliApi.parseSelfMid()
             ?: return Result.success(emptyList())

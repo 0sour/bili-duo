@@ -5,6 +5,7 @@ import androidx.compose.material.icons.filled.DynamicFeed
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.Email
 import androidx.compose.ui.graphics.vector.ImageVector
 
 sealed class Screen(
@@ -14,6 +15,7 @@ sealed class Screen(
 ) {
     data object Home : Screen("home", "首页", Icons.Default.Home)
     data object Dynamic : Screen("dynamic", "动态", Icons.Default.DynamicFeed)
+    data object Message : Screen("message", "消息", Icons.Outlined.Email)
     data object Search : Screen("search", "搜索", Icons.Default.Search)
     data object Profile : Screen("profile", "个人", Icons.Default.Person)
 }
@@ -25,6 +27,7 @@ object Routes {
     const val DOWNLOAD_PLAY = "download/{bvid}/{cid}"
     const val PGC_PLAYER = "pgc/{seasonId}"
     const val PGC_INDEX = "pgc_index/{indexType}"
+    const val PGC_TIMELINE = "pgc_timeline"
     const val LIVE_PLAYER = "live/{roomId}"
     const val LOGIN = "login"
     const val HISTORY = "history"

@@ -84,6 +84,10 @@ interface BilibiliApi {
     @GET("x/web-interface/view")
     suspend fun getVideoInfo(@Query("bvid") bvid: String): ApiResponse<VideoInfo>
 
+    /** Message-center rows only carry the numeric aid, so resolve it to a BV. */
+    @GET("x/web-interface/view")
+    suspend fun getVideoInfoByAid(@Query("aid") aid: Long): ApiResponse<VideoInfo>
+
     @GET("x/web-interface/archive/related")
     suspend fun getRelatedVideos(@Query("bvid") bvid: String): ApiResponse<List<RelatedVideoItem>>
 
@@ -277,6 +281,39 @@ interface BilibiliApi {
         @Query("csrf") csrf: String,
         @Body body: DynamicLikeRequest,
     ): ApiResponse<Any>
+
+    // ---- Message center ----
+
+    @GET("x/msgfeed/unread")
+    suspend fun getMessageUnread(): ApiResponse<MsgUnreadData>
+
+    @GET("x/msgfeed/reply")
+    suspend fun getMessageReplies(
+        @Query("id") id: Long = 0,
+        @Query("reply_time") replyTime: Long = 0,
+    ): ApiResponse<MsgFeedData>
+
+    @GET("x/msgfeed/at")
+    suspend fun getMessageAts(
+        @Query("id") id: Long = 0,
+        @Query("at_time") atTime: Long = 0,
+    ): ApiResponse<MsgFeedData>
+
+    /** The like feed nests its items under `total`; see [MsgLikeData]. */
+    @GET("x/msgfeed/like")
+    suspend fun getMessageLikes(
+        @Query("id") id: Long = 0,
+        @Query("like_time") likeTime: Long = 0,
+    ): ApiResponse<MsgLikeData>
+
+    // ---- PGC timeline ----
+
+    @GET("pgc/web/timeline")
+    suspend fun getPgcTimeline(
+        @Query("types") types: String = "1,2",
+        @Query("before") before: Int = 6,
+        @Query("after") after: Int = 6,
+    ): PgcApiResponse<List<PgcTimelineDay>>
 
     @GET("https://api.live.bilibili.com/room/v1/Danmu/getConf")
     suspend fun getLiveDanmakuConf(
@@ -970,8 +1007,10 @@ interface BilibiliApi {
                         !isLiveApi
                     val isLiveCdn = isCdn && url.contains("bilivideo.com") && url.contains("/live")
                     val isSpaceApi = !isCdn && ((url.contains("/x/space/") && !url.contains("acc/info")) || url.contains("/web-space/"))
+                    val isMsgApi = !isCdn && url.contains("/x/msgfeed/")
                     val spaceOrigin = "https://space.bilibili.com"
                     val liveOrigin = "https://live.bilibili.com"
+                    val msgOrigin = "https://message.bilibili.com"
                     val apiOrigin = "https://www.bilibili.com"
                     val builder = orig.newBuilder()
                         .header(
@@ -979,6 +1018,7 @@ interface BilibiliApi {
                             when {
                                 isLiveApi || isLiveCdn -> "$liveOrigin/"
                                 isSpaceApi -> "$spaceOrigin/"
+                                isMsgApi -> "$msgOrigin/"
                                 else -> "$apiOrigin/"
                             },
                         )
@@ -1019,7 +1059,7 @@ interface BilibiliApi {
                         val skipCookie = replyPage && pn > 1
 
                         builder.header("User-Agent", "Mozilla/5.0 (Linux; Android ${Build.VERSION.SDK_INT}; ${Build.MANUFACTURER} ${Build.MODEL}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36")
-                            .header("Origin", apiOrigin)
+                            .header("Origin", if (isMsgApi) msgOrigin else apiOrigin)
                         if (!skipCookie) {
                             builder.header("Cookie", buildString {
                                 append("buvid3=$buvid3; buvid4=${buvid4.ifBlank { buvid3 }}")

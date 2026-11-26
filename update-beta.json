@@ -1,21 +1,21 @@
 {
-  "versionCode": 64,
-  "versionName": "0.2.0-rc63",
-  "tag": "v0.2.0-rc63",
+  "versionCode": 65,
+  "versionName": "0.2.0-rc64",
+  "tag": "v0.2.0-rc64",
   "downloads": [
     {
       "name": "cn",
-      "url": "https://bili-duo.sourden.xyz/releases/bili-duo-0.2.0-rc63-release.apk"
+      "url": "https://bili-duo.sourden.xyz/releases/bili-duo-0.2.0-rc64-release.apk"
     },
     {
       "name": "github",
-      "url": "https://github.com/0sour/bili-duo/releases/download/v0.2.0-rc63/bili-duo-0.2.0-rc63-release.apk"
+      "url": "https://github.com/0sour/bili-duo/releases/download/v0.2.0-rc64/bili-duo-0.2.0-rc64-release.apk"
     }
   ],
-  "size": 4547348,
-  "sha256": "a89f7c257ee48335052c0a07225dd1a5e13b01547e3b6ca6ee1732b58433a8d5",
-  "notes": "· 视频弹幕升级为 DanmakuFlameMaster（DFM）：密集场景同屏数量更高，滚动弹幕占满屏幕，固定顶/底可与滚动重叠；自研 Canvas 引擎已移除\n· 修复关闭选择弹窗/播放设置/直播设置后快速按方向键被吞、焦点环回闪；同步覆盖历史/收藏/关注/下载/稍后再看/设置确认层\n· 保留「泳道满时」开关（默认丢弃超出，可允许重叠）；设置→弹幕不再提供引擎切换\n· 直播弹幕保持原实时引擎，本次不迁移\n· 安装：rc63 release 可覆盖安装 rc61/rc62 本地测试包（同 release key）；288 单测通过",
-  "publishedAt": "2026-11-23T12:40:19Z",
+  "size": 4582136,
+  "sha256": "e1bc7dc26c3e6cf08274e2e4ea3d32196c95295a48de5a4d1d2f967183c03316",
+  "notes": "· 新增「消息中心」：个人页「消息」行进入，回复我的/@我的/收到的赞三类，未读数胶囊；确认键打开对应视频\n· 新增「新番时间表」：番剧/影视页头入口，打开定位今天并聚焦之后首个更新；从播放页返回回到刚才的剧集\n· 个人页从二级页返回时焦点直接回到入口行，不再先闪「观看历史」、菜单不再滚回顶部\n· 直播：从「关注的主播」头像进入直播间，退出时焦点回到该头像\n· 视频弹幕新增「有/无描边」设置；修复首次播放描边宽度近似 0、需要打开菜单才生效\n· 评论多图缩略图间距加大并限制宽度，焦点环不再压到相邻图片\n· 播放页「合集」改为带封面/播放数/时长的卡片，保留 1、2、3 序号徽章\n· 308 单测通过；rc64 release 可覆盖安装 rc63（同 release key）",
+  "publishedAt": "2026-11-26T09:29:16Z",
   "minSdk": 24,
   "channel": "beta"
 }

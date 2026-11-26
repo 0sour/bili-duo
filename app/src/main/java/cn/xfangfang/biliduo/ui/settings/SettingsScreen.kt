@@ -540,6 +540,7 @@ fun SettingsScreen(
                         onSpeed = { playerViewModel?.setDanmakuSpeed(it) },
                         onSize = { playerViewModel?.setDanmakuTextSize(it) },
                         onArea = { playerViewModel?.setDanmakuArea(it) },
+                        onStroke = { playerViewModel?.setDanmakuStroke(it) },
                         onMax = { playerViewModel?.setDanmakuMaxOnScreen(it) },
                         onShieldLevel = { playerViewModel?.setDanmakuShieldLevel(it) },
                         onShowScroll = { playerViewModel?.setDanmakuShowScroll(it) },
@@ -1088,6 +1089,7 @@ private fun DanmakuSettings(
     onSpeed: (Float) -> Unit,
     onSize: (Float) -> Unit,
     onArea: (Float) -> Unit,
+    onStroke: (Boolean) -> Unit,
     onMax: (Int) -> Unit,
     onShieldLevel: (Int) -> Unit,
     onShowScroll: (Boolean) -> Unit,
@@ -1120,6 +1122,7 @@ private fun DanmakuSettings(
     val speed = ui?.danmakuSpeed ?: 1f
     val size = ui?.danmakuTextSize ?: 16f
     val area = ui?.danmakuArea ?: 1f
+    val stroke = ui?.danmakuStroke ?: true
     val max = ui?.danmakuMaxOnScreen ?: 0
     val shieldLevel = ui?.danmakuShieldLevel ?: 0
     val showScroll = ui?.danmakuShowScroll ?: true
@@ -1242,6 +1245,16 @@ private fun DanmakuSettings(
                 )
             },
             onSelect = { index -> onArea(danmakuAreaOptions[index]) },
+            modifier = noRight,
+        )
+        SettingsValueRow(
+            title = "弹幕描边",
+            value = if (stroke) "有描边" else "无描边",
+            options = listOf(
+                DuoChoiceOption(label = "有描边", selected = stroke),
+                DuoChoiceOption(label = "无描边", selected = !stroke),
+            ),
+            onSelect = { index -> onStroke(index == 0) },
             modifier = noRight,
         )
         SettingsValueRow(

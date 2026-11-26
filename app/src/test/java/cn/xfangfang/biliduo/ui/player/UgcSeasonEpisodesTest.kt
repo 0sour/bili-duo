@@ -5,6 +5,7 @@ import cn.xfangfang.biliduo.data.model.UgcSeasonEpisode
 import cn.xfangfang.biliduo.data.model.UgcSeasonEpisodeArc
 import cn.xfangfang.biliduo.data.model.UgcSeasonEpisodePage
 import cn.xfangfang.biliduo.data.model.UgcSeasonSection
+import cn.xfangfang.biliduo.data.model.VideoStat
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -24,7 +25,11 @@ class UgcSeasonEpisodesTest {
                             bvid = "BV1",
                             cid = 11,
                             title = "第一集",
-                            arc = UgcSeasonEpisodeArc(duration = 60),
+                            arc = UgcSeasonEpisodeArc(
+                                pic = "//i0.hdslb.com/bfs/archive/cover.jpg",
+                                duration = 60,
+                                stat = VideoStat(view = 12345),
+                            ),
                         ),
                         UgcSeasonEpisode(
                             bvid = "BV2",
@@ -40,7 +45,11 @@ class UgcSeasonEpisodesTest {
 
         assertEquals(
             listOf(
-                SeasonEpisodeUi("BV1", 11, "第一集", 60, "第一节"),
+                SeasonEpisodeUi(
+                    "BV1", 11, "第一集", 60, "第一节",
+                    cover = "//i0.hdslb.com/bfs/archive/cover.jpg",
+                    viewCount = 12345,
+                ),
                 SeasonEpisodeUi("BV2", 22, "第二集", 120, "第一节"),
             ),
             season.episodeItems(),

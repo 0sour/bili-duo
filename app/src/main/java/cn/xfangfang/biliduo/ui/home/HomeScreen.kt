@@ -130,6 +130,7 @@ fun HomeScreen(
     onVideoClick: (String) -> Unit,
     onPgcClick: (Long) -> Unit = {},
     onPgcIndexClick: (Int) -> Unit = {},
+    onPgcTimelineClick: () -> Unit = {},
     onLiveClick: (Long) -> Unit = {},
     onVideoFocused: (TopPreviewUi) -> Unit = {},
     onFocusCleared: () -> Unit = {},
@@ -157,8 +158,14 @@ fun HomeScreen(
     val tabFocuses = remember { List(HomeTab.entries.size) { FocusRequester() } }
     val refreshFocus = remember { FocusRequester() }
     val indexFocus = remember { FocusRequester() }
+    val timelineFocus = remember { FocusRequester() }
     val areaFocus = remember { FocusRequester() }
     val followedFocus = remember { FocusRequester() }
+    val followedFocusers = remember(state.liveFollowed) {
+        List(state.liveFollowed.size) { index ->
+            if (index == 0) followedFocus else FocusRequester()
+        }
+    }
     val subAreaFocus = remember { FocusRequester() }
     val areaFocusers = remember(state.liveAreas) {
         List(state.liveAreas.size) { FocusRequester() }
@@ -228,7 +235,7 @@ fun HomeScreen(
         }
     }
 
-    LaunchedEffect(state.tab, firstKey, itemsEmpty, tabFocusTarget) {
+    LaunchedEffect(state.tab, firstKey, state.liveFollowed.size, itemsEmpty, tabFocusTarget) {
         if (itemsEmpty || tabFocusTarget != TabFocusTarget.CONTENT) return@LaunchedEffect
         delay(80L)
         val savedKey = lastFocusedKey
@@ -243,7 +250,20 @@ fun HomeScreen(
                 state.items.indexOfFirst { it.bvid == bvid }
             } ?: -1
         }
+        val followedIndex = if (isLive && savedKey?.startsWith("followed:") == true) {
+            val parts = savedKey.split(':', limit = 3)
+            val uid = parts.getOrNull(1)?.toLongOrNull()
+            val roomId = parts.getOrNull(2)?.toLongOrNull()
+            state.liveFollowed.indexOfFirst { it.uid == uid && it.roomId == roomId }
+        } else {
+            -1
+        }
         when {
+            followedIndex >= 0 -> {
+                followedFocusers.getOrNull(followedIndex)?.let {
+                    runCatching { it.requestPageFocus() }
+                }
+            }
             savedIndex > 0 && isLive -> liveNavigator.focus(savedIndex, state.liveItems.size)
             savedIndex > 0 && isPgc -> pgcNavigator.focus(savedIndex, state.pgcItems.size)
             savedIndex > 0 -> videoNavigator.focus(savedIndex, state.items.size)
@@ -447,6 +467,8 @@ fun HomeScreen(
             isRefreshing = state.isLoading,
             refreshFocus = refreshFocus,
             indexFocus = indexFocus,
+            timelineFocus = timelineFocus,
+            onTimeline = if (state.tab.isPgc) onPgcTimelineClick else null,
             onIndex = if (state.tab.isPgc) {
                 {
                     onPgcIndexClick(if (state.tab == HomeTab.ANIME) 0 else 1)
@@ -513,6 +535,7 @@ fun HomeScreen(
                     firstFocus = firstFocus,
                     areaFocus = areaFocus,
                     followedFocus = followedFocus,
+                    followedFocusRequesters = followedFocusers,
                     subAreaFocus = subAreaFocus,
                     areaFocusRequesters = areaFocusers,
                     subAreaFocusRequesters = subAreaFocusers,
@@ -532,7 +555,7 @@ fun HomeScreen(
                         onLiveClick(room.roomId)
                     },
                     onFollowedClick = { anchor ->
-                        lastFocusedKey = "live:${anchor.roomId}"
+                        lastFocusedKey = "followed:${anchor.uid}:${anchor.roomId}"
                         onLiveClick(anchor.roomId)
                     },
                 )
@@ -799,6 +822,8 @@ private fun HomeHeader(
     isRefreshing: Boolean,
     refreshFocus: FocusRequester,
     indexFocus: FocusRequester,
+    timelineFocus: FocusRequester,
+    onTimeline: (() -> Unit)?,
     onIndex: (() -> Unit)?,
     downFocus: FocusRequester?,
 ) {
@@ -819,6 +844,29 @@ private fun HomeHeader(
             Spacer(Modifier.width(16.dp))
         }
         Spacer(Modifier.weight(1f))
+        if (onTimeline != null) {
+            Box(
+                modifier = Modifier
+                    .height(32.dp)
+                    .focusRequester(timelineFocus)
+                    .duoFocusRing(RoundedCornerShape(8.dp))
+                    .then(
+                        if (downFocus != null) {
+                            Modifier.focusProperties { down = downFocus }
+                        } else {
+                            Modifier
+                        }
+                    )
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(HomeCardBg)
+                    .duoClickable(onClick = onTimeline)
+                    .padding(horizontal = 10.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("时间表", color = HomeSecondary, fontSize = 11.sp)
+            }
+            Spacer(Modifier.width(6.dp))
+        }
         if (onIndex != null) {
             Box(
                 modifier = Modifier
@@ -924,6 +972,7 @@ private fun LiveSection(
     firstFocus: FocusRequester,
     areaFocus: FocusRequester,
     followedFocus: FocusRequester,
+    followedFocusRequesters: List<FocusRequester> = emptyList(),
     subAreaFocus: FocusRequester,
     areaFocusRequesters: List<FocusRequester> = emptyList(),
     subAreaFocusRequesters: List<FocusRequester> = emptyList(),
@@ -1074,7 +1123,7 @@ private fun LiveSection(
                 if (followed.isNotEmpty()) {
                     LiveFollowedRow(
                         followed = followed,
-                        firstFocus = followedFocus,
+                        focusers = followedFocusRequesters,
                         upFocusRequester = if (subAreas.isNotEmpty()) subAreaFocus else areaFocus,
                         downFocusRequester = firstFocus,
                         onClick = onFollowedClick,
@@ -1220,7 +1269,7 @@ private fun LiveAreaChip(
 @Composable
 private fun LiveFollowedRow(
     followed: List<LiveFollowedAnchor>,
-    firstFocus: FocusRequester,
+    focusers: List<FocusRequester>,
     upFocusRequester: FocusRequester,
     downFocusRequester: FocusRequester,
     onClick: (LiveFollowedAnchor) -> Unit,
@@ -1250,13 +1299,12 @@ private fun LiveFollowedRow(
             contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 7.dp, bottom = 7.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            items(followed, key = { it.uid }) { anchor ->
+            itemsIndexed(followed, key = { _, anchor -> anchor.uid }) { index, anchor ->
                 Column(
                     modifier = Modifier
                         .width(58.dp)
                         .then(
-                            if (anchor == followed.first()) Modifier.focusRequester(firstFocus)
-                            else Modifier
+                            focusers.getOrNull(index)?.let { Modifier.focusRequester(it) } ?: Modifier
                         )
                         .focusProperties {
                             up = upFocusRequester

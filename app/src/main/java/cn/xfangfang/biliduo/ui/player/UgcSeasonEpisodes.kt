@@ -9,6 +9,9 @@ data class SeasonEpisodeUi(
     val title: String,
     val durationSeconds: Long,
     val sectionTitle: String,
+    /** Cover and play count make the 合集 tab render like the 推荐 tab cards. */
+    val cover: String = "",
+    val viewCount: Long = 0,
 )
 
 /**
@@ -37,6 +40,8 @@ fun UgcSeason?.episodeItems(): List<SeasonEpisodeUi> {
                     ?: episode.page?.duration
                     ?: 0L,
                 sectionTitle = section.title,
+                cover = episode.arc?.pic.orEmpty(),
+                viewCount = episode.arc?.stat?.view ?: 0L,
             )
         }
     }

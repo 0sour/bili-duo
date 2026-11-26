@@ -10,27 +10,28 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc63-FB7299">
+  <img alt="version" src="https://img.shields.io/badge/version-0.2.0--rc64-FB7299">
   <img alt="status" src="https://img.shields.io/badge/status-test%20build-orange">
   <img alt="Android" src="https://img.shields.io/badge/Android-24%2B-3DDC84?logo=android&logoColor=white">
   <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-1.9.23-7F52FF?logo=kotlin&logoColor=white">
   <img alt="Compose" src="https://img.shields.io/badge/Jetpack%20Compose-2024.04-4285F4?logo=jetpackcompose&logoColor=white">
   <img alt="Media3" src="https://img.shields.io/badge/Media3-1.4.1-FF6D00">
-  <img alt="tests" src="https://img.shields.io/badge/tests-288%20passing-brightgreen">
+  <img alt="tests" src="https://img.shields.io/badge/tests-308%20passing-brightgreen">
   <img alt="license" src="https://img.shields.io/badge/license-MIT-blue">
 </p>
 
 上屏只负责视频画面，下屏用一块 `Presentation` 承载完整 UI；手柄和触摸共用同一棵
 Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，也没有上屏 OSD。
 
-> 当前版本：**0.2.0-rc63**（versionCode 64，第九版测试版）
-> 下载：https://github.com/0sour/bili-duo/releases/tag/v0.2.0-rc63
+> 当前版本：**0.2.0-rc64**（versionCode 65，第十版测试版）
+> 下载：https://github.com/0sour/bili-duo/releases/tag/v0.2.0-rc64
 > 国内下载站：https://bili-duo.sourden.xyz/
-> 状态：功能完整的 **测试版**，288 个单元测试通过；rc63 将视频弹幕引擎升级为
-> **DanmakuFlameMaster**，密集场景更接近官方，滚动弹幕占满屏幕、固定顶/底可重叠；
-> 同时修复关闭选择弹窗/播放设置/直播设置后快速按方向键被吞、焦点环回闪的问题。
-> 自研 Canvas 弹幕引擎已移除；直播弹幕仍使用原实时引擎。rc50–rc62 的上下屏交换、
-> 番剧/影视索引、音轨/HDR/4K、追番追剧、视频合集与弹幕过滤继续保留。
+> 状态：功能完整的 **测试版**，308 个单元测试通过；rc64 新增**消息中心**
+> （个人页入口，回复/@/赞三类 + 未读数）和**新番时间表**（番剧/影视页头入口，
+> 定位今天、返回回到打开的剧集），并修复个人页返回时焦点先闪「观看历史」、
+> 直播关注头像退出焦点错位、视频弹幕描边开关与首次不生效、评论多图缩略图叠环；
+> 播放页「合集」改为带封面的卡片并保留序号。rc63 的 DFM 弹幕引擎及 rc50–rc63
+> 的上下屏交换、番剧/影视索引、音轨/HDR/4K、追番追剧、视频合集与弹幕过滤继续保留。
 
 ## 界面预览
 
@@ -158,7 +159,7 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
 | 图片 | Coil 2.6（含 GIF）、telephoto-zoomable |
 | 登录 | ZXing 二维码、极验 Geetest WebView |
 | 构建 | Gradle 8.7、AGP 8.4.0、JDK 17、R8 |
-| 测试 | JUnit4，288 个单元测试 |
+| 测试 | JUnit4，308 个单元测试 |
 | 架构 | Activity + Presentation、MVVM + StateFlow、单一 `PlayerController` |
 | 界面语言 | 简体中文（当前未做多语言资源） |
 
@@ -168,7 +169,7 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
 
 ### 已验证
 
-- **单元测试**：288 个用例通过（`./gradlew testDebugUnitTest`）。
+- **单元测试**：308 个用例通过（`./gradlew testDebugUnitTest`）。
 - **MuMu（1280×960 / 320dpi）**：双屏壳层、首页、搜索、播放控制台、直播列表与
   HLS 播放、动态空态/登录态、单屏回退提示、签名包安装与冷启动。
 - **Retroid Pocket Duo 真机**：
@@ -337,6 +338,13 @@ Compose 焦点树，没有「现在在控上屏还是下屏」的模式切换，
     移除；密集场景同屏数量提升，滚动弹幕占满屏幕高度，固定顶/底可与滚动重叠；
     保留「泳道满时」开关；修复选择弹窗/播放设置/直播设置关闭后快速按方向键被
     延迟焦点恢复吞掉、焦点环回闪的问题；288 单测通过。
+  - rc64 第十版测试版：新增**消息中心**（个人页「消息」入口，回复/@/赞三类、
+    未读胶囊、确认键打开视频）与**新番时间表**（番剧/影视页头入口，定位今天并
+    聚焦之后首个更新，返回回到刚打开的剧集）；个人页二级页返回焦点直接回到
+    入口行，不再先闪「观看历史」；直播关注头像退出焦点回原头像；视频弹幕新增
+    「有/无描边」并修复首次描边不生效；评论多图缩略图间距/宽度；播放页「合集」
+    改为带封面/播放数/时长卡片并保留 1、2、3 序号。308 单测通过；Duo 复测无
+    明显 bug。
   - 登录、个人中心、历史/收藏/关注只读浏览；弹幕发送→撤回闭环。
 
 ### 未实现（代码层面）

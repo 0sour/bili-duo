@@ -8,6 +8,8 @@ data class DanmakuPreference(
     val speed: Float = 1f,
     val textSizeSp: Float = 16f,
     val area: Float = 1f,
+    /** True draws a dark outline around each video danmaku; false is plain fill. */
+    val stroke: Boolean = true,
     /** False drops overflow when all DFM lanes are busy; true allows overlap. */
     val allowOverlap: Boolean = false,
     val blockedWords: Set<String> = emptySet(),
@@ -48,6 +50,7 @@ class DanmakuPreferenceManager(private val prefs: SharedPreferences) {
             speed = speed,
             textSizeSp = textSize,
             area = area,
+            stroke = prefs.getBoolean(KEY_STROKE, true),
             allowOverlap = prefs.getBoolean(KEY_ALLOW_OVERLAP, false),
             blockedWords = prefs.getStringSet(KEY_BLOCKED_WORDS, emptySet())
                 ?.map { it.trim() }
@@ -83,6 +86,7 @@ class DanmakuPreferenceManager(private val prefs: SharedPreferences) {
             .putFloat(KEY_SPEED, pref.speed.coerceIn(0.5f, 2f))
             .putFloat(KEY_TEXT_SIZE, pref.textSizeSp.coerceIn(12f, 24f))
             .putFloat(KEY_AREA, pref.area.coerceIn(0.25f, 1f))
+            .putBoolean(KEY_STROKE, pref.stroke)
             .putBoolean(KEY_ALLOW_OVERLAP, pref.allowOverlap)
             .putStringSet(
                 KEY_BLOCKED_WORDS,
@@ -112,6 +116,7 @@ class DanmakuPreferenceManager(private val prefs: SharedPreferences) {
         const val KEY_SPEED = "danmaku_speed"
         const val KEY_TEXT_SIZE = "danmaku_text_size"
         const val KEY_AREA = "danmaku_area"
+        const val KEY_STROKE = "danmaku_stroke"
         const val KEY_ALLOW_OVERLAP = "danmaku_allow_overlap"
         const val KEY_BLOCKED_WORDS = "danmaku_blocked_words"
         const val KEY_BLOCKED_REGEX = "danmaku_blocked_regex"

@@ -154,6 +154,7 @@ fun TopScreenHost(
                     System.identityHashCode(playerUi.danmaku),
                     playerUi.danmakuTextSize,
                     playerUi.danmakuArea,
+                    playerUi.danmakuStroke,
                     playerUi.danmakuBlockedWords,
                     playerUi.danmakuBlockedRegex,
                     playerUi.danmakuShieldLevel,
@@ -169,6 +170,7 @@ fun TopScreenHost(
                         speed = playerUi.danmakuSpeed,
                         textSizeSp = playerUi.danmakuTextSize,
                         area = playerUi.danmakuArea,
+                        stroke = playerUi.danmakuStroke,
                         blockedWords = playerUi.danmakuBlockedWords,
                         blockedRegex = playerUi.danmakuBlockedRegex,
                         shieldLevel = playerUi.danmakuShieldLevel,
@@ -308,6 +310,7 @@ private fun DfmDanmakuOverlay(
     area: Float,
     blockedWords: Set<String>,
     blockedRegex: String,
+    stroke: Boolean,
     shieldLevel: Int,
     showScroll: Boolean,
     showTop: Boolean,
@@ -326,6 +329,7 @@ private fun DfmDanmakuOverlay(
                 speed = speed,
                 textSizeSp = textSizeSp,
                 area = area,
+                stroke = stroke,
                 blockedWords = blockedWords,
                 blockedRegex = blockedRegex,
                 shieldLevel = shieldLevel,
@@ -878,6 +882,7 @@ private fun topGlyphIcon(glyph: TopGlyph): ImageVector = when (glyph) {
     TopGlyph.BANGUMI -> Icons.Outlined.LiveTv
     TopGlyph.MOVIE -> Icons.Outlined.Movie
     TopGlyph.DYNAMIC -> Icons.Outlined.DynamicFeed
+    TopGlyph.MESSAGE -> Icons.Outlined.Email
 }
 
 @Composable

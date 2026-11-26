@@ -56,6 +56,7 @@ enum class TopGlyph {
     BANGUMI,
     MOVIE,
     DYNAMIC,
+    MESSAGE,
 }
 
 data class TopPersonStat(

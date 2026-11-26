@@ -80,6 +80,8 @@ data class PlayerUiState(
     val danmakuSpeed: Float = 1f,
     val danmakuTextSize: Float = 16f,
     val danmakuArea: Float = 1f,
+    /** True draws a dark outline around each video danmaku; false is plain fill. */
+    val danmakuStroke: Boolean = true,
     /** False drops overflow when all DFM lanes are full. */
     val danmakuAllowOverlap: Boolean = false,
     val danmakuBlockedWords: Set<String> = emptySet(),
@@ -156,6 +158,7 @@ class PlayerViewModel(
             danmakuSpeed = saved.speed,
             danmakuTextSize = saved.textSizeSp,
             danmakuArea = saved.area,
+            danmakuStroke = saved.stroke,
             danmakuAllowOverlap = saved.allowOverlap,
             danmakuBlockedWords = saved.blockedWords,
             danmakuBlockedRegex = saved.blockedRegex,
@@ -799,6 +802,7 @@ class PlayerViewModel(
             danmakuSpeed = current.danmakuSpeed,
             danmakuTextSize = current.danmakuTextSize,
             danmakuArea = current.danmakuArea,
+            danmakuStroke = current.danmakuStroke,
             danmakuAllowOverlap = current.danmakuAllowOverlap,
             danmakuBlockedWords = current.danmakuBlockedWords,
             danmakuBlockedRegex = current.danmakuBlockedRegex,
@@ -844,6 +848,10 @@ class PlayerViewModel(
 
     fun setDanmakuArea(value: Float) {
         updateDanmakuState { it.copy(danmakuArea = value.coerceIn(0.25f, 1f)) }
+    }
+
+    fun setDanmakuStroke(value: Boolean) {
+        updateDanmakuState { it.copy(danmakuStroke = value) }
     }
 
     fun setDanmakuAllowOverlap(value: Boolean) {
@@ -931,6 +939,7 @@ class PlayerViewModel(
                 speed = state.danmakuSpeed,
                 textSizeSp = state.danmakuTextSize,
                 area = state.danmakuArea,
+                stroke = state.danmakuStroke,
                 allowOverlap = state.danmakuAllowOverlap,
                 blockedWords = state.danmakuBlockedWords,
                 blockedRegex = state.danmakuBlockedRegex,

@@ -2936,6 +2936,23 @@ fun PlayerConsoleScreen(
                             },
                         )
                         DanmakuSettingRow(
+                            label = "弹幕描边",
+                            value = if (ui.danmakuStroke) "有描边" else "无描边",
+                            choices = listOf(
+                                DuoChoiceOption(
+                                    label = "有描边",
+                                    selected = ui.danmakuStroke,
+                                ),
+                                DuoChoiceOption(
+                                    label = "无描边",
+                                    selected = !ui.danmakuStroke,
+                                ),
+                            ),
+                            onChoice = { index ->
+                                vm.setDanmakuStroke(index == 0)
+                            },
+                        )
+                        DanmakuSettingRow(
                             label = "屏蔽词",
                             value = if (ui.danmakuBlockedWords.isEmpty()) {
                                 "未设置"
@@ -4342,9 +4359,8 @@ private fun SeasonTab(
         return
     }
     LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp),
-        contentPadding = PaddingValues(top = 8.dp, bottom = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
+        modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp),
+        contentPadding = PaddingValues(top = 12.dp, bottom = 12.dp),
     ) {
         episodes.forEachIndexed { index, episode ->
             val previousSection = episodes.getOrNull(index - 1)?.sectionTitle.orEmpty()
@@ -4363,6 +4379,8 @@ private fun SeasonTab(
                 var focused by remember { mutableStateOf(false) }
                 val current = episode.bvid == currentBvid &&
                     (currentCid <= 0L || episode.cid == currentCid)
+                // Same card shape as the 推荐 tab: cover + title + meta line,
+                // with the 1/2/3 order kept as a corner badge on the cover.
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -4375,42 +4393,79 @@ private fun SeasonTab(
                             if (index == episodes.lastIndex) down = FocusRequester.Cancel
                         }
                         .duoFocusRing(RoundedCornerShape(6.dp), focused = focused)
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(
-                            if (current) DuoPink.copy(alpha = 0.14f) else Color.Transparent
-                        )
                         .duoClickable { onPlay(episode) }
-                        .padding(horizontal = 8.dp, vertical = 7.dp),
+                        .padding(vertical = 5.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(
-                        text = "${index + 1}",
-                        color = if (current) DuoPink else DuoTextSecondary,
-                        fontSize = 9.sp,
-                        modifier = Modifier.width(24.dp),
-                    )
-                    Text(
-                        text = episode.title,
-                        color = if (current) DuoTheme.colors.pinkInk else DuoTextSecondary,
-                        fontSize = 11.sp,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f),
-                    )
-                    if (current) {
+                    Box(
+                        modifier = Modifier
+                            .width(92.dp)
+                            .height(52.dp)
+                            .clip(RoundedCornerShape(5.dp))
+                            .background(DuoSurfaceHigh),
+                    ) {
+                        AsyncImage(
+                            model = fixPic(episode.cover),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize(),
+                        )
                         Text(
-                            text = "播放中",
-                            color = DuoPink,
-                            fontSize = 8.sp,
-                            modifier = Modifier.padding(start = 6.dp),
+                            text = "${index + 1}",
+                            color = Color.White,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            modifier = Modifier
+                                .padding(4.dp)
+                                .clip(RoundedCornerShape(3.dp))
+                                .background(Color.Black.copy(alpha = 0.55f))
+                                .padding(horizontal = 5.dp, vertical = 1.dp),
                         )
                     }
+                    Spacer(Modifier.width(8.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            text = episode.title,
+                            color = if (current) DuoTheme.colors.pinkInk else DuoTextPrimary,
+                            fontSize = 11.sp,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Spacer(Modifier.height(3.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (current) {
+                                Text(
+                                    text = "播放中",
+                                    color = DuoPink,
+                                    fontSize = 8.sp,
+                                    maxLines = 1,
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(3.dp))
+                                        .background(DuoPink.copy(alpha = 0.14f))
+                                        .padding(horizontal = 4.dp, vertical = 1.dp),
+                                )
+                                Spacer(Modifier.width(6.dp))
+                            }
+                            Text(
+                                text = if (episode.viewCount > 0) {
+                                    "${formatCount(episode.viewCount)}播放"
+                                } else {
+                                    ""
+                                },
+                                color = DuoTextSecondary,
+                                fontSize = 9.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
                     if (episode.durationSeconds > 0) {
+                        Spacer(Modifier.width(6.dp))
                         Text(
                             text = formatTime(episode.durationSeconds * 1000L),
                             color = DuoTextSecondary,
                             fontSize = 9.sp,
-                            modifier = Modifier.padding(start = 6.dp),
                         )
                     }
                 }
@@ -4431,7 +4486,9 @@ private fun CommentPicturesRow(
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 5.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        // The focus ring extends ~5.75dp outside each thumbnail; 12dp keeps
+        // neighbouring rings (and images) from visually overlapping.
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         pictures.take(3).forEachIndexed { index, picture ->
             val ratio = if (picture.imgWidth > 0 && picture.imgHeight > 0) {
@@ -4440,13 +4497,15 @@ private fun CommentPicturesRow(
             } else {
                 1f
             }
+            val imageHeight = 64.dp
+            val imageWidth = (imageHeight * ratio).coerceIn(42.dp, 96.dp)
             AsyncImage(
                 model = fixPic(picture.imgSrc),
                 contentDescription = "评论图片 ${index + 1}",
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
-                    .height(64.dp)
-                    .aspectRatio(ratio, matchHeightConstraintsFirst = true)
+                    .width(imageWidth)
+                    .height(imageHeight)
                     .focusRequester(focusRequesters[index])
                     .duoFocusRing(RoundedCornerShape(4.dp))
                     .clip(RoundedCornerShape(4.dp))
